@@ -763,6 +763,19 @@ class CompanionAppTest {
     }
 
     @Test
+    fun thePhotoFaceEditorWarnsAboutASmallPhotoAndSendsItsLayout() {
+        val (demo, _) = showDemo(PhotoFaceRoute)
+        waitForText("Edit photo and layout")
+        compose.onNodeWithText("Edit photo and layout").performClick()
+        // The demo watch's photo is 320 pixels across, less than the 466 pixel screen.
+        waitForText("Smaller than the watch screen")
+        compose.onNodeWithTag("time_MIDDLE").performScrollTo().performClick()
+        compose.onNodeWithTag("photo_send").performScrollTo().performClick()
+        waitForText("Choose a photo")
+        assertEquals(2, demo.watchFaces.state.value.photo?.settings?.timePlace)
+    }
+
+    @Test
     fun watchAppsAndTheLockHandOverToTheWatch() {
         val (_, navigation) = showDemo(WatchAppsRoute)
         waitForText("Weather")

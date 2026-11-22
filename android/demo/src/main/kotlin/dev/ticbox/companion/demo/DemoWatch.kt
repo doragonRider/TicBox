@@ -860,9 +860,16 @@ class DemoWatch(
 
             override suspend fun queryPhoto(): WatchFacePhoto {
                 delay(SHORT_DELAY)
+                val saved = faceState.value.photo
                 return WatchFacePhoto(
-                    WatchFacePhotoSettings(name = text(R.string.demo_face_photo)),
-                    faceState.value.photo?.image ?: faceArt.last(),
+                    saved?.settings
+                        ?: WatchFacePhotoSettings(
+                            name = text(R.string.demo_face_photo),
+                            timePlace = 0,
+                            showBattery = 1,
+                            showDateAndWeek = 1,
+                        ),
+                    saved?.image ?: faceArt.last(),
                 )
             }
 
