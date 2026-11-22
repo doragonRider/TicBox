@@ -96,7 +96,7 @@ release 启用 R8 和资源收缩，只压缩和优化，不混淆类名。新�
 
 ## 4. 版本与发布
 
-版本号统一在 [android/version.properties](../../android/version.properties)（`versionName`、`versionCode`），发布时同步修改 `package.json` 的版本，并在 `docs/releases/<版本>.md` 写更新说明。tag 必须与 APK 的版本一致。
+版本号统一在 [android/version.properties](../../android/version.properties)（`versionName`、`versionCode`），发布时同步修改 `package.json` 的版本，并在 `docs/releases/<版本>.md` 写更新说明。GitHub Release 页面用英文说明 `docs/releases/en/<版本>.md`，没有时用中文的那份。tag 必须与 APK 的版本一致。
 
 GitHub Actions 需要以下 Repository secrets：
 
@@ -112,7 +112,7 @@ Linux 可用 `base64 -w0 <keystore>` 生成，Windows 可用 `[Convert]::ToBase6
 
 | 工作流 | 触发 | 作用 |
 |---|---|---|
-| [signed-package.yml](../../.github/workflows/signed-package.yml) | 推送 `v*` tag；或手动 | tag：release 检查、构建、打包，通过后先建草稿并上传资产，再发布 GitHub Release（说明取 `docs/releases/<版本>.md`）。手动：只上传 Actions 产物 |
+| [signed-package.yml](../../.github/workflows/signed-package.yml) | 推送 `v*` tag；或手动 | tag：release 检查、构建、打包，通过后先建草稿并上传资产，再发布 GitHub Release（说明取 `docs/releases/en/<版本>.md`，没有时取 `docs/releases/<版本>.md`）。手动：只上传 Actions 产物 |
 | [ci.yml](../../.github/workflows/ci.yml) | 手动 | debug 构建，不接收签名 secrets |
 | [android-build.yml](../../.github/workflows/android-build.yml) | 被调用 | 共享的构建步骤，报告保留 14 天；签名文件以 0600 写入临时目录，结束时删除 |
 
