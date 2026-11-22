@@ -10,10 +10,21 @@ enum class ThemeMode {
     DARK,
 }
 
+/**
+ * The launcher icon. Android only lets an app choose between icons it ships, so each one is a
+ * launcher entry of its own, of which one is enabled.
+ */
+enum class AppIconStyle {
+    DARK_DIAL,
+    SLATE,
+    WHITE_DIAL,
+}
+
 data class AppearanceSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     /** Wallpaper-based Material You colors; off uses the app's own palette. */
     val dynamicColor: Boolean = true,
+    val appIcon: AppIconStyle = AppIconStyle.DARK_DIAL,
 )
 
 enum class AppLanguage(val languageTag: String) {
@@ -52,6 +63,8 @@ interface AppPreferences {
     fun setThemeMode(mode: ThemeMode)
 
     fun setDynamicColor(enabled: Boolean)
+
+    fun setAppIcon(icon: AppIconStyle)
 
     fun setLanguage(language: AppLanguage)
 

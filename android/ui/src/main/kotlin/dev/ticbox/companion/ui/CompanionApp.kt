@@ -171,7 +171,8 @@ private fun AppShell(dependencies: CompanionDependencies, navController: NavHost
 
 /**
  * Leaving the app is when a running shell needs a decision, and only Back can ask for one: Home and
- * the recent apps screen give no chance to, so `MainActivity` keeps the shell running for those.
+ * the recent apps screen give no chance to, so `CompanionActivity` keeps the shell running for
+ * those.
  */
 @Composable
 private fun AskAboutARunningShell(shell: ShellHost, onFirstPage: Boolean) {

@@ -1,21 +1,60 @@
 package dev.ticbox.companion.ui.settings
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.ticbox.companion.ui.AppIconStyle
 import dev.ticbox.companion.ui.AppLanguage
 import dev.ticbox.companion.ui.AppPreferences
+import dev.ticbox.companion.ui.FaceShortcut
 import dev.ticbox.companion.ui.LocalSystemActions
 import dev.ticbox.companion.ui.R
 import dev.ticbox.companion.ui.ThemeMode
+import dev.ticbox.companion.ui.common.UserMessages
+import dev.ticbox.companion.ui.common.uiText
 import dev.ticbox.companion.ui.companionViewModel
+import dev.ticbox.companion.ui.designsystem.AppIcon
 import dev.ticbox.companion.ui.designsystem.AppIcons
+import dev.ticbox.companion.ui.designsystem.FadeSwitch
 import dev.ticbox.companion.ui.designsystem.FootnoteText
 import dev.ticbox.companion.ui.designsystem.ListGroup
 import dev.ticbox.companion.ui.designsystem.NavigationRow
@@ -32,8 +71,13 @@ import dev.ticbox.companion.ui.navigation.LanguageRoute
 import dev.ticbox.companion.ui.navigation.PrivacyRoute
 
 /** App-level preferences; independent of the watch session. */
-class AppSettingsViewModel(private val preferences: AppPreferences) : ViewModel() {
+class AppSettingsViewModel(
+    private val preferences: AppPreferences,
+    private val faceShortcut: FaceShortcut = FaceShortcut.UNAVAILABLE,
+    private val messages: UserMessages? = null,
+) : ViewModel() {
     val appearance = preferences.appearance
+    val face = faceShortcut.face
     val language = preferences.language
     val hideEmptyHealthMetrics = preferences.hideEmptyHealthMetrics
 
@@ -42,6 +86,12 @@ class AppSettingsViewModel(private val preferences: AppPreferences) : ViewModel(
     fun setThemeMode(mode: ThemeMode) = preferences.setThemeMode(mode)
 
     fun setDynamicColor(enabled: Boolean) = preferences.setDynamicColor(enabled)
+
+    fun setAppIcon(icon: AppIconStyle) = preferences.setAppIcon(icon)
+
+    fun pinFaceShortcut() {
+        if (!faceShortcut.pin()) messages?.show(uiText(R.string.app_icon_face_unsupported))
+    }
 
     fun setLanguage(language: AppLanguage) = preferences.setLanguage(language)
 }
@@ -148,10 +198,114 @@ fun SettingsScreen(navigate: (Any) -> Unit) {
     }
 }
 
+private val AppIconStyle.label: Int
+    get() =
+        when (this) {
+            AppIconStyle.DARK_DIAL -> R.string.app_icon_dark_dial
+            AppIconStyle.SLATE -> R.string.app_icon_slate
+            AppIconStyle.WHITE_DIAL -> R.string.app_icon_white_dial
+        }
+
+private val AppIconStyle.foreground: Int
+    get() =
+        when (this) {
+            AppIconStyle.DARK_DIAL -> R.drawable.ic_launcher_foreground
+            AppIconStyle.SLATE -> R.drawable.ic_launcher_foreground_slate
+            AppIconStyle.WHITE_DIAL -> R.drawable.ic_launcher_foreground_white_dial
+        }
+
+private val AppIconStyle.background: Int
+    get() =
+        if (this == AppIconStyle.SLATE) R.color.ic_launcher_background_slate
+        else R.color.ic_launcher_background
+
+/** A launcher icon the way a round launcher shows it: the middle two thirds of its layers. */
+@Composable
+private fun LauncherIconPreview(style: AppIconStyle, size: Dp) {
+    Box(
+        Modifier.size(size).clip(CircleShape).background(colorResource(style.background)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(painterResource(style.foreground), null, Modifier.requiredSize(size * 1.5f))
+    }
+}
+
+@Composable
+private fun AppIconChoices(selected: AppIconStyle, onSelect: (AppIconStyle) -> Unit) {
+    Row(Modifier.fillMaxWidth().selectableGroup().padding(horizontal = 8.dp, vertical = 4.dp)) {
+        AppIconStyle.entries.forEach { style ->
+            val chosen = style == selected
+            val ring by
+                animateColorAsState(
+                    if (chosen) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    label = "app icon ring",
+                )
+            Column(
+                Modifier.weight(1f)
+                    .clip(RoundedCornerShape(16.dp))
+                    .selectable(chosen, role = Role.RadioButton, onClick = { onSelect(style) })
+                    .padding(vertical = 8.dp)
+                    .testTag("app_icon_${style.name}"),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box(Modifier.border(3.dp, ring, CircleShape).padding(5.dp)) {
+                    LauncherIconPreview(style, 56.dp)
+                }
+                Text(
+                    stringResource(style.label),
+                    style = MaterialTheme.typography.labelLarge,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
+}
+
+/** Pins a shortcut with the watch's current face; waits until a real watch has shown one. */
+@Composable
+private fun FaceShortcutRow(face: ImageBitmap?, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val enabled = face != null
+    val text = if (enabled) colors.onSurface else colors.onSurface.copy(alpha = 0.38f)
+    val secondary = if (enabled) colors.onSurfaceVariant else colors.onSurface.copy(alpha = 0.38f)
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.app_icon_face), color = text) },
+        supportingContent = {
+            FadeSwitch(
+                stringResource(
+                    if (enabled) R.string.app_icon_face_summary else R.string.app_icon_face_waiting
+                )
+            ) {
+                Text(it, color = secondary)
+            }
+        },
+        leadingContent = {
+            Box(
+                Modifier.size(40.dp).clip(CircleShape).background(colors.surfaceContainerHighest),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (face != null) {
+                    Image(face, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                } else {
+                    AppIcon(AppIcons.WatchFaces, contentDescription = null, tint = secondary)
+                }
+            }
+        },
+        trailingContent = { AppIcon(AppIcons.Add, contentDescription = null, tint = secondary) },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier =
+            Modifier.clickable(enabled = enabled, onClick = onClick).testTag("face_shortcut"),
+    )
+}
+
 @Composable
 fun AppearanceScreen(onBack: () -> Unit) {
-    val viewModel = companionViewModel { AppSettingsViewModel(it.preferences) }
+    val viewModel = companionViewModel {
+        AppSettingsViewModel(it.preferences, it.faceShortcut, it.messages)
+    }
     val appearance by viewModel.appearance.collectAsStateWithLifecycle()
+    val face by viewModel.face.collectAsStateWithLifecycle()
     PageScaffold(stringResource(R.string.appearance_title), onBack = onBack) { padding ->
         PageColumn(padding) {
             ListGroup(
@@ -174,6 +328,10 @@ fun AppearanceScreen(onBack: () -> Unit) {
                     summary = stringResource(R.string.appearance_dynamic_color_summary),
                     icon = AppIcons.Palette,
                 )
+            }
+            ListGroup(title = stringResource(R.string.appearance_app_icon)) {
+                AppIconChoices(appearance.appIcon, viewModel::setAppIcon)
+                FaceShortcutRow(face, viewModel::pinFaceShortcut)
             }
         }
     }

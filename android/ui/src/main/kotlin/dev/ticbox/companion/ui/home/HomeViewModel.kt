@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -91,28 +92,31 @@ data class HomeState(
     val name: String?
         get() = device.info?.model ?: watch.connection.peerName
 
-    /**
-     * The current favorite, only when the catalog belongs to this exact link: a preview from an
-     * older session or another watch must not be shown as the current face.
-     */
     val currentFace: WatchFaceFavorite?
-        get() {
-            val connection = watch.connection
-            if (!linkReady || connection.sessionId == 0L) return null
-            if (faces.sessionId != connection.sessionId || faces.scope?.peer != connection.peer)
-                return null
-            val current = faces.current ?: return null
-            val id = current.favoriteId ?: return null
-            return faces.favorites.singleOrNull {
-                it.id == id &&
-                    (current.componentName == null || current.componentName == it.componentName)
-            }
-        }
+        get() = currentFaceOf(watch, faces)
 
     val currentFaceName: String?
         get() = currentFace?.let { face ->
             faces.installed.firstOrNull { it.componentName == face.componentName }?.displayedName
         }
+}
+
+/**
+ * The current favorite, only when the catalog belongs to this exact link: a preview from an older
+ * session or another watch must not be shown as the current face.
+ */
+internal fun currentFaceOf(
+    watch: WatchSnapshot,
+    faces: WatchFaceManagementState,
+): WatchFaceFavorite? {
+    val connection = watch.connection
+    if (connection.phase != ConnectionPhase.LINK_READY || connection.sessionId == 0L) return null
+    if (faces.sessionId != connection.sessionId || faces.scope?.peer != connection.peer) return null
+    val current = faces.current ?: return null
+    val id = current.favoriteId ?: return null
+    return faces.favorites.singleOrNull {
+        it.id == id && (current.componentName == null || current.componentName == it.componentName)
+    }
 }
 
 internal const val BATTERY_REFRESH_MILLIS = 10 * MINUTE_MILLIS
@@ -188,20 +192,43 @@ class HomeViewModel(dependencies: CompanionDependencies) : LocalHealthViewModel(
     private var loader: Pair<WatchSession, FacePreviewLoader>? = null
     private val refreshedSessions = mutableSetOf<Long>()
 
+    /**
+     * The current face's preview with the session it came from, read from that session's own state,
+     * so switching between the demo and a real watch can't pair one's face with the other.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val facePreview: StateFlow<ImageBitmap?> =
+    private val currentPreview: StateFlow<Pair<WatchSession, ImageBitmap>?> =
         session
             .flatMapLatest { current ->
                 if (current == null) flowOf(null)
                 else
-                    state
-                        .map { it?.currentFace }
+                    combine(
+                            current.client.state,
+                            current.services.watchFaces.state,
+                            ::currentFaceOf,
+                        )
                         .distinctUntilChanged()
-                        .mapLatest { face -> face?.let { loaderFor(current).load(it) } }
+                        .mapLatest { face ->
+                            face?.let { loaderFor(current).load(it) }?.let { current to it }
+                        }
             }
             .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    val facePreview: StateFlow<ImageBitmap?> =
+        currentPreview
+            .map { it?.second }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, currentPreview.value?.second)
+
     init {
+        // A real watch's face becomes the face shortcut's icon; the demo's never does.
+        viewModelScope.launch {
+            currentPreview
+                .filterNotNull()
+                .filter { (session, _) -> !session.isDemo }
+                .map { it.second }
+                .distinctUntilChanged()
+                .collect(dependencies.faceShortcut::offer)
+        }
         // The face catalog is needed for the preview; ask once per link session.
         viewModelScope.launch {
             state

@@ -93,6 +93,10 @@ class FakePreferences : AppPreferences {
         appearanceState.value = appearanceState.value.copy(dynamicColor = enabled)
     }
 
+    override fun setAppIcon(icon: AppIconStyle) {
+        appearanceState.value = appearanceState.value.copy(appIcon = icon)
+    }
+
     override fun setLanguage(language: AppLanguage) {
         languageState.value = language
     }
@@ -112,6 +116,7 @@ class TestDependencies(
     override val sessions: FakeSessions,
     override val phoneApps: PhoneAppsSource = FakePhoneApps(),
     override val terminalDisplays: TerminalDisplayFactory = FakeTerminalDisplays(),
+    override val faceShortcut: FaceShortcut = FaceShortcut.UNAVAILABLE,
 ) : CompanionDependencies {
     override val preferences = FakePreferences()
     override val messages = UserMessages()

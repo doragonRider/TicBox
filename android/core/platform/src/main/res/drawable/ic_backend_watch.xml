@@ -8,23 +8,23 @@
     android:viewportHeight="24">
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M8.39,1.4H14.41L15.17,3.94H7.63Z M7.63,20.06H15.17L14.41,22.6H8.39Z" />
+        android:pathData="M7.95,1.4H15.25L15.76,3.1H7.44Z M7.44,20.9H15.76L15.25,22.6H7.95Z" />
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M11.4,4.75a7.25,7.25 0,1 1,0 14.5a7.25,7.25 0,0 1,0 -14.5Z M6.33,6.81L6.93,4.32Q7.05,3.74 7.63,3.74H15.17Q15.75,3.74 15.87,4.32L16.48,6.81L11.4,5.91Z M11.4,18.09L16.48,17.19L15.87,19.68Q15.75,20.27 15.17,20.27H7.63Q7.05,20.27 6.93,19.68L6.33,17.19Z M11.4,6.7a5.3,5.3 0,1 0,0 10.6a5.3,5.3 0,0 0,0 -10.6Z" />
+        android:pathData="M11.6,4a8,8 0,1 1,0 16a8,8 0,0 1,0 -16Z M6,6.27L6.67,3.52Q6.8,2.88 7.44,2.88H15.76Q16.4,2.88 16.53,3.52L17.2,6.27L11.6,5.28Z M11.6,18.72L17.2,17.73L16.53,20.48Q16.4,21.12 15.76,21.12H7.44Q6.8,21.12 6.67,20.48L6,17.73Z M11.6,6.15a5.85,5.85 0,1 0,0 11.7a5.85,5.85 0,0 0,0 -11.7Z" />
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M18.36,11.07L18.88,11.07Q19.4,11.07 19.4,11.59L19.4,12.41Q19.4,12.93 18.88,12.93L18.36,12.93Z M16.3,6.96L16.62,6.71Q16.87,6.51 17.06,6.77L17.85,7.77Q18.05,8.02 17.79,8.22L17.47,8.47Z" />
+        android:pathData="M19.28,10.98L19.86,10.98Q20.43,10.98 20.43,11.55L20.43,12.45Q20.43,13.02 19.86,13.02L19.28,13.02Z M17,6.44L17.35,6.16Q17.63,5.95 17.85,6.22L18.72,7.33Q18.93,7.61 18.66,7.83L18.3,8.1Z" />
     <path
         android:fillColor="#00000000"
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.6"
+        android:strokeWidth="1.75"
         android:strokeLineCap="round"
-        android:pathData="M11.7,12.18L9.04,10.52" />
+        android:pathData="M11.93,12.2L8.99,10.37" />
     <path
         android:fillColor="#00000000"
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.25"
+        android:strokeWidth="1.4"
         android:strokeLineCap="round"
-        android:pathData="M11.1,12.17L14.87,10" />
+        android:pathData="M11.27,12.19L15.42,9.79" />
 </vector>

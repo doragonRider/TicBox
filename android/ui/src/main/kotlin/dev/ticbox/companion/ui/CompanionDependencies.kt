@@ -36,6 +36,9 @@ interface CompanionDependencies {
     /** Export and import of the app's data; the app restarts after an import. */
     val dataMigration: DataMigration
         get() = DataMigration.UNAVAILABLE
+
+    val faceShortcut: FaceShortcut
+        get() = FaceShortcut.UNAVAILABLE
 }
 
 /** A permission or system page that SMS assistance can need. */

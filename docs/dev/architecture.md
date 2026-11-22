@@ -177,7 +177,7 @@ interface WatchClient : AutoCloseable {
 
 ### 5.4 多语言
 
-字符串使用 `stringResource / pluralStringResource` 和格式化参数，不拼接片段。默认英文，`values-zh` 和 `values-b+zh+Hant` 保持相同的 key 和参数（`StringResourcesTest` 检查）。应用语言通过 `LocaleManager.applicationLocales` 设置。`MainActivity` 自己处理语言、主题、旋转、字体和键盘等配置变化，不重建 Activity。只打包 en / zh 资源（`localeFilters`），`supportsRtl="false"`，不支持的系统语言显示英文。手表 Local Bridge 跟随手表系统语言显示英文、简体或繁体。
+字符串使用 `stringResource / pluralStringResource` 和格式化参数，不拼接片段。默认英文，`values-zh` 和 `values-b+zh+Hant` 保持相同的 key 和参数（`StringResourcesTest` 检查）。应用语言通过 `LocaleManager.applicationLocales` 设置。`CompanionActivity` 自己处理语言、主题、旋转、字体和键盘等配置变化，不重建 Activity。只打包 en / zh 资源（`localeFilters`），`supportsRtl="false"`，不支持的系统语言显示英文。手表 Local Bridge 跟随手表系统语言显示英文、简体或繁体。
 
 ## 6. 测试
 

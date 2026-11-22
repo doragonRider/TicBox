@@ -30,7 +30,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
-class MainActivity : ComponentActivity(), SystemActions {
+class CompanionActivity : ComponentActivity(), SystemActions {
     private val app
         get() = application as CompanionApplication
 
@@ -217,7 +217,7 @@ class MainActivity : ComponentActivity(), SystemActions {
     }
 
     companion object {
-        private const val TAG = "MainActivity"
+        private const val TAG = "CompanionActivity"
         const val EXTRA_SHOW_SHELL = "dev.ticbox.companion.extra.SHOW_SHELL"
     }
 }
