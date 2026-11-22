@@ -31,7 +31,7 @@ For what isn't implemented yet or is limited compared with the official app, see
 - **Wi-Fi**: one network that both the phone and the watch can join. The phone installs Local Bridge and runs the advanced tools over the watch's wireless debugging, so the watch never needs a cable to a computer; the two-pin charging cable that comes with it can't carry data anyway.
 - **Computer (optional)**: only needed if the app can't be installed on the phone directly, with a cable to the phone; see [installing from a computer](#installing-from-a-computer-optional).
 
-A watch can be paired with only one phone at a time. If yours is paired with another phone (or the official app), see [step 2](#step-2-put-the-watch-into-pairing-mode).
+A watch can be paired with only one phone at a time. If yours is paired with another phone (or Mobvoi Health), see [step 2: put the watch into pairing mode](#step-2-put-the-watch-into-pairing-mode).
 
 ## Getting started
 
@@ -85,53 +85,53 @@ First check the watch's Wear OS version: it's the first item under Settings → 
 
 | The watch is | What to do |
 |---|---|
-| New, or already reset | Turn it on, choose a language, stop at the screen that asks you to pair it with a phone, and go on to step 3 |
+| New, or already reset | Turn it on, choose a language, stop at the screen that asks you to pair it with a phone, then continue with [step 3: pair](#step-3-pair) |
 | Paired with another phone, on Wear OS 4 | [Transfer it to this phone](#transfer-the-watch-to-this-phone); everything on the watch stays |
 | Paired with another phone, on Wear OS 3.5 | Wear OS 3.5 can't change phones and keep its data. Update the watch to Wear OS 4 under Settings → System → System updates first, then transfer |
-| Paired with the official app on this same phone | See [switching to TicBox on the same phone](#switching-to-ticbox-on-the-same-phone) |
+| Paired with Mobvoi Health on this same phone | See [switching to TicBox on the same phone](#switching-to-ticbox-on-the-same-phone) |
 
-A reset erases everything on the watch, so keep it as the [last resort](#reset-the-last-resort). Note that unpairing the watch in the official app also resets it.
+A reset erases everything on the watch, so keep it as the [last resort](#reset-the-last-resort). Settings → System → Disconnect & reset on the watch resets it, and so does unpairing it in Mobvoi Health; Mobvoi Health's Transfer doesn't.
 
 #### Transfer the watch to this phone
 
 This needs Wear OS 4. Keep the watch connected to the old phone, with enough battery.
 
-1. In the official app on the old phone, start the transfer from its device settings (System → Transfer), or use the transfer option under Settings → System on the watch. Both need a Google account on the watch; without one, see below.
+1. In Mobvoi Health on the old phone, start the transfer from its device settings (System → Transfer), or use the transfer option under Settings → System on the watch. Both need a Google account on the watch; without one, see below.
 2. Confirm on the watch. It goes into transfer mode and waits for the new phone. Until the transfer has finished, don't unpair the watch on the old phone or forget it in the old phone's Bluetooth settings.
-3. Do step 3 on this phone and follow TicBox's prompts. Once the watch is back on its watch face, the transfer is done.
+3. Continue with [step 3: pair](#step-3-pair) on this phone and follow TicBox's prompts. Once the watch is back on its watch face, the transfer is done.
 
 After a transfer, the watch may stop accepting connections after one of them ends, for example after you update TicBox. If TicBox keeps trying to reconnect, restart the watch normally once; that clears it, with no reset and no unpairing needed. This is a known issue on the watch's side, and it's more likely when the old phone's pairing is removed before the transfer has finished.
 
-**Without a Google account on the watch**, neither option shows. TicBox's demo watch can open the same confirmation page from this phone: the demo's Advanced tools work on the real watch over wireless debugging. This path hasn't been fully verified on a real watch yet.
+**Without a Google account on the watch**, neither option shows. TicBox's demo watch can open the same confirmation page from this phone: the demo's Advanced tools work on the real watch over wireless debugging.
 
-1. Connect the watch to Wi-Fi and turn on its wireless debugging, as in step 5, items 1–3.
-2. On TicBox's first page, tap "Try the demo watch", open Watch → Manage → Advanced → Wireless debugging, and pair and connect to the watch as in step 5, items 5–6.
+1. Connect the watch to Wi-Fi and turn on its wireless debugging, as in [step 5](#step-5-install-local-bridge-for-health-data), items 1–3.
+2. On TicBox's first page, tap "Try the demo watch", open Watch → Manage → Advanced → Wireless debugging, and pair and connect to the watch as in [step 5](#step-5-install-local-bridge-for-health-data), items 5–6.
 3. Go back to Advanced, open Terminal, and enter this line:
 
    ```bash
    am start -W -a android.settings.WATCH_TRANSFER
    ```
 
-4. Confirm on the watch, which goes into transfer mode. Back in TicBox, tap "Exit demo", then do step 3.
+4. Confirm on the watch, which goes into transfer mode. Back in TicBox, tap "Exit demo", then continue with [step 3: pair](#step-3-pair).
 
 A computer can do the same without a cable: connect to the watch's wireless debugging with `./adb pair` and `./adb connect`, then run `./adb shell am start -W -a android.settings.WATCH_TRANSFER`.
 
 #### Switching to TicBox on the same phone
 
-When the official app and TicBox are on the same phone, a transfer doesn't work: it needs two different phones, and doing it on one phone deletes the watch's Bluetooth pairing.
+When Mobvoi Health and TicBox are on the same phone, a transfer doesn't work: it needs two different phones, and doing it on one phone deletes the watch's Bluetooth pairing.
 
 To keep the watch's data, you can go through a second phone running Android 14 or later. This path hasn't been verified on a real watch yet.
 
-1. Install TicBox on the other phone (step 1) and transfer the watch from the official app to it, as above. Once that's done, you can uninstall the official app on this phone.
+1. Install TicBox on the other phone ([step 1](#step-1-download-and-install-the-phone-app)) and transfer the watch from Mobvoi Health to it, as above. Once that's done, you can uninstall Mobvoi Health on this phone.
 2. In TicBox on the other phone, open Watch → Manage → Connection → Change paired phone, tap "Check watch support", then "Open transfer on watch", and confirm on the watch.
-3. Do step 3 in TicBox on this phone to bring the watch back.
+3. Pair the watch back to TicBox on this phone, as in [step 3: pair](#step-3-pair).
 4. When it's back, tap "Clear this phone's pairing" on the same page on the other phone.
 
 #### Reset (the last resort)
 
-On the watch, choose Settings → System → Disconnect & reset, then treat it as new. This erases everything on the watch, including health records that haven't been synced anywhere. Before you reset, keep what you can somewhere else:
+On the watch, choose Settings → System → Disconnect & reset. When the watch restarts, choose a language, then continue with [step 3: pair](#step-3-pair). This erases everything on the watch, including health records that haven't been synced anywhere. Before you reset, keep what you can somewhere else:
 
-- With the official app, let it finish syncing. If you're signed in to a Mobvoi account, the data is in the Mobvoi cloud: later, sign in to the same account under Settings → Mobvoi account in TicBox to download the cloud health records to the phone. This is off by default, uses the internet, and hasn't been fully verified with real accounts yet.
+- With Mobvoi Health, let it finish syncing. If you're signed in to a Mobvoi account, the data is in the Mobvoi cloud: later, sign in to the same account under Settings → Mobvoi account in TicBox to download the cloud health records to the phone. This is off by default, uses the internet, and hasn't been fully verified with real accounts yet.
 - With TicBox, export under Settings → Data migration and import it on the new phone.
 
 ### Step 3: Pair
@@ -192,24 +192,24 @@ To read everything again later, use Settings → Diagnostics → "Sync all healt
 - **Health tab**: charts and details for each kind of data, and workouts.
 - **Settings tab**: privacy, appearance, language, data migration (exporting and importing the phone's data), diagnostics, and the Mobvoi account and cloud services, which are off by default.
 - Features such as SOS and phone calls explain the permissions they need the first time you open them.
-- **Do Not Disturb sync**: in Watch preferences, choose "Follow the phone". It needs the notification access from step 4, and the first time, a one-off permission for Local Bridge over wireless debugging; the page walks you through it.
+- **Do Not Disturb sync**: in Watch preferences, choose "Follow the phone". It needs the notification access from [step 4](#step-4-turn-on-notification-sync), and the first time, a one-off permission for Local Bridge over wireless debugging; the page walks you through it.
 
 ### Changing phones
 
 The watch needs Wear OS 4. TicBox on the old phone starts the transfer, and the phone's data moves with an export and an import.
 
 1. **Old phone**: export under Settings → Data migration, leaving "Watch pairing identity" unticked, and copy the file to the new phone.
-2. **New phone**: install TicBox (step 1), pick the file under Settings → Data migration and tap "Import and restart".
+2. **New phone**: install TicBox ([step 1](#step-1-download-and-install-the-phone-app)), pick the file under Settings → Data migration and tap "Import and restart".
 3. **Old phone**: open Watch → Manage → Connection → Change paired phone, tap "Check watch support", then "Open transfer on watch", and confirm on the watch.
-4. **New phone**: pair as in step 3, then allow notification access again as in step 4. Other permissions are also kept per phone; allow them again when a page asks. Then check the Local Bridge page.
+4. **New phone**: pair as in [step 3](#step-3-pair), then allow notification access again as in [step 4](#step-4-turn-on-notification-sync). Other permissions are also kept per phone; allow them again when a page asks. Then check the Local Bridge page.
 5. **Old phone**: once the watch stays connected to the new phone and health sync has resumed, tap "Clear this phone's pairing" on the Change paired phone page.
 
 If the watch won't connect after the transfer, restart it here too.
 
 ### Updating
 
-1. **Phone**: download the new APK and open it as in step 1; your data stays. Play Protect may say "App scan recommended": tap "Scan app" to install after a scan, which takes about half a minute, or "More details" → "Install without scanning". From a computer, use `adb install -r`.
-2. **Watch**: open the Local Bridge page on the phone and follow its prompt to update. As in step 5, the watch's wireless debugging has to be connected; with root it can update without it (see below).
+1. **Phone**: download the new APK and open it as in [step 1](#step-1-download-and-install-the-phone-app); your data stays. Play Protect may say "App scan recommended": tap "Scan app" to install after a scan, which takes about half a minute, or "More details" → "Install without scanning". From a computer, use `adb install -r`.
+2. **Watch**: open the Local Bridge page on the phone and follow its prompt to update. As in [step 5](#step-5-install-local-bridge-for-health-data), the watch's wireless debugging has to be connected; with root it can update without it (see below).
 
 Each version's [release notes](docs/releases/) (in Chinese) say whether to update the phone, the watch, or both. When the private protocol between them changes, updating only one side makes the advanced tools refuse to connect, so if in doubt, update both.
 
@@ -217,7 +217,7 @@ Each version's [release notes](docs/releases/) (in Chinese) say whether to updat
 
 | What you see | What to do |
 |---|---|
-| Installing the APK on the phone is blocked | See "If the install is blocked" in step 1 |
+| Installing the APK on the phone is blocked | See "If the install is blocked" in [step 1](#step-1-download-and-install-the-phone-app) |
 | From a computer, `adb devices` lists no phone, or shows `unauthorized` | Use a cable that carries data, and tap Allow on the phone's USB debugging prompt |
 | From a computer, `INSTALL_FAILED_USER_RESTRICTED` | Turn on "Install via USB" in Developer options (Xiaomi and some other brands) |
 | The watch isn't in the pairing list | Turn on the phone's Location setting; keep the watch on its pairing screen, near the phone |
