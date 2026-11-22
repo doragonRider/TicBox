@@ -71,8 +71,8 @@ import dev.ticbox.companion.ui.designsystem.ActionIcon
 import dev.ticbox.companion.ui.designsystem.AppBottomSheet
 import dev.ticbox.companion.ui.designsystem.AppIcon
 import dev.ticbox.companion.ui.designsystem.AppIcons
+import dev.ticbox.companion.ui.designsystem.CaptionText
 import dev.ticbox.companion.ui.designsystem.EmptyState
-import dev.ticbox.companion.ui.designsystem.FootnoteText
 import dev.ticbox.companion.ui.designsystem.InlineValueRow
 import dev.ticbox.companion.ui.designsystem.NavigationRow
 import dev.ticbox.companion.ui.designsystem.PageList
@@ -475,7 +475,7 @@ private fun AppSheet(
     AppBottomSheet(onDismiss) {
         Column(Modifier.verticalScroll(rememberScrollState()).padding(bottom = 16.dp)) {
             if (protectedHost)
-                FootnoteText(
+                CaptionText(
                     stringResource(R.string.toolbox_host_protected),
                     Modifier.padding(24.dp),
                 )

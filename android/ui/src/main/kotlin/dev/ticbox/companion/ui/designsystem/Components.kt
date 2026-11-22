@@ -757,12 +757,21 @@ fun EmptyState(
     }
 }
 
-/** Small explanatory text under a group. */
+/**
+ * Small explanatory text under a group, set in as far as the text inside the group. Inside a card
+ * or a sheet that already has its own margins, use [CaptionText].
+ */
 @Composable
 fun FootnoteText(text: String, modifier: Modifier = Modifier) {
+    CaptionText(text, modifier.padding(horizontal = 16.dp))
+}
+
+/** Small explanatory text that lines up with what's above it, such as a progress bar in a card. */
+@Composable
+fun CaptionText(text: String, modifier: Modifier = Modifier) {
     Text(
         text,
-        modifier.padding(horizontal = 16.dp),
+        modifier,
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )

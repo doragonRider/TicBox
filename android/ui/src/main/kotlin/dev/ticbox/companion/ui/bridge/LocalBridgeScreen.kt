@@ -39,6 +39,7 @@ import dev.ticbox.companion.ui.common.toUiText
 import dev.ticbox.companion.ui.companionViewModel
 import dev.ticbox.companion.ui.designsystem.AppIcons
 import dev.ticbox.companion.ui.designsystem.BannerTone
+import dev.ticbox.companion.ui.designsystem.CaptionText
 import dev.ticbox.companion.ui.designsystem.FadeSwitch
 import dev.ticbox.companion.ui.designsystem.FootnoteText
 import dev.ticbox.companion.ui.designsystem.GrowingGaps
@@ -602,11 +603,11 @@ private fun InstallStep(
             when (shown) {
                 is BridgeInstallState.Running -> {
                     ProgressBar(shown.fraction)
-                    FootnoteText(stringResource(R.string.bridge_installing))
+                    CaptionText(stringResource(R.string.bridge_installing))
                 }
                 BridgeInstallState.Restarting -> {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
-                    FootnoteText(stringResource(R.string.bridge_restarting))
+                    CaptionText(stringResource(R.string.bridge_restarting))
                 }
                 BridgeInstallState.Updated ->
                     StatusBanner(stringResource(R.string.bridge_updated), tone = BannerTone.Success)
