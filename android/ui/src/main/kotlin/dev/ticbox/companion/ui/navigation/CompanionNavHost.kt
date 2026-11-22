@@ -34,6 +34,7 @@ import dev.ticbox.companion.ui.faces.PhotoFaceEditorScreen
 import dev.ticbox.companion.ui.faces.PhotoFaceScreen
 import dev.ticbox.companion.ui.faces.PhotoFaceViewModel
 import dev.ticbox.companion.ui.faces.WatchFacesScreen
+import dev.ticbox.companion.ui.faces.rememberPhotoFaceStore
 import dev.ticbox.companion.ui.finding.FindDevicesScreen
 import dev.ticbox.companion.ui.health.HealthDetailScreen
 import dev.ticbox.companion.ui.health.HealthLogScreen
@@ -253,7 +254,8 @@ private fun photoFaceViewModel(
     entry: NavBackStackEntry,
 ): PhotoFaceViewModel {
     val pageEntry = remember(entry) { navController.getBackStackEntry<PhotoFaceRoute>() }
-    return companionViewModel(pageEntry) { PhotoFaceViewModel(it) }
+    val store = rememberPhotoFaceStore()
+    return companionViewModel(pageEntry) { PhotoFaceViewModel(it, store) }
 }
 
 /** The overview and the workout list share one view model, so the list is read only once. */

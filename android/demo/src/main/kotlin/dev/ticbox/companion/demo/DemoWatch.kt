@@ -731,6 +731,8 @@ class DemoWatch(
             R.string.demo_face_sport,
             R.string.demo_face_daylight,
             R.string.demo_face_field,
+            // The photo face: installed but, as on a real watch, not a favorite until added.
+            R.string.demo_face_photo,
         )
     private val faceArt = faceNames.indices.map { DemoFaceArt.render(it) }
 
@@ -864,6 +866,8 @@ class DemoWatch(
                 return WatchFacePhoto(
                     saved?.settings
                         ?: WatchFacePhotoSettings(
+                            packageName = FACE_PACKAGE,
+                            className = ".Face${faceNames.lastIndex}",
                             name = text(R.string.demo_face_photo),
                             timePlace = 0,
                             showBattery = 1,

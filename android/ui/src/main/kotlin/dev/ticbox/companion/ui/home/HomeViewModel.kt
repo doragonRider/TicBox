@@ -1,6 +1,7 @@
 package dev.ticbox.companion.ui.home
 
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.viewModelScope
 import dev.ticbox.companion.api.ConnectionPhase
 import dev.ticbox.companion.api.ConnectionRecoveryPhase
@@ -10,11 +11,13 @@ import dev.ticbox.companion.api.PeerAddress
 import dev.ticbox.companion.api.StepSnapshot
 import dev.ticbox.companion.api.WatchFaceFavorite
 import dev.ticbox.companion.api.WatchFaceManagementState
+import dev.ticbox.companion.api.WatchFacePhoto
 import dev.ticbox.companion.api.WatchObservation
 import dev.ticbox.companion.api.WatchSnapshot
 import dev.ticbox.companion.ui.CompanionDependencies
 import dev.ticbox.companion.ui.common.MINUTE_MILLIS
 import dev.ticbox.companion.ui.faces.FacePreviewLoader
+import dev.ticbox.companion.ui.faces.PhotoFacePictures
 import dev.ticbox.companion.ui.health.HealthRecordsLoader
 import dev.ticbox.companion.ui.health.LocalHealthViewModel
 import dev.ticbox.companion.ui.health.stepGoalFor
@@ -25,6 +28,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
@@ -40,6 +44,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** The step count on the home page. [lastKnown] when the watch may have counted more since. */
@@ -105,6 +110,12 @@ data class HomeState(
  * The current favorite, only when the catalog belongs to this exact link: a preview from an older
  * session or another watch must not be shown as the current face.
  */
+private data class CurrentFace(
+    val face: WatchFaceFavorite?,
+    val photo: WatchFacePhoto?,
+    val battery: Int?,
+)
+
 internal fun currentFaceOf(
     watch: WatchSnapshot,
     faces: WatchFaceManagementState,
@@ -137,7 +148,11 @@ internal fun batteryRefreshDelay(
     return (last + BATTERY_REFRESH_MILLIS - nowMillis).coerceIn(0, BATTERY_REFRESH_MILLIS)
 }
 
-class HomeViewModel(dependencies: CompanionDependencies) : LocalHealthViewModel(dependencies) {
+/** [photoFace] draws the photo face, whose own preview on the watch is a stock picture. */
+class HomeViewModel(
+    dependencies: CompanionDependencies,
+    private val photoFace: PhotoFacePictures? = null,
+) : LocalHealthViewModel(dependencies) {
     private val sessions: SessionController = dependencies.sessions
     val sessionState: StateFlow<SessionState> = sessions.state
 
@@ -191,6 +206,7 @@ class HomeViewModel(dependencies: CompanionDependencies) : LocalHealthViewModel(
 
     private var loader: Pair<WatchSession, FacePreviewLoader>? = null
     private val refreshedSessions = mutableSetOf<Long>()
+    private val photoAsked = mutableSetOf<Long>()
 
     /**
      * The current face's preview with the session it came from, read from that session's own state,
@@ -202,14 +218,21 @@ class HomeViewModel(dependencies: CompanionDependencies) : LocalHealthViewModel(
             .flatMapLatest { current ->
                 if (current == null) flowOf(null)
                 else
-                    combine(
-                            current.client.state,
-                            current.services.watchFaces.state,
-                            ::currentFaceOf,
-                        )
+                    combine(current.client.state, current.services.watchFaces.state) { watch, faces
+                            ->
+                            CurrentFace(
+                                currentFaceOf(watch, faces),
+                                faces.photo,
+                                watch.battery?.value,
+                            )
+                        }
                         .distinctUntilChanged()
-                        .mapLatest { face ->
-                            face?.let { loaderFor(current).load(it) }?.let { current to it }
+                        .mapLatest { (face, photo, battery) ->
+                            face ?: return@mapLatest null
+                            val image =
+                                photoFacePicture(current, face, photo, battery)
+                                    ?: loaderFor(current).load(face)
+                            image?.let { current to it }
                         }
             }
             .stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -289,6 +312,34 @@ class HomeViewModel(dependencies: CompanionDependencies) : LocalHealthViewModel(
 
     companion object {
         const val RECONNECT = "home_reconnect"
+    }
+
+    /**
+     * The photo face as it looks, when it is the current face: the watch's preview of it is the
+     * stock picture, not the user's photo. Asks the watch for the photo once per link if needed.
+     */
+    private suspend fun photoFacePicture(
+        session: WatchSession,
+        face: WatchFaceFavorite,
+        photo: WatchFacePhoto?,
+        battery: Int?,
+    ): ImageBitmap? {
+        val pictures = photoFace ?: return null
+        val component = face.componentName ?: return null
+        return try {
+            if (!withContext(Dispatchers.IO) { pictures.isPhotoFace(component) }) return null
+            val link = session.client.state.value.connection.sessionId
+            val known =
+                photo?.takeIf { it.image != null }
+                    ?: if (photoAsked.add(link)) session.services.watchFaces.queryPhoto() else null
+            known
+                ?.let { withContext(Dispatchers.Default) { pictures.draw(it, battery) } }
+                ?.asImageBitmap()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun loaderFor(session: WatchSession): FacePreviewLoader {

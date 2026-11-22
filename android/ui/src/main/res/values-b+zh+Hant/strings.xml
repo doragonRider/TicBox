@@ -817,6 +817,9 @@
     <string name="faces_photo_show_battery_summary">顯示在底部</string>
     <string name="faces_photo_send">傳送到手錶</string>
     <string name="faces_photo_sending">正在傳送…</string>
+    <string name="faces_photo_face_missing">無法將手錶切換到相片錶面。請在「錶面」頁的「更多錶面」裡新增「%1$s」，然後選擇它。</string>
+    <string name="faces_photo_face_missing_unnamed">無法將手錶切換到相片錶面。請在「錶面」頁的「更多錶面」裡找到並新增相片錶面，然後選擇它。</string>
+    <string name="faces_photo_face_added">相片錶面已新增到手錶的錶面中，請在「錶面」頁選擇它。</string>
     <string name="calling_title">通話</string>
     <string name="calling_resync">與手錶同步</string>
     <string name="calling_enabled">手錶通話</string>
