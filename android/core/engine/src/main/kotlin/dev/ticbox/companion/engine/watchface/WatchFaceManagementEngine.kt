@@ -210,6 +210,8 @@ class WatchFaceManagementEngine(
             val body = if (settings == null) image.copyOf() else WatchFacePhotoProtocol.combine(WatchFaceMobvoiJson.encode(settings), image)
             require(body.size <= ProtocolLimits.MAX_MESSAGE_BYTES) { "Watch face photo byte budget exceeded" }
             legacyRequest(run, if (settings == null) WatchFaceProtocol.MOBVOI_BACKGROUND else WatchFaceProtocol.MOBVOI_PHOTO_COMBINED, body, WatchFaceProtocol.MOBVOI_PHOTO_CONFIRM)
+            // The watch now shows what was sent, so a page showing its photo needn't ask again.
+            if (active === run) mutableState.update { it.copy(photo = WatchFacePhoto(settings ?: it.photo?.settings, WatchFaceImage(image), it.photo?.imageClassName)) }
             WatchFaceOperationResult(WatchFaceOutcome.ACKNOWLEDGED, detail = "uncorrelated_background_save_confirmation")
         }
     }

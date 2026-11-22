@@ -776,6 +776,14 @@ class CompanionAppTest {
         assertEquals(2, photo?.settings?.timePlace)
         // A PNG, so the watch's own JPEG is the only lossy step.
         assertEquals("PNG", photo?.image?.bytes?.copyOfRange(1, 4)?.decodeToString())
+        // The photo face wasn't a favorite, so it was added and made the watch's face. The demo
+        // watch takes a moment for each, and the main looper's clock only moves when told to.
+        val photoFace = "dev.ticbox.companion.demo.faces/.Face4"
+        compose.waitUntil(5_000) {
+            ShadowLooper.idleMainLooper(100, TimeUnit.MILLISECONDS)
+            demo.watchFaces.state.value.current?.componentName == photoFace
+        }
+        assertTrue(demo.watchFaces.state.value.favorites.any { it.componentName == photoFace })
     }
 
     @Test

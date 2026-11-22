@@ -66,6 +66,7 @@ import dev.ticbox.companion.ui.designsystem.Reveal
 import dev.ticbox.companion.ui.designsystem.RevealValue
 import dev.ticbox.companion.ui.designsystem.StatusBanner
 import dev.ticbox.companion.ui.designsystem.WatchIllustration
+import dev.ticbox.companion.ui.faces.rememberPhotoFacePictures
 import dev.ticbox.companion.ui.navigation.CallingRoute
 import dev.ticbox.companion.ui.navigation.ConnectionRoute
 import dev.ticbox.companion.ui.navigation.FindDevicesRoute
@@ -81,7 +82,8 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun HomeScreen(navigate: (Any) -> Unit) {
-    val viewModel = companionViewModel { HomeViewModel(it) }
+    val photoFace = rememberPhotoFacePictures()
+    val viewModel = companionViewModel { HomeViewModel(it, photoFace) }
     val sessionState by viewModel.sessionState.collectAsStateWithLifecycle()
     val state by viewModel.state.collectAsStateWithLifecycle()
     val preview by viewModel.facePreview.collectAsStateWithLifecycle()

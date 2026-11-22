@@ -109,6 +109,7 @@ class WatchFaceManagementEngineTest {
             assertEquals(WatchFaceOutcome.ACKNOWLEDGED, result.outcome)
             assertEquals("uncorrelated_background_save_confirmation", result.detail)
             assertContentEquals(byteArrayOf(8, 9), WatchFacePhotoProtocol.split(f.messages.last().bytes).second)
+            assertContentEquals(byteArrayOf(8, 9), f.engine.state.value.photo!!.image!!.bytes)
         }
     }
 

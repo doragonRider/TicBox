@@ -1,11 +1,12 @@
 package dev.ticbox.companion.ui.faces
 
-import android.content.Context
+import android.content.ContentResolver
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ColorSpace
 import android.graphics.ImageDecoder
 import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -56,6 +57,8 @@ import dev.ticbox.companion.ui.designsystem.PageColumn
 import dev.ticbox.companion.ui.designsystem.PageScaffold
 import dev.ticbox.companion.ui.designsystem.Reveal
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileNotFoundException
 import java.nio.ByteBuffer
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -88,10 +91,16 @@ data class PhotoFaceUiState(
     val image: ImageBitmap? = null,
 )
 
-/** A photo being edited, read once and kept while the photo face pages are open. */
-class PhotoSource(val bitmap: Bitmap) {
+/**
+ * A photo being edited, read once and kept while the photo face pages are open. [file] is the copy
+ * it was read from, to keep once the watch has the photo; none for the watch's own preview.
+ */
+class PhotoSource(val bitmap: Bitmap, @Volatile var file: File? = null) {
     val image: ImageBitmap = bitmap.asImageBitmap()
 }
+
+/** A photo just read, with how it was framed before when it is one kept from an earlier edit. */
+private class OpenedPhoto(val bitmap: Bitmap, val file: File?, val framing: PhotoFraming? = null)
 
 /** What the scaled pixels depend on. */
 data class RenderKey(val crop: PhotoCrop, val filter: ResampleFilter, val sharpening: Sharpening)
@@ -125,7 +134,8 @@ data class PhotoEditorState(
 )
 
 /** Shared by the photo face page and its editor. */
-class PhotoFaceViewModel(dependencies: CompanionDependencies) : SessionViewModel(dependencies) {
+class PhotoFaceViewModel(dependencies: CompanionDependencies, private val store: PhotoFaceStore) :
+    SessionViewModel(dependencies) {
     private val current = MutableStateFlow(PhotoFaceUiState())
     val state = current.asStateFlow()
 
@@ -176,6 +186,13 @@ class PhotoFaceViewModel(dependencies: CompanionDependencies) : SessionViewModel
             current.value =
                 try {
                     val photo = faces.queryPhoto()
+                    photo.settings
+                        ?.let { photoFaceComponent(faces.state.value, it) }
+                        ?.let { found ->
+                            withContext(Dispatchers.IO) {
+                                runCatching { store.rememberComponent(found) }
+                            }
+                        }
                     PhotoFaceUiState(false, photo, decode(photo.image?.bytes))
                 } catch (cancelled: CancellationException) {
                     throw cancelled
@@ -185,11 +202,11 @@ class PhotoFaceViewModel(dependencies: CompanionDependencies) : SessionViewModel
         }
     }
 
-    /** Starts editing a photo that [read] decodes. */
-    fun open(read: suspend () -> Bitmap) {
+    /** Starts editing a photo that [read] decodes, framed as before when that is known. */
+    private fun open(read: () -> OpenedPhoto) {
         editing.value = PhotoEditorState(loading = true)
         viewModelScope.launch {
-            val bitmap =
+            val opened =
                 try {
                     withContext(Dispatchers.IO) { read() }
                 } catch (cancelled: CancellationException) {
@@ -199,16 +216,58 @@ class PhotoFaceViewModel(dependencies: CompanionDependencies) : SessionViewModel
                     editing.value = PhotoEditorState()
                     return@launch
                 }
-            val crop = PhotoCrop.fill(bitmap.width, bitmap.height)
-            editing.value = PhotoEditorState(source = PhotoSource(bitmap), edit = PhotoEdit(crop))
+            val bitmap = opened.bitmap
+            val framing = opened.framing
+            val edit =
+                if (framing == null) {
+                    PhotoEdit(PhotoCrop.fill(bitmap.width, bitmap.height))
+                } else {
+                    PhotoEdit(
+                        framing.crop.within(bitmap.width, bitmap.height, WatchScreenPixels),
+                        down = framing.down,
+                        up = framing.up,
+                        sharpening = framing.sharpening,
+                    )
+                }
+            editing.value = PhotoEditorState(source = PhotoSource(bitmap, opened.file), edit = edit)
         }
     }
 
-    /** Opens the photo edited last on this page, or else the one on the watch. */
+    /** Starts editing a chosen photo, read from a copy that is kept once the watch has it. */
+    fun openChosen(resolver: ContentResolver, uri: Uri) = open {
+        val open = { resolver.openInputStream(uri) ?: throw FileNotFoundException() }
+        // A photo too large to copy is still edited, just not kept.
+        val file = store.stage(open)
+        val source =
+            if (file != null) ImageDecoder.createSource(file)
+            else ImageDecoder.createSource(resolver, uri)
+        OpenedPhoto(decodePhoto(source), file)
+    }
+
+    /**
+     * Opens the photo edited last on this page; else the last one the watch accepted from here, as
+     * it was framed; else the watch's own, which is only a small preview of it.
+     */
     fun editCurrent() {
         if (editing.value.source != null || editing.value.loading) return
-        val bytes = current.value.photo?.image?.bytes ?: return
-        open { decodePhoto(ImageDecoder.createSource(ByteBuffer.wrap(bytes))) }
+        val preview = current.value.photo?.image?.bytes
+        open {
+            val kept = store.kept()
+            when {
+                kept != null ->
+                    OpenedPhoto(
+                        decodePhoto(ImageDecoder.createSource(kept.first)),
+                        kept.first,
+                        kept.second,
+                    )
+                preview != null ->
+                    OpenedPhoto(
+                        decodePhoto(ImageDecoder.createSource(ByteBuffer.wrap(preview))),
+                        null,
+                    )
+                else -> throw FileNotFoundException()
+            }
+        }
     }
 
     fun edit(change: (PhotoEdit) -> PhotoEdit) {
@@ -229,7 +288,10 @@ class PhotoFaceViewModel(dependencies: CompanionDependencies) : SessionViewModel
         edit { it.copy(crop = PhotoCrop.fill(bitmap.width, bitmap.height)) }
     }
 
-    /** Sends the edited photo with its layout. Without the watch's settings, only the photo. */
+    /**
+     * Sends the edited photo with its layout, then makes the photo face the watch's face. Without
+     * the watch's settings, only the photo goes, and the face stays as it is.
+     */
     fun send() {
         val state = editing.value
         val source = state.source ?: return
@@ -239,24 +301,38 @@ class PhotoFaceViewModel(dependencies: CompanionDependencies) : SessionViewModel
             val output =
                 state.output?.takeIf { it.key == edit.render } ?: render(source, edit.render)
             val bytes = withContext(Dispatchers.Default) { encode(output.pixels) }
-            val result = session.services.watchFaces.setPhoto(settings, bytes)
-            if (result.outcome == WatchFaceOutcome.ACKNOWLEDGED) {
-                current.update { page ->
-                    val photo = page.photo?.let { it.copy(settings = settings ?: it.settings) }
-                    page.copy(photo = photo, image = output.image)
-                }
-                sent.update { it + 1 }
+            val faces = session.services.watchFaces
+            val result = faces.setPhoto(settings, bytes)
+            if (result.outcome != WatchFaceOutcome.ACKNOWLEDGED)
+                return@command result.outcome.message()
+            current.update { page ->
+                val photo = page.photo?.let { it.copy(settings = settings ?: it.settings) }
+                page.copy(photo = photo, image = output.image)
             }
-            result.outcome.message()
+            keep(source, edit)
+            sent.update { it + 1 }
+            settings?.let { showPhotoFace(faces, it, store) }
         }
     }
 
-    /** Makes the photo face the active one. The watch sends no reply, so this only says "sent". */
+    /** Keeps the photo the watch just accepted, so editing it again starts from it. */
+    private suspend fun keep(source: PhotoSource, edit: PhotoEdit) {
+        val file = source.file ?: return
+        val framing = PhotoFraming(edit.crop, edit.down, edit.up, edit.sharpening)
+        withContext(Dispatchers.IO) {
+            try {
+                source.file = store.keep(file, framing)
+            } catch (problem: Exception) {
+                // The photo is on the watch all the same; editing again starts from its preview.
+                Log.w(TAG, "Photo not kept: ${problem.javaClass.simpleName}")
+            }
+        }
+    }
+
+    /** Makes the photo face the watch's face, adding it to the favorites when it isn't one. */
     fun usePhotoFace() {
         val settings = current.value.photo?.settings ?: return
-        command(USE) { session ->
-            session.services.watchFaces.selectMobvoiFace(settings).outcome.message()
-        }
+        command(USE) { session -> showPhotoFace(session.services.watchFaces, settings, store) }
     }
 
     private suspend fun render(source: PhotoSource, key: RenderKey): PhotoOutput =
@@ -279,6 +355,7 @@ class PhotoFaceViewModel(dependencies: CompanionDependencies) : SessionViewModel
     companion object {
         const val SET = "photo_set"
         const val USE = "photo_use"
+        private const val TAG = "PhotoFace"
         private const val RenderDelayMillis = 150L
     }
 }
@@ -326,9 +403,6 @@ private fun decodePhoto(source: ImageDecoder.Source): Bitmap =
         // Drawn much smaller than its size while zoomed out, so it needs mipmaps not to shimmer.
         .also { it.setHasMipMap(true) }
 
-private fun decodePhoto(context: Context, uri: Uri): Bitmap =
-    decodePhoto(ImageDecoder.createSource(context.contentResolver, uri))
-
 @Composable
 fun PhotoFaceScreen(viewModel: PhotoFaceViewModel, onBack: () -> Unit, onEdit: () -> Unit) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -349,7 +423,7 @@ fun PhotoFaceScreen(viewModel: PhotoFaceViewModel, onBack: () -> Unit, onEdit: (
     val picker =
         rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
             if (uri != null) {
-                viewModel.open { decodePhoto(context, uri) }
+                viewModel.openChosen(context.contentResolver, uri)
                 onEdit()
             }
         }
