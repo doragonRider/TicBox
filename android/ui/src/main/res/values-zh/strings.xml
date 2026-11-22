@@ -300,6 +300,7 @@
     <string name="metric_blood_oxygen">血氧</string>
     <string name="period_day">日</string>
     <string name="period_week">周</string>
+    <string name="period_month">月</string>
     <string name="date_today">今天</string>
     <string name="date_yesterday">昨天</string>
     <string name="date_previous">前一天</string>

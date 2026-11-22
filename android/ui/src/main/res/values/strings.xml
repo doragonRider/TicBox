@@ -300,6 +300,7 @@
     <string name="metric_blood_oxygen">Blood oxygen</string>
     <string name="period_day">Day</string>
     <string name="period_week">Week</string>
+    <string name="period_month">Month</string>
     <string name="date_today">Today</string>
     <string name="date_yesterday">Yesterday</string>
     <string name="date_previous">Previous day</string>
