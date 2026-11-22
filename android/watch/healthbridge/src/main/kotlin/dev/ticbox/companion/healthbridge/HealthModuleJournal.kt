@@ -11,6 +11,7 @@ import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Parcel
 import android.os.RemoteException
+import android.os.SharedMemory
 import android.util.Log
 import dev.ticbox.companion.protocol.*
 import java.io.File
@@ -112,6 +113,10 @@ internal object ModuleConnection {
     private const val GRANTED = 1
     private const val TRANSACTION = IBinder.FIRST_CALL_TRANSACTION
     private const val HANDOVER_MILLIS = 3_000L
+    private const val INLINE = 0
+    private const val SHARED = 1
+    /** As the module bounds its answers. */
+    private const val MAX_REPLY = 4 * 1024 * 1024
     private val handler by lazy { Handler(HandlerThread("TicBoxModuleJournal").apply { isDaemon = true; start() }.looper) }
     @Volatile private var connection: Pair<IBinder, String>? = null
 
@@ -147,8 +152,21 @@ internal object ModuleConnection {
             data.writeByteArray(request.toString().toByteArray(Charsets.UTF_8))
             try { if (!binder.transact(TRANSACTION, data, reply, 0)) throw HealthJournalException("journal_module_unavailable") }
             catch (_: RemoteException) { connection = null; throw HealthJournalException("journal_module_unavailable") }
-            val bytes = reply.createByteArray() ?: throw HealthJournalException("journal_invalid_reply")
-            return LocalHealthProtocol.parse(bytes)
+            return LocalHealthProtocol.parse(answer(reply))
         } finally { data.recycle(); reply.recycle() }
     }
+
+    /** The module's answer: in the reply itself, or in read-only shared memory when it is large. */
+    internal fun answer(reply: Parcel): ByteArray = when (reply.readInt()) {
+        INLINE -> reply.createByteArray()
+        SHARED -> try {
+            SharedMemory.CREATOR.createFromParcel(reply).use { memory ->
+                if (memory.size !in 1..MAX_REPLY) null else {
+                    val buffer = memory.mapReadOnly()
+                    try { ByteArray(buffer.remaining()).also { buffer.get(it) } } finally { SharedMemory.unmap(buffer) }
+                }
+            }
+        } catch (_: Exception) { throw HealthJournalException("journal_reply_unreadable") }
+        else -> null
+    } ?: throw HealthJournalException("journal_invalid_reply")
 }

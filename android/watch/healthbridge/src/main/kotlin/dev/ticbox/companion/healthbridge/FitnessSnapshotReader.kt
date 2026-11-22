@@ -1,5 +1,6 @@
 package dev.ticbox.companion.healthbridge
 
+import android.database.sqlite.SQLiteBlobTooBigException
 import android.os.CancellationSignal
 import android.util.Log
 import dev.ticbox.companion.protocol.*
@@ -47,7 +48,18 @@ internal fun fitnessDatabasePage(database: android.database.sqlite.SQLiteDatabas
             database.rawQuery("SELECT * FROM $sqlTable WHERE $bounds ORDER BY _id ASC LIMIT ${limit + 1}", args,
                 cancellation).use { cursor ->
                 val rows = mutableListOf<JsonObject>(); var last = after; var complete = true; var bytes = 0
-                while (cursor.moveToNext()) {
+                while (true) {
+                    val moved = try { cursor.moveToNext() } catch (tooLarge: SQLiteBlobTooBigException) {
+                        // No cursor can hold the next row. The rows before it go now, and it starts the next page.
+                        if (rows.isNotEmpty()) { complete = false; break }
+                        val source = OversizedRows(sqlTable, cursor.columnNames.toList()) { selection, values, order ->
+                            database.rawQuery("SELECT * FROM $sqlTable WHERE $selection" + order?.let { " ORDER BY $it" }.orEmpty(), values, cancellation)
+                        }
+                        val id = source.first(setOf("_id"), bounds, args, "_id ASC")?.get("_id")?.toLongOrNull() ?: throw tooLarge
+                        val row = source.read("_id", id.toString()) { it.healthRawRow(id, table) } ?: throw tooLarge
+                        return localHealthPage(listOf(row), id, upper, id >= upper, providerVersion)
+                    }
+                    if (!moved) break
                     cancellation.throwIfCanceled()
                     if (rows.size == limit) { complete = false; break }
                     val id = cursor.healthRowId()

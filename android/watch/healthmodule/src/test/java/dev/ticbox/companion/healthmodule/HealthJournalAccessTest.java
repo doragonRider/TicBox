@@ -9,6 +9,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Parcel;
+import android.os.SharedMemory;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.Test;
@@ -19,8 +20,10 @@ import org.robolectric.annotation.Config;
 import org.robolectric.annotation.LooperMode;
 import org.robolectric.annotation.SQLiteMode;
 import java.io.File;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.Assert.*;
@@ -81,6 +84,42 @@ public class HealthJournalAccessTest {
         }
     }
 
+    @Test public void largeAnswersGoAsReadOnlySharedMemoryAndRowsNoCursorCanHoldAreNamedAsSuch() throws Exception {
+        byte[] small = "{\"version\":1}".getBytes(StandardCharsets.UTF_8);
+        byte[] large = new byte[HealthJournalAccess.MAX_INLINE + 1];
+        Arrays.fill(large, (byte) 'x');
+        assertArrayEquals(small, answered(small, HealthJournalAccess.REPLY_INLINE));
+        assertArrayEquals(large, answered(large, HealthJournalAccess.REPLY_SHARED));
+
+        File file = context.getDatabasePath(HealthJournalAccess.DATABASE);
+        file.getParentFile().mkdirs();
+        try (SQLiteDatabase db = SQLiteDatabase.openOrCreateDatabase(file, null)) {
+            db.execSQL("CREATE TABLE data_point (_id INTEGER PRIMARY KEY, v TEXT)");
+            db.execSQL("INSERT INTO data_point VALUES(1, ?)", new Object[]{"x".repeat(3 * 1024 * 1024)});
+        }
+        HealthJournalAccess access = new HealthJournalAccess(context, HealthProfile.V56);
+        String token = new String(Files.readAllBytes(new File(context.getNoBackupFilesDir(), HealthJournalAccess.TOKEN_FILE).toPath()),
+                StandardCharsets.US_ASCII);
+        JSONObject query = new JSONObject().put("version", 1).put("op", "journal_query").put("token", token).put("sql", "SELECT * FROM data_point");
+        assertEquals("journal_row_too_big", new JSONObject(new String(access.handle(query.toString().getBytes(StandardCharsets.UTF_8)),
+                StandardCharsets.UTF_8)).getString("error"));
+    }
+
+    /** Reads the reply as Local Bridge does. */
+    private static byte[] answered(byte[] answer, int expectedKind) throws Exception {
+        Parcel reply = Parcel.obtain();
+        try {
+            HealthJournalAccess.answer(reply, answer);
+            reply.setDataPosition(0);
+            assertEquals(expectedKind, reply.readInt());
+            if (expectedKind == HealthJournalAccess.REPLY_INLINE) return reply.createByteArray();
+            try (SharedMemory memory = SharedMemory.CREATOR.createFromParcel(reply)) {
+                ByteBuffer buffer = memory.mapReadOnly();
+                try { byte[] read = new byte[buffer.remaining()]; buffer.get(read); return read; } finally { SharedMemory.unmap(buffer); }
+            }
+        } finally { reply.recycle(); }
+    }
+
     private IBinder handOver(String token, int expectedCode) {
         AtomicInteger code = new AtomicInteger(-1);
         AtomicReference<IBinder> binder = new AtomicReference<>();
@@ -101,6 +140,7 @@ public class HealthJournalAccessTest {
         try {
             data.writeByteArray(request.toString().getBytes(StandardCharsets.UTF_8));
             assertTrue(binder.transact(HealthJournalAccess.TRANSACTION, data, reply, 0));
+            assertEquals(HealthJournalAccess.REPLY_INLINE, reply.readInt());
             return new JSONObject(new String(reply.createByteArray(), StandardCharsets.UTF_8));
         } finally { data.recycle(); reply.recycle(); }
     }

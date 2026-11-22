@@ -11,6 +11,8 @@ internal class SessionProjection(private val resolver: ContentResolver, cancella
     private val carrier = (resolver.query(HealthProviderReader.URI, null, "0", null, null, cancellation)
         ?: throw HealthSchemaException("Missing session carrier")).use { it.columnNames.toList() }
     private val names: List<String>?
+    /** A carrier slot the extra-column reads don't need, which tells whether a cell was too large to read. */
+    private val flag = carrier.firstOrNull { it.equals("type", true) }?.lowercase(Locale.ROOT)
     val select: String
 
     init {
@@ -55,12 +57,20 @@ internal class SessionProjection(private val resolver: ContentResolver, cancella
         for (name in schema.filter { it !in KNOWN }) {
             val seen = mutableSetOf<Long>()
             try {
-                val sql = "0 UNION ALL SELECT ${projection("rowid", quote(name), emptyMap())} FROM data_session WHERE $bounds"
+                // A cell too large to deliver is never read; the flag slot says which rows left it out.
+                val cell = quote(name); val tooLarge = "length(CAST($cell AS BLOB))>$MAX_ROW_BYTES"
+                val select = flag?.let { projection("rowid", "CASE WHEN $tooLarge THEN NULL ELSE $cell END", mapOf(it to tooLarge)) }
+                    ?: projection("rowid", cell, emptyMap())
+                val sql = "0 UNION ALL SELECT $select FROM data_session WHERE $bounds"
                 (resolver.query(HealthProviderReader.URI, null, sql, args, "_id ASC LIMIT ${rows.size}", cancellation)
                     ?: throw HealthSchemaException("Session extra column unavailable")).use { cursor ->
                     while (cursor.moveToNext()) {
                         cancellation.throwIfCanceled()
                         val id = cursor.healthRowId(); val raw = result[id] ?: continue
+                        if (flag != null && cursor.getLong(cursor.getColumnIndexOrThrow(flag)) == 1L) {
+                            raw["oversizedColumns"] = JsonArray((raw["oversizedColumns"] as? JsonArray).orEmpty() + JsonPrimitive(name))
+                            seen += id; continue
+                        }
                         val (value, type) = cursor.healthCell(cursor.getColumnIndexOrThrow("values"))
                         raw["columns"] = JsonObject((raw["columns"] as JsonObject) + (name to value))
                         raw["storageTypes"] = JsonObject((raw["storageTypes"] as JsonObject) + (name to type)); seen += id

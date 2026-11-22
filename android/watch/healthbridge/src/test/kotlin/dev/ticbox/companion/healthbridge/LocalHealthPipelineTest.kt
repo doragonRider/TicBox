@@ -329,6 +329,18 @@ class LocalHealthPipelineTest {
         assertEquals("opaque,,75", row.text("values")); assertEquals(77L, row.number("type"))
         assertEquals(0, provider.mutations)
     }
+    @Test fun aSessionCellTooLargeToDeliverIsLeftOutWithoutBeingRead() {
+        provider.db.execSQL("ALTER TABLE data_session ADD COLUMN track TEXT")
+        provider.insertSession(1, "large", 100, 200); provider.insertSession(2, "small", 300, 400)
+        // Larger than a CursorWindow, so reading it at all would fail the column for the whole page.
+        provider.db.execSQL("UPDATE data_session SET track=? WHERE id='large'", arrayOf("x".repeat(3 * 1024 * 1024)))
+        provider.db.execSQL("UPDATE data_session SET track='kept' WHERE id='small'")
+        val page = LocalHealthProtocol.page(HealthProviderReader(context.contentResolver).page(LocalHealthProtocol.request(LocalHealthTable.SESSION, null, null)))
+        assertNull(page.error); assertFalse(page.partial)
+        val (large, small) = page.rows
+        assertTrue(large.oversized); assertFalse(large.partial); assertEquals("large", large.text("id")); assertNull(large.columns["track"])
+        assertFalse(small.oversized); assertEquals("kept", small.text("track"))
+    }
     @Test fun deniedProviderIsAnExplicitErrorAndRawValuesNeverAppearInDiagnosticMessages() {
         provider.deny = true
         val page = LocalHealthProtocol.page(HealthProviderReader(context.contentResolver).page(LocalHealthProtocol.request(LocalHealthTable.POINT, null, null)))

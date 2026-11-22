@@ -4,8 +4,11 @@ package dev.ticbox.companion.healthbridge
 
 import android.app.Application
 import android.database.Cursor
+import android.database.sqlite.SQLiteBlobTooBigException
 import android.database.sqlite.SQLiteDatabase
 import android.os.CancellationSignal
+import android.os.Parcel
+import android.os.SharedMemory
 import dev.ticbox.companion.protocol.*
 import java.io.File
 import java.util.UUID
@@ -54,13 +57,15 @@ class ModuleJournalReadTest {
                 put("versionName", version); put("apkSha256", "276264832680b5da9fc7bae260ff521e7df6d49c7e04fa40c00f64e3ef96c4db")
                 put("device", 7); put("inode", inodes.next())
             }
-            else -> db.rawQuery(request.text("sql")!!, Json.parseToJsonElement(request.text("args")!!).jsonArray.map { it.jsonPrimitive.content }.toTypedArray()).use { c ->
-                if (request.text("sql")!!.startsWith("SELECT * FROM") && c.count > maxRows) return@use buildJsonObject { put("error", "journal_reply_too_large") }
-                buildJsonObject {
-                    put("columns", JsonArray(c.columnNames.map(::JsonPrimitive)))
-                    put("rows", buildJsonArray { while (c.moveToNext()) add(JsonArray((0 until c.columnCount).map { cell(c, it) })) })
+            else -> try {
+                db.rawQuery(request.text("sql")!!, Json.parseToJsonElement(request.text("args")!!).jsonArray.map { it.jsonPrimitive.content }.toTypedArray()).use { c ->
+                    if (request.text("sql")!!.startsWith("SELECT * FROM") && c.count > maxRows) return@use buildJsonObject { put("error", "journal_reply_too_large") }
+                    buildJsonObject {
+                        put("columns", JsonArray(c.columnNames.map(::JsonPrimitive)))
+                        put("rows", buildJsonArray { while (c.moveToNext()) add(JsonArray((0 until c.columnCount).map { cell(c, it) })) })
+                    }
                 }
-            }
+            } catch (_: SQLiteBlobTooBigException) { buildJsonObject { put("error", "journal_row_too_big") } }
         }
     }
 
@@ -94,6 +99,33 @@ class ModuleJournalReadTest {
         assertEquals(expected, HealthModuleJournal(context) { module() }.read(positions, signal))
         // Row answers too large for the module are asked for again in smaller parts, with the same result.
         assertEquals(expected, HealthModuleJournal(context) { module(maxRows = 1) }.read(positions, signal))
+    }
+
+    @Test fun aRowNoCursorCanHoldIsReadWithoutItsLargestCellOnBothPaths() {
+        val start = HealthJournalWindow.parse(onFile(JsonObject(emptyMap())))!!.position()
+        db.execSQL("INSERT INTO data_point(_id,\"values\",type,time_to,time_from) VALUES(1,'a',1,1,1)")
+        db.execSQL("INSERT INTO data_point(_id,\"values\",type,time_to,time_from) VALUES(2,?,1,2,2)", arrayOf("x".repeat(3 * 1024 * 1024)))
+        db.execSQL("INSERT INTO data_point(_id,\"values\",type,time_to,time_from) VALUES(3,'c',1,3,3)")
+        val positions = buildJsonObject { put("data_point", start.json()) }
+        val expected = onFile(positions)
+        val page = expected.getValue("pages").jsonObject.getValue("data_point").jsonObject
+        val rows = page.getValue("rows").jsonArray.map { it.jsonObject }
+        assertEquals(listOf("1", "2", "3"), rows.map { it.text("id") }); assertEquals(0, page.getValue("missingKeys").jsonArray.size)
+        assertEquals("""["values"]""", rows[1]["oversizedColumns"].toString())
+        assertEquals(expected, HealthModuleJournal(context) { module() }.read(positions, signal))
+    }
+
+    @Test fun aLargeModuleAnswerArrivesThroughSharedMemory() {
+        val body = buildJsonObject { put("text", "x".repeat(300_000)) }.toString().toByteArray()
+        val reply = Parcel.obtain()
+        try {
+            SharedMemory.create("fixture", body.size).use { memory ->
+                memory.mapReadWrite().let { buffer -> buffer.put(body); SharedMemory.unmap(buffer) }
+                reply.writeInt(1); memory.writeToParcel(reply, 0)
+            }
+            reply.setDataPosition(0)
+            assertContentEquals(body, ModuleConnection.answer(reply))
+        } finally { reply.recycle() }
     }
 
     @Test fun aFileReplacedDuringTheReadIsReportedAndAMissingModuleLeavesTheReadToTheHelper() {

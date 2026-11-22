@@ -36,6 +36,8 @@ android {
         unitTests.isIncludeAndroidResources = true
         unitTests.all { task ->
             task.useJUnitPlatform(); task.maxHeapSize = "1g"
+            // Robolectric's SharedMemory reaches into FileDescriptor.
+            task.jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED", "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED")
             listOf("robolectric.dependency.repo.url", "https.proxyHost", "https.proxyPort", "http.proxyHost", "http.proxyPort").forEach { key -> System.getProperty(key)?.let { task.systemProperty(key, it) } }
             if (task.name == "testReleaseUnitTest") {
                 val fixture = layout.buildDirectory.file("journal-fixtures/health.db")

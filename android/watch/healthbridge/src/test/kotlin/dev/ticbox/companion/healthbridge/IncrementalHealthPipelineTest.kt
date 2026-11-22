@@ -321,6 +321,21 @@ class IncrementalHealthPipelineTest {
         }
     }
 
+    @Test fun aPointNoCursorCanHoldGoesWithoutItsLargestCellInsteadOfStoppingTheTable() = runBlocking {
+        val unframed = HealthProviderReader(context.contentResolver, "synthetic", framed = false)
+        reader.close(); reader = IncrementalHealthReader(ledger, { request, signal -> unframed.page(request, signal) }, tables)
+        provider.insertFixture(1, "70", 1); provider.insertFixture(2, "x".repeat(3 * 1024 * 1024), 1); provider.insertFixture(3, "72", 1)
+        SQLiteDataSyncStore(context, "cursor-oversized-phone.sqlite").use { database ->
+            val phone = SQLiteLocalHealthStore(database, now = { now })
+            val first = sync(phone)
+            assertEquals(LocalHealthSyncPhase.COMPLETED, first.phase); assertEquals(3, first.recordsCommitted)
+            val point = phone.points(HealthPointQuery(source)).items.single { it.providerId == 2L }
+            assertNull(point.rawValues); assertTrue("oversizedColumns" in point.raw.json)
+            now += HOUR
+            assertEquals(0, sync(phone).recordsCommitted)
+        }
+    }
+
     @Test fun aTooLargeRowQueuedBeforeRowsWereBoundedIsDeliveredWithoutItsLargestCell() = runBlocking {
         fun row(id: Int, value: String) = buildJsonObject {
             put("id", id.toString()); put("columns", buildJsonObject { put("_id", id); put("type", 1); put("values", value) })

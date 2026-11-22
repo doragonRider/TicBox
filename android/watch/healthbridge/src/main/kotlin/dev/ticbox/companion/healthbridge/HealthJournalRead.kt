@@ -1,5 +1,6 @@
 package dev.ticbox.companion.healthbridge
 
+import android.database.sqlite.SQLiteBlobTooBigException
 import dev.ticbox.companion.protocol.*
 import java.security.MessageDigest
 import kotlinx.serialization.json.*
@@ -76,7 +77,10 @@ internal object HealthJournalRead {
         return JsonObject(read + mapOf("rows" to JsonArray(rows), "missingKeys" to JsonArray(missing.map(::JsonPrimitive))))
     }
 
-    /** An answer too large for the module is asked for again in halves. */
+    /**
+     * An answer too large for the module is asked for again in halves, and a row too large for any cursor is read on its
+     * own without its largest cells. Rows already handed over aren't asked for again.
+     */
     private inline fun rows(db: JournalSql, table: LocalHealthTable, keys: List<String>, each: (JsonObject, String) -> Unit) {
         val sqlTable = when (table) {
             LocalHealthTable.POINT -> "data_point"; LocalHealthTable.SESSION -> "data_session"
@@ -87,18 +91,32 @@ internal object HealthJournalRead {
         val pending = ArrayDeque(listOf(keys))
         while (pending.isNotEmpty()) {
             val chunk = pending.removeFirst()
-            val cursor = try { db.rawQuery("SELECT * FROM $sqlTable WHERE $key IN (${chunk.joinToString(",") { "?" }})", chunk.toTypedArray()) }
-            catch (problem: HealthJournalException) {
-                if (problem.code != "journal_reply_too_large" || chunk.size == 1) throw problem
-                pending.addFirst(chunk.subList(chunk.size / 2, chunk.size)); pending.addFirst(chunk.subList(0, chunk.size / 2))
-                continue
-            }
-            cursor.use {
-                while (it.moveToNext()) {
-                    val value = it.getString(it.getColumnIndexOrThrow(key))
-                    each(it.healthDatabaseRow(value, table), value)
+            val seen = HashSet<String>()
+            val failure = try {
+                db.rawQuery("SELECT * FROM $sqlTable WHERE $key IN (${chunk.joinToString(",") { "?" }})", chunk.toTypedArray()).use {
+                    while (it.moveToNext()) {
+                        val value = it.getString(it.getColumnIndexOrThrow(key))
+                        seen += value; each(it.healthDatabaseRow(value, table), value)
+                    }
                 }
+                continue
+            } catch (problem: Exception) {
+                if (problem !is SQLiteBlobTooBigException && (problem as? HealthJournalException)?.code !in TOO_LARGE) throw problem
+                problem
             }
+            val rest = chunk.filter { it !in seen }
+            if (rest.size > 1) { pending.addFirst(rest.subList(rest.size / 2, rest.size)); pending.addFirst(rest.subList(0, rest.size / 2)) }
+            else if (rest.size == 1) each(oversized(db, sqlTable, key, rest[0], table) ?: throw failure, rest[0])
         }
+    }
+
+    private val TOO_LARGE = setOf("journal_reply_too_large", "journal_row_too_big")
+
+    /** One row no cursor can hold, read on its own without its largest cells; null when that isn't why the read failed. */
+    private fun oversized(db: JournalSql, sqlTable: String, key: String, value: String, table: LocalHealthTable): JsonObject? {
+        val columns = db.rawQuery("SELECT * FROM $sqlTable WHERE 0", null).use { it.columnNames.toList() }
+        return OversizedRows(sqlTable, columns) { selection, args, order ->
+            db.rawQuery("SELECT * FROM $sqlTable WHERE $selection" + order?.let { " ORDER BY $it" }.orEmpty(), args)
+        }.read(key, value) { it.healthDatabaseRow(value, table) }
     }
 }

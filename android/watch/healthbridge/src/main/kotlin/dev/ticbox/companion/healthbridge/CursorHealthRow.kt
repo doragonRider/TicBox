@@ -62,8 +62,12 @@ private fun Cursor.healthRawRow(id: JsonPrimitive, table: LocalHealthTable, dire
         unavailable += missing
         if (missing.isNotEmpty()) android.util.Log.w("TicBoxHealthBridge", "Session fields unavailable; columns=${missing.joinToString(",")}")
     }
-    return boundHealthRow(buildJsonObject {
+    val row = buildJsonObject {
         put("id", id); put("columns", JsonObject(columns)); put("storageTypes", JsonObject(types))
         if (unavailable.isNotEmpty()) { put("partial", true); put("unavailableColumns", JsonArray(unavailable.map(::JsonPrimitive))) }
-    })
+    }
+    return boundHealthRow(row).also { bounded ->
+        if (bounded !== row) android.util.Log.i("TicBoxHealthBridge", "Source row too large to deliver whole; table=${table.wireName} " +
+            "cellsLeftOut=${(bounded["oversizedColumns"] as? JsonArray)?.size ?: 0}")
+    }
 }
