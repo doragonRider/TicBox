@@ -11,9 +11,6 @@ import java.io.IOException
 import java.security.SecureRandom
 import java.util.UUID
 import kotlinx.coroutines.*
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /** Wake over the existing direct link; all health payloads use a separate secure Bluetooth socket. */
 class BluetoothLocalHealthRemote(context: Context,
@@ -51,49 +48,7 @@ class BluetoothLocalHealthRemote(context: Context,
             if (reply.text("op") != "ready") throw IOException("Local health bridge handshake failed")
             val version = reply.number("version") ?: 1
             if (version < LocalHealthProtocol.INCREMENTAL_VERSION) throw IOException("health_bridge_update_required")
-            return object : LocalHealthConnection {
-                override val setupStages = setup.stages()
-                override val servesAllTables = true
-                override val supportedTables = LocalHealthProtocol.supportedTables(reply)
-                /**
-                 * A batch already committed here whose ACK goes with the table's next request, saving a round trip per page.
-                 * If that request never goes out, the watch resends the batch and the phone's commit repeats harmlessly.
-                 */
-                var held: Pair<LocalHealthTable, String>? = null
-                suspend fun send(table: LocalHealthTable, batch: String) {
-                    frames.write(LocalHealthProtocol.acknowledge(link.source.localUserId, table, batch))
-                    val result = frames.read()
-                    if (result.text("batch") != batch || result.flag("committed") != true)
-                        throw IOException("Local health acknowledgement was not persisted")
-                }
-                override suspend fun page(table: LocalHealthTable, checkpoint: LocalHealthCheckpoint): LocalHealthPage {
-                    held?.takeIf { it.first != table }?.let { (other, batch) -> held = null; send(other, batch) }
-                    val ack = held?.second; held = null
-                    frames.write(LocalHealthProtocol.changes(table, checkpoint.receiver ?: link.source.localUserId,
-                        checkpoint.run ?: error("Missing acquisition run"), checkpoint.full, checkpoint.window, ack, zlib = true))
-                    val reply = frames.read()
-                    return LocalHealthProtocol.page(reply, frames.lastFrameBytes.toLong())
-                }
-                override suspend fun acknowledge(table: LocalHealthTable, page: LocalHealthPage) {
-                    val batch = page.batchId ?: return
-                    // The last page of a table has no next request to carry its ACK.
-                    if (page.inlineAck && !page.complete) held = table to batch else send(table, batch)
-                }
-                override suspend fun journal(source: LocalHealthJournalSource, enabled: Boolean?): LocalHealthJournalStatus {
-                    if (reply.number("journalVersion") != 1L) throw LocalHealthJournalException("journal_bridge_update_required")
-                    frames.write(buildJsonObject {
-                        put("op", "journal"); put("source", source.wireName)
-                        put("action", when (enabled) { null -> "status"; true -> "enable"; false -> "disable" })
-                    })
-                    val result = frames.read()
-                    if (result.text("op") != "journal" || result.text("source") != source.wireName)
-                        throw LocalHealthJournalException("journal_invalid_reply")
-                    return LocalHealthJournalStatus(source, result.flag("enabledForSync") == true, result.flag("installed"),
-                        result.number("version")?.toInt(), result.number("floor"), result.number("head"),
-                        result.text("error")?.takeIf { it.matches(Regex("[a-z_]{1,80}")) })
-                }
-                override fun close() = connected.close()
-            }
+            return LocalHealthFrameConnection(frames, reply, link.source.localUserId, setup.stages(), connected::close)
         } catch (problem: Throwable) { connected.close(); throw problem }
     }
 

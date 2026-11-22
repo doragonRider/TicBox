@@ -56,7 +56,10 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
     /** Most rows per source read and per batch; tests lower it to cross page boundaries with few rows. */
     val pageRows: Int = LocalHealthProtocol.MAX_PAGE_ROWS) : AutoCloseable {
     // Version 1 is the baseline shipped in 0.2.0. Any format change must raise it and add a migration.
-    private val helper = object : SQLiteOpenHelper(context, File(context.noBackupFilesDir, name).path, null, 1) {
+    // Version 2 (1.0.9) lets a table have several batches waiting for their ACKs, each with its bound and order.
+    private val helper = object : SQLiteOpenHelper(context, File(context.noBackupFilesDir, name).path, null, 2) {
+        // The answering thread reads batches while the reading thread saves a page; WAL lets those reads go on meanwhile.
+        init { setWriteAheadLoggingEnabled(true) }
         override fun onCreate(db: SQLiteDatabase) {
             db.execSQL("CREATE TABLE metadata (name TEXT PRIMARY KEY,value TEXT NOT NULL)")
             db.execSQL("INSERT INTO metadata VALUES ('epoch','${UUID.randomUUID()}')")
@@ -64,12 +67,28 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
             db.execSQL("CREATE INDEX observed_range ON observations(receiver,kind,source_id)")
             db.execSQL("CREATE INDEX observed_parent ON observations(receiver,kind,parent_id)")
             db.execSQL("CREATE TABLE pending (revision INTEGER PRIMARY KEY AUTOINCREMENT,receiver TEXT NOT NULL,kind TEXT NOT NULL,row_key TEXT NOT NULL,payload TEXT NOT NULL,UNIQUE(receiver,kind,row_key))")
-            db.execSQL("CREATE TABLE batches (receiver TEXT NOT NULL,kind TEXT NOT NULL,batch_id TEXT NOT NULL,payload TEXT NOT NULL,PRIMARY KEY(receiver,kind))")
+            db.execSQL(BATCHES)
             db.execSQL("CREATE TABLE progress (receiver TEXT NOT NULL,kind TEXT NOT NULL,baseline INTEGER NOT NULL DEFAULT 0,audit_after INTEGER NOT NULL DEFAULT 0,step INTEGER NOT NULL DEFAULT 0,capture TEXT,schema_fields TEXT,PRIMARY KEY(receiver,kind))")
             db.execSQL("CREATE TABLE children (receiver TEXT NOT NULL,parent_id INTEGER NOT NULL,last_checked INTEGER NOT NULL,same_count INTEGER NOT NULL,PRIMARY KEY(receiver,parent_id))")
         }
-        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) =
-            error("No migration from health bridge schema $oldVersion to $newVersion")
+        override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+            if (oldVersion != 1 || newVersion != 2) error("No migration from health bridge schema $oldVersion to $newVersion")
+            db.execSQL("ALTER TABLE batches RENAME TO batches_v1")
+            db.execSQL(BATCHES)
+            val bounds = HashMap<String, String>()
+            db.rawQuery("SELECT name,value FROM metadata WHERE name LIKE 'batch_bound:%'", null).use { c -> while (c.moveToNext()) bounds[c.getString(0)] = c.getString(1) }
+            db.rawQuery("SELECT receiver,kind,batch_id,payload FROM batches_v1", null).use { c ->
+                while (c.moveToNext()) {
+                    val (receiver, kind, id, payload) = List(4) { c.getString(it) }
+                    // A batch whose bound was kept deletes by it; an older one still names its rows in its payload.
+                    val bound = bounds["batch_bound:$receiver:$kind"]?.split(' ')?.takeIf { it.size == 2 && it[0] == id }?.get(1)?.toLongOrNull()
+                    val step = runCatching { LocalHealthProtocol.parse(payload.toByteArray()).number("nextId") }.getOrNull() ?: 0L
+                    db.execSQL("INSERT INTO batches VALUES (?,?,?,?,?,?)", arrayOf<Any?>(receiver, kind, id, payload, bound, step))
+                }
+            }
+            db.execSQL("DROP TABLE batches_v1")
+            db.execSQL("DELETE FROM metadata WHERE name LIKE 'batch_bound:%'")
+        }
     }
     private val db get() = helper.writableDatabase
     private fun args(receiver: String, table: LocalHealthTable) = arrayOf(receiver, table.wireName)
@@ -119,7 +138,6 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
         db.delete("metadata", "name=?", arrayOf(fallbackKey(receiver, table)))
     }
     private fun deferredKey(receiver: String, table: LocalHealthTable) = "deferred_before:$receiver:${table.wireName}"
-    private fun batchKey(receiver: String, table: LocalHealthTable) = "batch_bound:$receiver:${table.wireName}"
     /** Rows older than this were never sent to the receiver; set by a first-sync window, cleared by a complete resend. */
     fun deferredBefore(receiver: String, table: LocalHealthTable) = metadata(deferredKey(receiver, table))?.toLongOrNull()
     private fun lowestObserved(receiver: String, table: LocalHealthTable) =
@@ -494,14 +512,106 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
         db.execSQL("UPDATE observations SET present=0 WHERE receiver=? AND kind=? AND row_key=?", args(receiver, table) + key)
     }
 
-    fun batch(receiver: String, table: LocalHealthTable, capture: HealthCapture): JsonObject = transaction {
-        val existing = it.rawQuery("SELECT payload FROM batches WHERE receiver=? AND kind=?", args(receiver, table)).use { c ->
-            if (c.moveToFirst()) LocalHealthProtocol.parse(c.getString(0).toByteArray()) else null
+    /*
+     * Batches, and the queued rows they cover, change only on the thread that answers the phone. Reading ahead adds queued
+     * rows and moves the capture from another thread, each source page in one transaction, so what is read here outside a
+     * transaction is never older than the batches it is compared with.
+     */
+
+    /** A batch made and not yet acknowledged; [bound] is null for one made before 1.0.6 kept bounds. */
+    private class Outstanding(val id: String, val bound: Long?, val step: Long)
+    private fun outstanding(receiver: String, table: LocalHealthTable) =
+        db.rawQuery("SELECT batch_id,bound,step FROM batches WHERE receiver=? AND kind=? ORDER BY step", args(receiver, table)).use { c ->
+            buildList { while (c.moveToNext()) add(Outstanding(c.getString(0), if (c.isNull(1)) null else c.getLong(1), c.getLong(2))) }
         }
-        if (existing != null) return@transaction JsonObject(existing.toMutableMap().apply { if (!capture.done) put("complete", JsonPrimitive(false)) })
-        val epoch = JsonPrimitive(it.rawQuery("SELECT value FROM metadata WHERE name='epoch'", null).use { c -> c.moveToFirst(); c.getString(0) }).toString()
-        val rows = mutableListOf<JsonElement>(); var bytes = 0; var last = 0L
-        it.rawQuery("SELECT revision,row_key,payload FROM pending WHERE receiver=? AND kind=? ORDER BY revision LIMIT ?", args(receiver, table) + (pageRows + 1).toString()).use { c ->
+
+    /**
+     * The made batch a request gets: with [after], the one made after that batch; without, or when this side no longer has
+     * it (acknowledged since), the oldest. Null when a new one is to be made. Batches go out in the order they were made,
+     * so a row is never sent older than it was sent before.
+     */
+    private fun pick(made: List<Outstanding>, after: String?): Outstanding? {
+        val index = after?.let { id -> made.indexOfFirst { it.id == id } } ?: -1
+        if (index < 0) return made.firstOrNull()
+        // An old batch names its rows only in its payload, so nothing is made past it until its ACK.
+        return made.getOrNull(index + 1) ?: made.firstOrNull { it.bound == null }
+    }
+
+    private fun beyond(made: List<Outstanding>) = made.mapNotNull { it.bound }.maxOrNull() ?: -1L
+
+    /** Queued rows no made batch covers yet, counted up to [limit]. */
+    private fun pendingBeyond(receiver: String, table: LocalHealthTable, made: List<Outstanding>, limit: Int): Int =
+        db.rawQuery("SELECT COUNT(*) FROM (SELECT 1 FROM pending WHERE receiver=? AND kind=? AND revision>? LIMIT ?)",
+            args(receiver, table) + beyond(made).toString() + limit.toString()).use { it.moveToFirst(); it.getInt(0) }
+
+    /** Queued rows no made batch covers yet, counted up to one page: enough to make the next batch from. */
+    fun pendingBeyond(receiver: String, table: LocalHealthTable): Int = pendingBeyond(receiver, table, outstanding(receiver, table), pageRows)
+
+    /** Whether a request for the batch after [after] needs a new batch and no queued row is there to make it from. */
+    fun needsRows(receiver: String, table: LocalHealthTable, after: String? = null): Boolean {
+        val made = outstanding(receiver, table)
+        return pick(made, after) == null && pendingBeyond(receiver, table, made, 1) == 0
+    }
+
+    /** The table's capture as last saved; null before its first. */
+    fun capture(receiver: String, table: LocalHealthTable): HealthCapture? =
+        db.rawQuery("SELECT capture FROM progress WHERE receiver=? AND kind=?", args(receiver, table)).use { c ->
+            if (c.moveToFirst() && !c.isNull(0)) HealthCapture.parse(LocalHealthProtocol.parse(c.getString(0).toByteArray())) else null
+        }
+
+    /** The batch for a request that has received [after]: one already made, or a new one from the rows queued past them. */
+    fun batch(receiver: String, table: LocalHealthTable, after: String? = null): JsonObject {
+        val made = outstanding(receiver, table)
+        val chosen = pick(made, after) ?: return make(receiver, table, made)
+        // Read first: once reading is done, no row is queued until the next run begins.
+        val capture = capture(receiver, table)
+        val existing = db.rawQuery("SELECT payload FROM batches WHERE receiver=? AND kind=? AND batch_id=?", args(receiver, table) + chosen.id).use { c ->
+            c.moveToFirst(); LocalHealthProtocol.parse(c.getString(0).toByteArray())
+        }
+        // A last batch sent again in a later run that hasn't finished reading isn't the end any more.
+        if (capture?.done != true) return if (existing.flag("complete") == false) existing else JsonObject(existing + ("complete" to JsonPrimitive(false)))
+        // One made ahead while reading went on becomes the end once reading has finished and nothing is queued past it,
+        // and then says how reading ended.
+        val last = chosen === made.last() && chosen.bound != null && db.rawQuery("SELECT 1 FROM pending WHERE receiver=? AND kind=? AND revision>? LIMIT 1",
+            args(receiver, table) + chosen.bound.toString()).use { !it.moveToFirst() }
+        return if (!last || existing.flag("complete") == true) existing
+            else JsonObject(existing - setOf("deferredBefore", "providerVersion", "sourceJournal") + ending(receiver, table, capture, complete = true))
+    }
+
+    /** What a batch says about the read it came from. */
+    private fun ending(receiver: String, table: LocalHealthTable, capture: HealthCapture, complete: Boolean) = buildJsonObject {
+        put("complete", complete); put("partial", capture.partial); put("scannedRows", capture.scanned)
+        deferredBefore(receiver, table)?.let { before -> put("deferredBefore", before) }
+        capture.providerVersion?.let { put("providerVersion", it) }
+        capture.journal?.let { journal -> put("sourceJournal", buildJsonObject {
+            put("version", 1); put("baseline", journal.baseline); put("finished", journal.finished)
+            put("sequence", journal.position.sequence.toString()); put("upper", journal.upper.toString())
+        }) }
+    }
+
+    /**
+     * Makes the next batch ahead of its request, while the one before it travels, once a full page is queued or reading is
+     * done; false when there is nothing to make or enough are waiting already.
+     */
+    fun packAhead(receiver: String, table: LocalHealthTable): Boolean {
+        val made = outstanding(receiver, table)
+        if (made.size >= MAX_OUTSTANDING || made.any { it.bound == null }) return false
+        val done = capture(receiver, table)?.done == true
+        val queued = pendingBeyond(receiver, table, made, pageRows)
+        if (queued < pageRows && !(done && queued > 0)) return false
+        return make(receiver, table, made).text("error") == null
+    }
+
+    /** Only the rows' bound and the batch itself are written, so a page being saved by the reading thread rarely waits. */
+    private fun make(receiver: String, table: LocalHealthTable, made: List<Outstanding>): JsonObject {
+        val database = db
+        // Read before the rows: a capture that says reading is done queues no more.
+        val capture = capture(receiver, table) ?: HealthCapture("", false, emptyList())
+        val after = beyond(made)
+        val epoch = JsonPrimitive(metadata("epoch")!!).toString()
+        val rows = mutableListOf<JsonElement>(); var bytes = 0; var last = maxOf(after, 0L)
+        database.rawQuery("SELECT revision,row_key,payload FROM pending WHERE receiver=? AND kind=? AND revision>? ORDER BY revision LIMIT ?",
+            args(receiver, table) + after.toString() + (pageRows + 1).toString()).use { c ->
             while (c.moveToNext()) {
                 if (rows.size >= pageRows) break
                 // The stored object text with the delivery fields appended, as adding them to the parsed row would print it.
@@ -516,52 +626,48 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
                     size = utf8Length(row)
                 }
                 if (bytes + size > BATCH_BUDGET) {
-                    if (rows.isEmpty()) return@transaction queryError("row_exceeds_budget")
+                    if (rows.isEmpty()) return queryError("row_exceeds_budget")
                     break
                 }
                 rows += LocalHealthProtocol.storedRow(row); bytes += size; last = c.getLong(0)
             }
         }
-        val total = it.rawQuery("SELECT COUNT(*) FROM pending WHERE receiver=? AND kind=?", args(receiver, table)).use { c -> c.moveToFirst(); c.getLong(0) }
-        it.execSQL("UPDATE progress SET step=step+1 WHERE receiver=? AND kind=?", args(receiver, table))
-        val step = it.rawQuery("SELECT step FROM progress WHERE receiver=? AND kind=?", args(receiver, table)).use { c -> c.moveToFirst(); c.getLong(0) }
+        val more = database.rawQuery("SELECT 1 FROM pending WHERE receiver=? AND kind=? AND revision>? LIMIT 1",
+            args(receiver, table) + last.toString()).use { it.moveToFirst() }
+        val step = database.rawQuery("SELECT step FROM progress WHERE receiver=? AND kind=?", args(receiver, table)).use { c ->
+            if (c.moveToFirst()) c.getLong(0) else 0L
+        } + 1
         val batchId = UUID.randomUUID().toString()
         val result = buildJsonObject {
             put("op", "changes"); put("version", LocalHealthProtocol.INCREMENTAL_VERSION); put("table", table.wireName)
             put("rows", JsonArray(rows)); put("batch", batchId); put("nextId", step.toString())
-            put("complete", capture.done && total <= rows.size); put("partial", capture.partial); put("scannedRows", capture.scanned)
-            deferredBefore(receiver, table)?.let { before -> put("deferredBefore", before) }
+            ending(receiver, table, capture, complete = capture.done && !more).forEach { (name, value) -> put(name, value) }
             // This batch's ACK may come with the table's next changes request.
             put("inlineAck", true)
-            capture.providerVersion?.let { put("providerVersion", it) }
-            capture.journal?.let { journal -> put("sourceJournal", buildJsonObject {
-                put("version", 1); put("baseline", journal.baseline); put("finished", journal.finished)
-                put("sequence", journal.position.sequence.toString()); put("upper", journal.upper.toString())
-            }) }
         }
-        it.execSQL("INSERT INTO batches VALUES (?,?,?,?)", arrayOf<Any?>(receiver, table.wireName, batchId, result.toString()))
-        // A batch is the table's queued rows up to its last revision, and later rows get higher ones; its ACK deletes by that.
-        setMetadata(batchKey(receiver, table), "$batchId $last")
-        result
+        val payload = result.toString()
+        // A batch is the table's queued rows after the batch before it, up to its last revision, and later rows get higher
+        // ones; its ACK deletes by that.
+        transaction {
+            it.execSQL("UPDATE progress SET step=? WHERE receiver=? AND kind=?", arrayOf<Any?>(step, receiver, table.wireName))
+            it.execSQL("INSERT INTO batches VALUES (?,?,?,?,?,?)", arrayOf<Any?>(receiver, table.wireName, batchId, payload, last, step))
+        }
+        return result
     }
-    fun hasBatch(receiver: String, table: LocalHealthTable) = db.rawQuery("SELECT 1 FROM batches WHERE receiver=? AND kind=?", args(receiver, table)).use { it.moveToFirst() }
-    fun hasPending(receiver: String, table: LocalHealthTable) = db.rawQuery("SELECT 1 FROM pending WHERE receiver=? AND kind=? LIMIT 1", args(receiver, table)).use { it.moveToFirst() }
     fun pendingCount(receiver: String, table: LocalHealthTable) =
         db.rawQuery("SELECT COUNT(*) FROM pending WHERE receiver=? AND kind=?", args(receiver, table)).use { it.moveToFirst(); it.getLong(0) }
 
+    /** Also clears every batch made before it: the phone commits in order, and each batch's rows follow the one before. */
     fun acknowledge(receiver: String, table: LocalHealthTable, batch: String): JsonObject = transaction {
-        val bound = metadata(batchKey(receiver, table))?.split(' ')?.takeIf { parts -> parts.size == 2 && parts[0] == batch }?.get(1)?.toLongOrNull()
-        if (bound != null) {
-            if (it.delete("batches", "receiver=? AND kind=? AND batch_id=?", args(receiver, table) + batch) > 0)
-                it.execSQL("DELETE FROM pending WHERE receiver=? AND kind=? AND revision<=?", arrayOf<Any?>(receiver, table.wireName, bound))
-            it.delete("metadata", "name=?", arrayOf(batchKey(receiver, table)))
-            return@transaction buildJsonObject { put("op", "ack"); put("batch", batch); put("committed", true) }
-        }
-        // A batch made before its bound was kept names its rows only in its payload.
-        val stored = it.rawQuery("SELECT payload FROM batches WHERE receiver=? AND kind=? AND batch_id=?", args(receiver, table) + batch).use { c ->
-            if (c.moveToFirst()) LocalHealthProtocol.parse(c.getString(0).toByteArray()) else null
-        }
-        if (stored != null) {
+        val acknowledged = outstanding(receiver, table).firstOrNull { made -> made.id == batch }
+        if (acknowledged?.bound != null) {
+            it.execSQL("DELETE FROM pending WHERE receiver=? AND kind=? AND revision<=?", arrayOf<Any?>(receiver, table.wireName, acknowledged.bound))
+            it.execSQL("DELETE FROM batches WHERE receiver=? AND kind=? AND step<=?", arrayOf<Any?>(receiver, table.wireName, acknowledged.step))
+        } else if (acknowledged != null) {
+            // A batch made before its bound was kept names its rows only in its payload.
+            val stored = it.rawQuery("SELECT payload FROM batches WHERE receiver=? AND kind=? AND batch_id=?", args(receiver, table) + batch).use { c ->
+                c.moveToFirst(); LocalHealthProtocol.parse(c.getString(0).toByteArray())
+            }
             (stored["rows"] as JsonArray).forEach { item ->
                 val row = item as JsonObject
                 it.delete("pending", "receiver=? AND kind=? AND row_key=? AND revision=?", args(receiver, table) + arrayOf(row.text("bridgeKey")!!, row.text("bridgeRevision")!!))
@@ -582,6 +688,10 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
         private const val KEYS_PER_STATEMENT = 500
         /** Room for one batch's rows, leaving the rest of the frame to its metadata. */
         private const val BATCH_BUDGET = LocalHealthProtocol.MAX_FRAME_BYTES - 8192
+        /** One being committed on the phone, one on its way, and one made ahead of its request. */
+        const val MAX_OUTSTANDING = 3
+        private const val BATCHES = "CREATE TABLE batches (receiver TEXT NOT NULL,kind TEXT NOT NULL,batch_id TEXT NOT NULL,payload TEXT NOT NULL," +
+            "bound INTEGER,step INTEGER NOT NULL,PRIMARY KEY(receiver,kind,batch_id))"
 
     }
 }

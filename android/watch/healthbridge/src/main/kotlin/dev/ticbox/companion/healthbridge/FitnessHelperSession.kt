@@ -97,10 +97,10 @@ internal class FitnessHelperSession(private val context: Context,
             return true
         }
         stop(); broken = true
-        // Root refused, or a helper that said why it couldn't start, leaves the one-shot helpers to meet and report the
-        // same. No answer in time, or one that isn't a frame, is this way of talking to the helper failing, which later
-        // syncs on this version needn't pay for again.
-        val unusable = slow || garbled || (ready != null && ready.text("helperError") == null)
+        // Root refused, or no workout app, leaves the one-shot helpers to meet and report the same, and root may be granted
+        // later. No answer in time, one that isn't a frame, or a helper that failed to set itself up is this way of reading
+        // failing, which later syncs on this version needn't pay for again.
+        val unusable = slow || garbled || (ready != null && ready.text("helperError") in setOf(null, "snapshot_failed"))
         val reason = ready?.text("helperError") ?: when { slow -> "timeout"; garbled -> "garbled"; ready == null -> "closed"; else -> "invalid" }
         Log.w(TAG, "Fitness helper unavailable; reason=$reason step=${ready?.text("step") ?: "none"} " +
             "exception=${ready?.text("exception") ?: "none"} millis=${SystemClock.elapsedRealtime() - started}")
@@ -171,7 +171,9 @@ object FitnessHelperMain {
             // The log needs an app version it was made for; workout pages don't, so a refusal is kept for log requests only.
             step = "verify"
             var refusal: String? = null
-            val verified = try { HealthJournalProfiles.verify(context, "fitness") } catch (problem: HealthJournalException) { refusal = problem.code; null }
+            val verified = try { HealthJournalProfiles.verify(context, "fitness") } catch (problem: Exception) {
+                refusal = (problem as? HealthJournalException)?.code ?: "journal_operation_unconfirmed"; null
+            }
             val file = verified?.file ?: File(info.dataDir, "databases/fitness.db")
             step = "stat"; val before = verified?.let { Os.stat(it.file.path) }
             // Reads run as the app's own user, so SQLite never leaves root-owned files beside its database.

@@ -127,9 +127,9 @@ git push origin refs/tags/v1.0.0
 
 ## 5. 数据库与格式的兼容
 
-手机的 `data-sync.sqlite`（[DataSyncSqlSchema.VERSION](../../android/core/platform/src/main/kotlin/dev/ticbox/companion/platform/data/DataSyncSqlSchema.kt)）和手表的 `health-incremental.sqlite`（[HealthIncrementalStore](../../android/watch/healthbridge/src/main/kotlin/dev/ticbox/companion/healthbridge/HealthIncrementalStore.kt)）当前版本都是 1，是正式的基线。
+手机的 `data-sync.sqlite`（[DataSyncSqlSchema.VERSION](../../android/core/platform/src/main/kotlin/dev/ticbox/companion/platform/data/DataSyncSqlSchema.kt)）的当前版本是 1，是正式的基线。手表的 `health-incremental.sqlite`（[HealthIncrementalStore](../../android/watch/healthbridge/src/main/kotlin/dev/ticbox/companion/healthbridge/HealthIncrementalStore.kt)）以版本 1 为基线，1.0.9 升到 2（每张表可以有多个等待确认的批次），带从 1 升级的迁移。
 
-修改任何一个数据库的表、列或索引，都必须提高版本，在 `onUpgrade` 中写迁移，并用旧版本的库测试升级；不能靠删库、清数据或卸载解决，也不能不升版本直接改 DDL。两个 `onUpgrade` 目前只在缺少迁移时报错，不会删除数据。手机库的表或列变化，以及设置、身份等文件的格式变化，还必须同步更新[数据迁移](data-migration.md)，保证旧版本导出的文件能导入新版本。
+修改任何一个数据库的表、列或索引，都必须提高版本，在 `onUpgrade` 中写迁移，并用旧版本的库测试升级；不能靠删库、清数据或卸载解决，也不能不升版本直接改 DDL。两个 `onUpgrade` 只在缺少迁移时报错，不会删除数据；降级时 SQLite 拒绝打开更高版本的库，同样不删除。手机库的表或列变化，以及设置、身份等文件的格式变化，还必须同步更新[数据迁移](data-migration.md)，保证旧版本导出的文件能导入新版本。
 
 ## 6. 代码风格
 
