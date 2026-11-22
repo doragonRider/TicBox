@@ -190,10 +190,13 @@ POINT 和私有运动表读取 Cursor 返回的所有列。SESSION 通过 data_p
 
 ### 4.2.1 预读
 
-1.0.9 起，手表在另一个线程上预读：写出一个没有结束（非 `complete`、无错误）的 changes 回复后，它一页一页地读源数据，直到待传队列里不属于任何批次的行够一页，或采集结束。每读完一页，回复请求的线程就用这些行提前组好下一批（每张表最多 3 个未确认的批次，见 [3.2.1](#321-提前请求下一批)），组好之后预读接着读。所以读源数据、算指纹、写账本和组批、压缩、发送同时进行，请求到达时下一批通常已经组好。
+1.0.9 起，手表在另一个线程上预读：处理完一个没有结束（非 `complete`、无错误）的 changes 请求后，不等回复写完，它就一页一页地读源数据，直到待传队列里不属于任何批次的行够两页，或采集结束。每读完一页，回复请求的线程就用这些行提前组好下一批（每张表最多 3 个未确认的批次，见 [3.2.1](#321-提前请求下一批)），组好之后预读接着读。所以读源数据、算指纹、写账本和组批、压缩、发送同时进行，请求到达时下一批通常已经组好。
+
+1.0.9 只多读一页，而且要等回复写完才接着读：手机提前发出的请求在这一页读完之前就到了，只好等它读完再当场组批，读取和组批仍然轮流进行。1.0.10 改为多读两页，请求一拿走预读的行就接着读。
 
 - 两个线程不同时读源数据：回复请求的线程只在队列里没有可发的行时自己读，读之前等预读读完手上那一页。
 - 每页的观察结果、待传队列和采集位置仍在一个事务里保存。本地账本使用 WAL，组批和发送不用等预读那一页的事务提交，只有写入时依次进行。
+- 变更日志的基线结束时不读源数据，所以和读完最后一页在同一步完成（1.0.10 起），最后一批组好时就带 `complete`，不再多一次空的往返。
 - 预读与按请求读取走同一套采集和持久化流程，被中断时进度同样保留；预读出错时不回复，留给下一个请求遇到并报告。`watchMillis` 只计请求处理的时间，不含预读和提前组批。
 
 1.0.6 到 1.0.8 在同一个线程上预读：写出回复后读到待传队列比正在路上的这一批多出一页，或用完 3 秒的读取预算，下一个请求要等它读完。
@@ -369,7 +372,7 @@ adb shell am start -W -n dev.ticbox.companion/dev.ticbox.companion.healthbridge.
 
 手表每读一次变更日志，记录走了哪条路：`Journal read through the module` 带查询次数和毫秒数，`Journal helper finished` 带操作和毫秒数，`Journal window unchanged` 表示运动库没变、沿用了上次的窗口。模块那条路失败时记录 `Journal read through the module failed` 和稳定的原因码，`Health module journal not available` 表示模块没有交回 Binder（没装模块，或令牌不符）。一行太大、去掉了单元格时记录 `Source row too large to deliver whole` 或 `Source row too large for a cursor`，带表名和去掉的单元格数，不带内容。
 
-手表每开始一次新的采集，记录一行 `Capture planned`：表、是否全量、是否重发、是否走变更日志，以及计划的范围种类（new、recent、deep、workout、all、probe），不含 ID 或时间。近期范围被未结束或最近一天有变化的会话向前扩展时，记录这样的会话数（`Recent range widened`）。预读每读一页记录一行 `Read-ahead`：读取的源行数、还不属于任何批次的待传行数（`queued`，最多数到一页）、采集是否结束和耗时；提前组好一批时记录 `Packed ahead` 和耗时。`Local changes sent`（每个 changes 回复一行）和 `Read-ahead` 还把耗时拆成读源数据（`source`）、算行的指纹（`hash`）、写本地账本（`ledger`）和组装批次（`pack`，只有回复有；发的是提前组好的批次时只是读出它的时间）各用的毫秒数；`Local changes sent` 的 `queued` 是请求等待处理的时间。
+手表每开始一次新的采集，记录一行 `Capture planned`：表、是否全量、是否重发、是否走变更日志，以及计划的范围种类（new、recent、deep、workout、all、probe），不含 ID 或时间。近期范围被未结束或最近一天有变化的会话向前扩展时，记录这样的会话数（`Recent range widened`）。预读每读一页记录一行 `Read-ahead`：读取的源行数、还不属于任何批次的待传行数（`queued`，最多数到两页；1.0.9 最多数到一页）、采集是否结束和耗时；提前组好一批时记录 `Packed ahead` 和耗时。`Local changes sent`（每个 changes 回复一行）和 `Read-ahead` 还把耗时拆成读源数据（`source`）、算行的指纹（`hash`）、写本地账本（`ledger`）和组装批次（`pack`，只有回复有；发的是提前组好的批次时只是读出它的时间）各用的毫秒数；`Local changes sent` 的 `queued` 是请求等待处理的时间。
 
 运动库的辅助进程记录 `Fitness helper started`（启动耗时）、`Fitness helper unavailable`（原因：`timeout`、`garbled`、`closed`、`invalid` 或它回复的错误码，以及失败的步骤和异常类型）和 `Fitness helper ended`（两次读取之间退出，带异常类型）；经它读运动日志时记录 `Journal read through the fitness helper` 和耗时，失败时与一次性的辅助进程一样记录 `Journal helper failed`。
 
