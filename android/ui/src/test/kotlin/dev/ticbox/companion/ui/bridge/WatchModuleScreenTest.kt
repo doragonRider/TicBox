@@ -477,11 +477,31 @@ class WatchModuleScreenTest {
             ModulePlan(install = true, zygisk = true, alerts = true, restart = true),
             plan(ModuleStage.NOT_INSTALLED, false, AlertPatchStage.UNKNOWN, true),
         )
+        // Turned off before there's a copy on the watch, so the new one keeps it off.
         assertEquals(
-            ModulePlan(install = true, restart = true),
+            ModulePlan(install = true, alertsOff = true, restart = true),
             plan(ModuleStage.NOT_INSTALLED),
         )
-        assertEquals(ModulePlan(update = true, restart = true), plan(ModuleStage.UPDATE))
+        assertEquals(
+            ModulePlan(update = true, alertsOff = true, restart = true),
+            plan(ModuleStage.UPDATE),
+        )
+        // On unless turned off: the update's restart loads it, with nothing to write.
+        for (alerts in listOf(AlertPatchStage.NOT_LOADED, AlertPatchStage.REBOOT_TO_LOAD)) {
+            assertEquals(
+                ModulePlan(update = true, alerts = true, restart = true),
+                plan(ModuleStage.UPDATE, alerts = alerts, want = true),
+            )
+        }
+        assertEquals(
+            ModulePlan(update = true, restart = true),
+            plan(ModuleStage.UPDATE, alerts = AlertPatchStage.APPLIED, want = true),
+        )
+        // Not knowing is no reason to undo what the watch keeps.
+        assertEquals(
+            ModulePlan(update = true, restart = true),
+            plan(ModuleStage.UPDATE, alerts = AlertPatchStage.UNKNOWN, want = true),
+        )
         assertEquals(ModulePlan(restart = true), plan(ModuleStage.REBOOT))
         assertEquals(
             ModulePlan(zygisk = true, restart = true),
@@ -578,25 +598,27 @@ class WatchModuleScreenTest {
             host = host,
         )
         waitForTag("module_restart")
-        tap("module_alerts_switch")
-        waitFor("Turn on and restart the system UI")
-        tap("module_setup")
-        waitFor("takes about 20 seconds")
-        confirm()
-        waitUntilTrue { host.uiRestarts == 1 }
+        // On unless turned off.
         waitFor("Applied.")
         tap("module_alerts_switch")
         waitFor("Alert correction is inactive")
         tap("module_setup")
         waitFor("takes about 20 seconds")
         confirm()
-        waitUntilTrue { host.uiRestarts == 2 }
+        waitUntilTrue { host.uiRestarts == 1 }
         waitFor("The watch rings and vibrates for every notification")
+        tap("module_alerts_switch")
+        waitFor("Turn on and restart the system UI")
+        tap("module_setup")
+        waitFor("takes about 20 seconds")
+        confirm()
+        waitUntilTrue { host.uiRestarts == 2 }
+        waitFor("Applied.")
         assertEquals(0, host.restarts)
     }
 
     @Test
-    fun theSwitchLeavesTheNotificationControlOutOfThePlan() {
+    fun turnedOffBeforeInstallingItStaysOffAfterTheRestart() {
         show()
         waitFor("Install and restart the watch")
         tap("module_alerts_switch")

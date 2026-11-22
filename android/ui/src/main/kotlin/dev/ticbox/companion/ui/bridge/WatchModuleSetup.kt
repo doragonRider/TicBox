@@ -83,7 +83,7 @@ internal fun lastKnownStage(state: HealthModuleState): ModuleStage? {
     }
 }
 
-/** Where the optional notification extension stands. The opt-in always comes before loading. */
+/** Where the notification extension stands. It loads unless turned off, which leaves a record. */
 internal enum class AlertPatchStage {
     UNKNOWN,
     OFF,
@@ -93,13 +93,13 @@ internal enum class AlertPatchStage {
     READY_TO_APPLY,
     APPLIED,
 
-    /** A restart has passed since opting in, and SystemUI isn't answering. */
+    /** A restart has passed since it was turned on or installed, and SystemUI isn't answering. */
     NOT_LOADED,
 
     /** It loaded but couldn't attach, so the watch alerts the way it always did. */
     NOT_HOOKED,
 
-    /** The marker is gone, but this process has not confirmed a passive mode. */
+    /** Off for the next start, but the running extension hasn't confirmed a passive mode. */
     STOP_PENDING,
     REBOOT_TO_UNLOAD,
 }
@@ -156,6 +156,8 @@ internal data class ModulePlan(
     val update: Boolean = false,
     val zygisk: Boolean = false,
     val alerts: Boolean = false,
+    /** The new copy keeps it turned off, so the restart doesn't load it. */
+    val alertsOff: Boolean = false,
     val restart: Boolean = false,
     /** The system UI alone starts again, which is all the notification extension needs. */
     val restartUi: Boolean = false,
@@ -164,7 +166,7 @@ internal data class ModulePlan(
         get() = restart || restartUi
 
     val isEmpty: Boolean
-        get() = !install && !update && !zygisk && !alerts && !restarts
+        get() = !install && !update && !zygisk && !alerts && !alertsOff && !restarts
 }
 
 internal fun modulePlan(
@@ -179,14 +181,28 @@ internal fun modulePlan(
     val onWatch = stage in ON_WATCH
     if (!install && !update && !onWatch) return ModulePlan()
     val zygisk = stage != ModuleStage.RUNNING && zygiskOn != true
+    val installing = install || update
     val alerts =
         wantAlerts &&
-            (alertStage == AlertPatchStage.UNKNOWN ||
-                alertStage == AlertPatchStage.OFF ||
-                alertStage == AlertPatchStage.STOP_PENDING ||
-                alertStage == AlertPatchStage.REBOOT_TO_UNLOAD)
+            when (alertStage) {
+                // Not knowing is no reason to undo a choice the watch may keep. A first install
+                // keeps none.
+                AlertPatchStage.UNKNOWN -> install
+                AlertPatchStage.OFF,
+                AlertPatchStage.STOP_PENDING,
+                AlertPatchStage.REBOOT_TO_UNLOAD -> true
+                // The new copy loads it at the restart that follows, so that restart turns it on.
+                AlertPatchStage.REBOOT_TO_LOAD,
+                AlertPatchStage.NOT_LOADED,
+                AlertPatchStage.READY_TO_APPLY -> installing
+                AlertPatchStage.APPLIED,
+                AlertPatchStage.NOT_HOOKED -> false
+            }
+    // Turning it off writes the record into whatever copy there is, and Local Bridge carries it
+    // into the new one. A first install has no copy yet, so the new one gets it before the restart.
+    val alertsOff = !wantAlerts && installing
     val watchRestart = install || update || zygisk || stage == ModuleStage.REBOOT
-    // Zygisk looks for the extension's marker whenever the system UI starts.
+    // Zygisk looks for the record of turning it off whenever the system UI starts.
     val extensionRestart =
         alertStage == AlertPatchStage.REBOOT_TO_LOAD ||
             // The extension is still loaded after turning it off, so back on needs no restart.
@@ -204,6 +220,7 @@ internal fun modulePlan(
         update = update,
         zygisk = zygisk,
         alerts = alerts,
+        alertsOff = alertsOff,
         restart = watchRestart || (extensionRestart && !uiAlone),
         restartUi = uiAlone,
     )
@@ -239,7 +256,8 @@ data class ModuleSetupState(
 )
 
 /**
- * The extension's marker goes wherever the next boot looks for it, which takes a copy on the watch.
+ * The record of turning the extension off goes where the next boot looks, which takes a copy on the
+ * watch.
  */
 private val HealthModuleSnapshot?.onWatch: Boolean
     get() =
@@ -271,6 +289,7 @@ internal fun moduleMessage(code: String): UiText =
         "notification_alert_contract_unavailable",
         "notification_alert_control_unavailable" -> uiText(R.string.module_error_alert_control)
         "mode_write_unconfirmed",
+        "module_alerts_off_not_kept",
         "notification_alert_write_failed",
         "notification_alert_unconfirmed" -> uiText(R.string.module_error_alert_write)
         else -> toolboxMessage(code)
@@ -485,6 +504,18 @@ class WatchModuleViewModel(dependencies: CompanionDependencies) : SessionViewMod
                 return
             }
             shared.update { it.copy(applyAlerts = true, targetPeer = peer) }
+        }
+        if (plan.alertsOff) {
+            requireTarget(session, peer, ready = true)
+            patch.keepOff()
+            requireTarget(session, peer, ready = true)
+            val kept = patch.state.value
+            if (!kept.current || kept.snapshot?.optedIn != false || kept.reason != null) {
+                shared.update {
+                    it.copy(problem = kept.reason ?: "notification_alert_unconfirmed")
+                }
+                return
+            }
         }
         if (plan.restartUi) {
             restartSystemUi(session, peer, ::show)

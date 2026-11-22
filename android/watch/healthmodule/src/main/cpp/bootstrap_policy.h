@@ -1,4 +1,5 @@
 #pragma once
+#include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -10,10 +11,9 @@ constexpr const char *kTarget = "com.mobvoi.wear.health.at";
 constexpr const char *kAlertTarget = "com.mobvoi.wear.refsysui";
 constexpr size_t kMaxDexBytes = 2 * 1024 * 1024;
 
-inline bool alert_opt_in_allowed(const struct stat &flag) {
-    return S_ISREG(flag.st_mode) && flag.st_uid == 0 && !(flag.st_mode & 0022) &&
-        flag.st_size >= 0 && flag.st_size <= 16;
-}
+// SystemUI gets the extension unless it was turned off, which leaves a marker. Anything under that name counts, and so
+// does a look at it that fails for any reason but its absence, so a damaged marker never turns the extension back on.
+inline bool alert_opted_out(int stat_result, int error) { return stat_result == 0 || error != ENOENT; }
 
 // nice_name alone is insufficient: require the actual per-user private app directory and UID.
 inline bool package_allowed(const char *target, const char *process, const char *directory, int uid,

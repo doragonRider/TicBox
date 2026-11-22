@@ -22,9 +22,11 @@ final class AlertPolicy {
     AlertPolicy(Context context) {
         this.context = context;
         preferences = context.getSharedPreferences("ticwatch_notification_alerts_v1", Context.MODE_PRIVATE);
-        mode = parse(preferences.getString(AlertProfile.SHA256, Mode.OBSERVE.name()));
+        // On until turned off: a SystemUI build with no saved mode follows the phone's choices from its first start.
+        mode = parse(preferences.getString(AlertProfile.SHA256, Mode.ALL.name()));
     }
 
+    /** A saved mode this version doesn't know only observes. */
     static Mode parse(String value) {
         try { return Mode.valueOf(value); } catch (RuntimeException invalid) { return Mode.OBSERVE; }
     }

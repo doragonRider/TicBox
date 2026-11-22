@@ -84,11 +84,12 @@ val result = client.installBundled { progress -> /* ZIP 上传进度；100% 后�
 
 - 前提：Android 11+、ARM32 / ARM64、Magisk 26+；Zygisk 和 DenyList 由用户管理。接口只针对当前真实配对的手表（不是高级页选择的任意 ADB 目标），校验物理会话、root 通道代次和 READY 的设备身份。演示手表只在内存中模拟安装。
 - 上传到 `/data/adb/ticbox-module-installer/upload-*/module.zip`（4 MiB，解压预算 8 MiB），Agent 检查 ZIP 摘要、每个文件、模块 ID、版本和 buildId，以跨进程文件锁防止并发安装，然后执行 `magisk --install-module ZIP`，成功后回读 `modules_update/ticwatch_health_settings` 的 DEX、两个 ELF 和构建元数据。安装器的输出和退出码都不作为成功依据（Magisk 可能提前更新活动目录的 `module.prop`）。
+- 安装前查看活动目录和暂存目录有没有通知控制的关闭记录 `notification-alerts.disabled`；回读通过后，新的暂存副本缺少记录就补上（root，`0600`），补不上时报告 `module_alerts_off_not_kept`。这样关闭的选择不依赖 `customize.sh` 的复制（见[通知的声音与振动 §3.3](../spec/notification-alerts.md#33-开关与模式)）。
 - 模块被用户禁用或标记删除时拒绝安装（官方安装器会清除这些标记），同 ID 的其他模块拒绝覆盖。
 - 断线或取消时已提交的安装不回滚、不重放；仍在同一会话时 `state.lastOperation` 标为 UNCONFIRMED。
-- 常见 reason：`companion_link_required`、`bluetooth_bond_required`、`root_required`、`module_root_required`、`module_bridge_update_required`、`device_changed`、`connection_replaced`、`module_device_unsupported`、`magisk_unavailable`、`magisk_too_old`、`module_disabled_or_removing`、`module_id_conflict`、`module_busy`、`module_payload_unavailable`、`module_payload_invalid`、`magisk_install_failed`、`module_install_unconfirmed`。不要都简化为“重新配对”。
+- 常见 reason：`companion_link_required`、`bluetooth_bond_required`、`root_required`、`module_root_required`、`module_bridge_update_required`、`device_changed`、`connection_replaced`、`module_device_unsupported`、`magisk_unavailable`、`magisk_too_old`、`module_disabled_or_removing`、`module_id_conflict`、`module_busy`、`module_payload_unavailable`、`module_payload_invalid`、`magisk_install_failed`、`module_install_unconfirmed`、`module_alerts_off_not_kept`。不要都简化为“重新配对”。
 
-`HealthModuleClient` 本身不重启、不改 Zygisk、DenyList、SELinux 或通知补丁的模式。
+`HealthModuleClient` 本身不重启、不改 Zygisk、DenyList、SELinux 或通知补丁的模式；它只把已有的关闭记录带进新副本。
 
 ### 3.3 系统步骤：`services.watchModuleHost`
 
@@ -108,13 +109,13 @@ val result = client.installBundled { progress -> /* ZIP 上传进度；100% 后�
 
 入口：连接页、本地桥接页、健康监测页缺少模块的提示、通知页的“声音和振动控制”。[WatchModuleScreen](../../android/ui/src/main/kotlin/dev/ticbox/companion/ui/bridge/WatchModuleScreen.kt) 是一张清单（手表连接、模块、Zygisk、健康应用）、一个“通知声音和振动控制”开关和一个主按钮，逻辑在 [WatchModuleSetup](../../android/ui/src/main/kotlin/dev/ticbox/companion/ui/bridge/WatchModuleSetup.kt)。
 
-- **一次完成**：`modulePlan` 根据手表的回答算出缺少的步骤，确认一次后按顺序完成，只重启一次：保持唤醒 → 上传并安装 → 开启 Zygisk → 写通知标记 → 重启 → 等连接断开再恢复 → 确认，通知控制加载后切换到 `ALL`。流程在应用级作用域中运行，离开页面不中断，进度保存在 `WatchUiServices.moduleSetup`。不需要的步骤被跳过，所以同一个按钮也负责更新、补开 Zygisk 和单纯重启。
-- **只改通知开关**：模块本次开机已生效时，只需重启系统界面：写标记 → 结束系统界面进程 → 手表在后台循环点亮屏幕约半分钟 → 等 20 秒 → 确认，最多再读约 35 秒。不亮屏时系统界面可能不绘制，恢复显示约需 20 秒，页面和确认弹窗都会提示。仍未加载就报错，主按钮回到“重启手表”。安装、更新和开 Zygisk 仍需重启手表。
+- **一次完成**：`modulePlan` 根据手表的回答算出缺少的步骤，确认一次后按顺序完成，只重启一次：保持唤醒 → 上传并安装 → 开启 Zygisk → 按开关删除或写入通知控制的关闭记录 → 重启 → 等连接断开再恢复 → 确认，通知控制加载后还停在 `OFF` 或 `OBSERVE` 时切换到 `ALL`。通知控制默认开启，只有关闭会写记录；关闭时手表上还没有模块，记录在安装后写进暂存目录。流程在应用级作用域中运行，离开页面不中断，进度保存在 `WatchUiServices.moduleSetup`。不需要的步骤被跳过，所以同一个按钮也负责更新、补开 Zygisk 和单纯重启。
+- **只改通知开关**：模块本次开机已生效时，只需重启系统界面：删除关闭记录 → 结束系统界面进程 → 手表在后台循环点亮屏幕约半分钟 → 等 20 秒 → 确认，最多再读约 35 秒。不亮屏时系统界面可能不绘制，恢复显示约需 20 秒，页面和确认弹窗都会提示。仍未加载就报错，主按钮回到“重启手表”。安装、更新和开 Zygisk 仍需重启手表。
 - 每次连接进入页面读取一次；没有安装 Local Bridge 时不读取。旧版 Bridge 可能把已加载读成未加载，所以每次连接还会读取 Bridge 的 versionCode，比手机旧时清单第一行给出更新入口，并隐藏主按钮。
 - 普通刷新只读一轮，刚启动健康应用时再看两次；读取失败时保留上次结果但不提供任何操作，连接断开时清空。Magisk 没有回答显示“没有返回”，不当作未开启。
 - 确认弹窗打开时固定目标手表，整个计划只接受该手表重启后的重连；换手表立即终止。安装、主机命令和通知引擎也通过 `WatchModuleTarget` 协程上下文核对目标。
-- 自动切换到 `ALL` 的机会在发送前消费；失败、超时或回包丢失后只读，不自动再写。Zygisk 和通知标记必须由本次读回确认。
-- `UNCONFIRMED` 只跟一次 refresh：磁盘上确实有这个版本才继续，否则停下，不重试。Zygisk 没开成或通知标记没写成，都停在重启之前。
+- 自动切换到 `ALL` 的机会在发送前消费；失败、超时或回包丢失后只读，不自动再写。Zygisk 和关闭记录必须由本次读回确认。
+- `UNCONFIRMED` 只跟一次 refresh：磁盘上确实有这个版本才继续，否则停下，不重试。Zygisk 没开成或关闭记录没写成、没删成，都停在重启之前。
 - 未加载时按 Zygisk、DenyList、健康应用未安装、版本不支持、进程未启动的顺序给出原因；原因明确时不再重复读取，其余情况重启后最多连续读 6 次（约 1.5 分钟）。健康进程未启动时读一次它的设置 Provider，顺带把进程带起来，不强制启动或停止。
 
 ### 3.5 停用

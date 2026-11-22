@@ -206,6 +206,8 @@ class WatchModuleSetupTest {
             var failedApply = false
             var applications = 0
             var optIns = 0
+            var keptOff = 0
+            var keepOffFails = false
             override val state =
                 MutableStateFlow(NotificationAlertPatchState(NotificationAlertPatchPhase.READY))
 
@@ -243,6 +245,19 @@ class WatchModuleSetupTest {
                 mode = NotificationAlertPatchMode.OFF
                 state.value =
                     NotificationAlertPatchState(NotificationAlertPatchPhase.READY, snapshot(), true)
+            }
+
+            override suspend fun keepOff() {
+                observed("keepoff")
+                keptOff++
+                if (!keepOffFails) optedIn = false
+                state.value =
+                    NotificationAlertPatchState(
+                        NotificationAlertPatchPhase.READY,
+                        snapshot(),
+                        true,
+                        "notification_alert_write_failed".takeIf { keepOffFails },
+                    )
             }
 
             override suspend fun applyToAll() {
@@ -477,6 +492,35 @@ class WatchModuleSetupTest {
             assertEquals(0, f.host.restarts)
             assertEquals("module_zygisk_failed", f.setup.problem)
             assertFalse(f.setup.applyAlerts)
+        }
+    }
+
+    @Test
+    fun turnedOffBeforeInstallingTheNewCopyKeepsItOffThroughTheOneRestart() = runTest {
+        Fixture(backgroundScope).use { f ->
+            f.patch.optedIn = true
+            f.begin(ModulePlan(update = true, alertsOff = true, restart = true))
+            advanceUntilIdle()
+            val order = f.calls.map { it.first }
+            assertTrue(order.indexOf("install") < order.indexOf("keepoff"))
+            assertTrue(order.indexOf("keepoff") < order.indexOf("restart"))
+            assertFalse(f.patch.optedIn)
+            assertEquals(1, f.host.restarts)
+            assertEquals(0, f.patch.optIns)
+            assertFalse(f.setup.applyAlerts)
+        }
+    }
+
+    @Test
+    fun aRecordThatWasntKeptStopsBeforeTheRestart() = runTest {
+        Fixture(backgroundScope).use { f ->
+            f.patch.optedIn = true
+            f.patch.keepOffFails = true
+            f.begin(ModulePlan(install = true, alertsOff = true, restart = true))
+            advanceUntilIdle()
+            assertEquals(1, f.patch.keptOff)
+            assertEquals(0, f.host.restarts)
+            assertEquals("notification_alert_write_failed", f.setup.problem)
         }
     }
 

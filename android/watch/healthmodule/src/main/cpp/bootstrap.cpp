@@ -125,13 +125,14 @@ public:
         int directory_fd = api_->getModuleDir();
         if (directory_fd < 0) { report("module_directory_unavailable"); return; }
         if (alert_) {
-            // No SystemUI injection for existing health-only installations. This root-owned
-            // opt-in file must be explicitly created before a later process start/reboot.
-            int opt_in = openat(directory_fd, "notification-alerts.enabled", O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+            // Read once per SystemUI start: turning it off or back on takes effect at the next one.
             struct stat flag{};
-            bool enabled = opt_in >= 0 && !fstat(opt_in, &flag) && healthmodule::alert_opt_in_allowed(flag);
-            if (opt_in >= 0) close(opt_in);
-            if (!enabled) { report("alert_opt_in_absent"); close(directory_fd); api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY); return; }
+            int looked = fstatat(directory_fd, "notification-alerts.disabled", &flag, AT_SYMLINK_NOFOLLOW);
+            int error = looked ? errno : 0;
+            if (healthmodule::alert_opted_out(looked, error)) {
+                report(looked ? "alert_opt_out_unreadable" : "alert_opted_out");
+                close(directory_fd); api_->setOption(zygisk::DLCLOSE_MODULE_LIBRARY); return;
+            }
         }
         int fd = openat(directory_fd, "module.dex", O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
         close(directory_fd);

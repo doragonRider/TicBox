@@ -80,7 +80,8 @@ public class NotificationAlertsTest {
     }
 
     @Test public void observeAndOffLeaveOriginalEffectsAloneAndOnlyObserveTheProbe() throws Exception {
-        install(); assertEquals(AlertPolicy.Mode.OBSERVE, policy.mode());
+        install(); assertEquals(AlertPolicy.Mode.ALL, policy.mode());
+        setMode("OBSERVE");
         alert(notification(AlertPolicy.PROBE_PACKAGE, false, false), false); effects(1, 1);
         assertEquals(2, policy.result(null).getLong("probeLoaderCalls"));
         alert(notification("com.tencent.mm", false, false), false); effects(1, 1);
@@ -215,7 +216,7 @@ public class NotificationAlertsTest {
         };
         for (JSONObject request : invalid) assertEquals("invalid_request", policy.request(request).getString("error"));
         assertEquals("invalid_mode", mode("arbitrary").getString("error"));
-        assertEquals(AlertPolicy.Mode.OBSERVE, policy.mode());
+        assertEquals(AlertPolicy.Mode.ALL, policy.mode()); // Nothing saved yet, so the default holds.
         setMode("PROBE"); assertEquals(AlertPolicy.Mode.PROBE, new AlertPolicy(app).mode());
         assertEquals("PROBE", app.getSharedPreferences("ticwatch_notification_alerts_v1", 0).getString(AlertProfile.SHA256, null));
         assertEquals(AlertPolicy.Mode.OBSERVE, AlertPolicy.parse("future-mode"));

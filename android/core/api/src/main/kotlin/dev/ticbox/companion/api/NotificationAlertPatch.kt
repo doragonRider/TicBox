@@ -7,9 +7,9 @@ enum class NotificationAlertPatchMode { OFF, OBSERVE, PROBE, ALL }
 
 /** What root can see of the module's optional SystemUI extension. Never proof an alert played. */
 data class NotificationAlertPatchSnapshot(
-    /** The module's opt-in marker exists where the next boot will look for it. */
+    /** No record of turning it off where the next boot will look, so it loads there: it is on unless turned off. */
     val optedIn: Boolean,
-    /** The marker is older than this boot, so a process start has already had the chance to load. */
+    /** It has been on since before this boot, so a process start has already had the chance to load it. */
     val optInSurvivedReboot: Boolean,
     /** The control socket answered with the exact supported SystemUI identity. */
     val running: Boolean,
@@ -30,20 +30,22 @@ data class NotificationAlertPatchState(
     val reason: String? = null,
 )
 /**
- * The module's documented opt-in and control commands over root Local Bridge, for explicit requests
- * only. Never reboots, never repeats a write, and only [optOut] or the watch's own Magisk undo it.
+ * The module's documented on/off and control commands over root Local Bridge, for explicit requests
+ * only. Never reboots and never repeats a write. Only turning it off leaves a record on the watch.
  */
 interface NotificationAlertPatchClient : AutoCloseable {
     val state: StateFlow<NotificationAlertPatchState>
     suspend fun refresh()
-    /** Creates the marker, in the staged copy when there is one. Loading takes a normal reboot. */
+    /** Removes the record of turning it off from every copy. Loading takes a restart of the system UI. */
     suspend fun optIn()
     /**
-     * Independently attempts OFF and marker removal, then reads status. A missing control socket
-     * does not prevent cancelling the next boot's opt-in. Check reason and the observed mode:
-     * removing the marker alone does not prove the currently loaded extension is passive.
+     * Independently attempts OFF and the record of turning it off, then reads status. A missing
+     * control socket does not stop the record. Check reason and the observed mode: the record
+     * alone does not prove the currently loaded extension is passive.
      */
     suspend fun optOut()
+    /** Only the record, into every copy, for when a restart follows that unloads whatever runs now. */
+    suspend fun keepOff() = optOut()
     suspend fun applyToAll()
     override fun close()
     companion object {

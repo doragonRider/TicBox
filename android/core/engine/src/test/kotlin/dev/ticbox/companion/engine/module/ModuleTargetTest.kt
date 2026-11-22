@@ -23,7 +23,7 @@ class ModuleTargetTest {
         var contacts = 0
         val module = HealthModuleEngine({ payload() }) { _, _, _, _, _ -> contacts++; reply() }
         val host = WatchModuleHostEngine { _, _, _ -> contacts++; commandResult("zygisk value=1\n") }
-        val patch = NotificationAlertPatchEngine { _, _, _ -> contacts++; commandResult("optin none\n") }
+        val patch = NotificationAlertPatchEngine { _, _, _ -> contacts++; commandResult("alerts off\n") }
         val changed = HealthModuleLink(other, 2)
         module.attach(changed); host.attach(changed); patch.attach(changed)
         withContext(WatchModuleTarget(peer)) {
@@ -45,7 +45,7 @@ class ModuleTargetTest {
         val seen = mutableListOf<HealthModuleLink>()
         val module = HealthModuleEngine({ payload() }) { link, _, _, _, _ -> seen += link; reply() }
         val host = WatchModuleHostEngine { link, _, _ -> seen += link; commandResult("zygisk value=1\n") }
-        val patch = NotificationAlertPatchEngine { link, _, _ -> seen += link; commandResult("optin none\n") }
+        val patch = NotificationAlertPatchEngine { link, _, _ -> seen += link; commandResult("alerts off\n") }
         withContext(WatchModuleTarget(peer)) {
             for (sessionId in listOf(1L, 2L)) {
                 val link = HealthModuleLink(peer, sessionId)
