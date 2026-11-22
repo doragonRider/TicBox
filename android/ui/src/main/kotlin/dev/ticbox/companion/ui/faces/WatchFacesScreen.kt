@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.ticbox.companion.api.ConnectionPhase
 import dev.ticbox.companion.api.WatchFaceFavorite
+import dev.ticbox.companion.api.WatchFaceImage
 import dev.ticbox.companion.api.WatchFaceInstalled
 import dev.ticbox.companion.api.WatchFaceManagementState
 import dev.ticbox.companion.api.WatchFaceOutcome
@@ -107,7 +108,11 @@ data class WatchFacesUiState(val faces: WatchFaceManagementState, val linkReady:
         favorite.id != null && favorite.id == faces.current?.favoriteId
 }
 
-class WatchFacesViewModel(dependencies: CompanionDependencies) : SessionViewModel(dependencies) {
+/** [photoFace] draws the photo face, whose own preview on the watch is a stock picture. */
+class WatchFacesViewModel(
+    dependencies: CompanionDependencies,
+    private val photoFace: PhotoFacePictures? = null,
+) : SessionViewModel(dependencies) {
     val state: StateFlow<WatchFacesUiState?> =
         sessionState(
             current = {
@@ -124,13 +129,32 @@ class WatchFacesViewModel(dependencies: CompanionDependencies) : SessionViewMode
         )
 
     private var loader: Pair<WatchSession, FacePreviewLoader>? = null
+    private val photoAsked = mutableSetOf<Long>()
 
     suspend fun preview(favorite: WatchFaceFavorite): ImageBitmap? {
         val current = session.value ?: return null
+        photoFacePicture(current, favorite)?.let {
+            return it
+        }
         val active =
             loader?.takeIf { it.first == current }?.second
                 ?: FacePreviewLoader(current.services.watchFaces).also { loader = current to it }
         return active.load(favorite)
+    }
+
+    /** The photo face with the watch's photo on it, asking the watch once per link. */
+    private suspend fun photoFacePicture(
+        session: WatchSession,
+        favorite: WatchFaceFavorite,
+    ): ImageBitmap? {
+        val pictures = photoFace ?: return null
+        val component = favorite.componentName ?: return null
+        val watch = session.client.state.value
+        val link = watch.connection.sessionId
+        val known = session.services.watchFaces.state.value.photo
+        return pictures.picture(component, known, watch.battery?.value) {
+            if (photoAsked.add(link)) session.services.watchFaces.queryPhoto() else null
+        }
     }
 
     fun refresh() =
@@ -209,7 +233,8 @@ internal fun WatchFaceOutcome.message(): UiText? =
 
 @Composable
 fun WatchFacesScreen(onBack: () -> Unit, navigate: (Any) -> Unit) {
-    val viewModel = companionViewModel { WatchFacesViewModel(it) }
+    val photoFace = rememberPhotoFacePictures()
+    val viewModel = companionViewModel { WatchFacesViewModel(it, photoFace) }
     val state by viewModel.state.collectAsStateWithLifecycle()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     PageScaffold(
@@ -273,6 +298,7 @@ fun WatchFacesScreen(onBack: () -> Unit, navigate: (Any) -> Unit) {
                             current = current.isCurrent(favorite),
                             enabled = current.linkReady && favorite.id != null && !busy,
                             busy = busy,
+                            photo = current.faces.photo?.image,
                             loadPreview = viewModel::preview,
                             onSelect = { viewModel.select(favorite) },
                             menu =
@@ -437,12 +463,16 @@ private fun FavoriteCard(
     current: Boolean,
     enabled: Boolean,
     busy: Boolean,
+    /** The watch's photo, which the photo face's card shows; other cards keep their cached one. */
+    photo: WatchFaceImage?,
     loadPreview: suspend (WatchFaceFavorite) -> ImageBitmap?,
     onSelect: () -> Unit,
     menu: FavoriteMenu,
 ) {
     val preview by
-        produceState<ImageBitmap?>(null, favorite.previewKey()) { value = loadPreview(favorite) }
+        produceState<ImageBitmap?>(null, favorite.previewKey(), photo) {
+            value = loadPreview(favorite)
+        }
     Card(
         modifier =
             Modifier.selectable(

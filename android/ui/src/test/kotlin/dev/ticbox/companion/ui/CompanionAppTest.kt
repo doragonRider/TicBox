@@ -771,7 +771,16 @@ class CompanionAppTest {
         waitForText("Smaller than the watch screen")
         compose.onNodeWithTag("time_MIDDLE").performScrollTo().performClick()
         compose.onNodeWithTag("photo_send").performScrollTo().performClick()
-        waitForText("Choose a photo")
+        // Each step shows while it runs, and the editor stays open until the watch has switched.
+        compose.waitUntil(5_000) {
+            listOf("Preparing the photo…", "Sending the photo to the watch…").any {
+                compose.onAllNodesWithText(it).fetchSemanticsNodes().isNotEmpty()
+            }
+        }
+        compose.waitUntil(5_000) {
+            ShadowLooper.idleMainLooper(100, TimeUnit.MILLISECONDS)
+            compose.onAllNodesWithText("Choose a photo").fetchSemanticsNodes().isNotEmpty()
+        }
         val photo = demo.watchFaces.state.value.photo
         assertEquals(2, photo?.settings?.timePlace)
         // A PNG, so the watch's own JPEG is the only lossy step.

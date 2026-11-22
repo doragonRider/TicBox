@@ -66,6 +66,7 @@ fun PhotoFaceEditorScreen(viewModel: PhotoFaceViewModel, onBack: () -> Unit, onD
     val linkReady by viewModel.linkReady.collectAsStateWithLifecycle()
     val battery by viewModel.battery.collectAsStateWithLifecycle()
     val delivered by viewModel.delivered.collectAsStateWithLifecycle()
+    val progress by viewModel.progress.collectAsStateWithLifecycle()
     val ready = linkReady == true
     val sending = PhotoFaceViewModel.SET in pending
     // Back to the photo face page once the watch has the photo, or when there is none to edit,
@@ -101,12 +102,9 @@ fun PhotoFaceEditorScreen(viewModel: PhotoFaceViewModel, onBack: () -> Unit, onD
                 enabled = ready && editor.edit != null && !sending,
                 modifier = Modifier.fillMaxWidth().testTag("photo_send"),
             ) {
-                Text(
-                    stringResource(
-                        if (sending) R.string.faces_photo_sending else R.string.faces_photo_send
-                    )
-                )
+                Text(stringResource(R.string.faces_photo_send))
             }
+            PhotoProgressView(progress)
             FootnoteText(
                 stringResource(
                     if (ready) R.string.faces_photo_edit_hint else R.string.faces_photo_disconnected
