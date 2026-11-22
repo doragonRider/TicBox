@@ -105,7 +105,10 @@ internal data class RootProcessResult(val exitCode: Int, val output: String, val
 internal object RootProcess {
     fun run(command: String, cancellation: CancellationSignal, timeoutMillis: Long): RootProcessResult {
         cancellation.throwIfCanceled()
-        val process = try { ProcessBuilder("su", "-c", command).redirectErrorStream(true).start() }
+        // Without --mount-master, su keeps this app's mount namespace, where Android 11+ data
+        // isolation hides other apps' data directories even from root: the health and fitness
+        // databases then look absent.
+        val process = try { ProcessBuilder("su", "--mount-master", "-c", command).redirectErrorStream(true).start() }
         catch (_: java.io.IOException) { throw FitnessSourceException("root_unavailable") }
         val output = ByteArrayOutputStream()
         val drain = Thread({

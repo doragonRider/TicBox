@@ -22,7 +22,7 @@ TicBox 是 TicWatch 手表（TicWatch Pro 5、Pro 5 Enduro、Atlas）的本地�
 2. 安装或更新 APK，`-r` 会保留应用数据：
 
    ```bash
-   adb install -r ticbox-phone-1.0.0-release-<commit>.apk
+   adb install -r ticbox-phone-<version>-release-<commit>.apk
    ```
 
 3. 如果通知访问权限的开关是灰色的，打开本应用的“应用信息”，点右上角 ⋮ →“允许受限制的设置”，再开启通知访问。
