@@ -59,7 +59,7 @@ class FitnessSnapshotPipelineTest {
             db.record(); repeat(600) { db.point(it + 1L) }
             var now = 1_800_000_000_000L
             val tables = listOf(LocalHealthTable.FITNESS_RECORD, LocalHealthTable.FITNESS_POINT)
-            val ledger = HealthIncrementalStore(context, "fitness-incremental.sqlite", now = { now })
+            val ledger = HealthIncrementalStore(context, "fitness-incremental.sqlite", now = { now }, pageRows = 128)
             var sourceReads = 0
             IncrementalHealthReader(ledger, { request, signal ->
                 sourceReads++

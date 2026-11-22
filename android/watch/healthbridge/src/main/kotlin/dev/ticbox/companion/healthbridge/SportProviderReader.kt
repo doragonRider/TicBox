@@ -35,7 +35,7 @@ internal class SportProviderReader(private val resolver: ContentResolver, privat
         if (upper == null) return localHealthPage(emptyList(), consumed, null, true, providerVersion,
             nextKey = after)
         val limit = (request.number("limit") ?: LocalHealthProtocol.PAGE_SIZE.toLong())
-            .coerceIn(1, LocalHealthProtocol.PAGE_SIZE.toLong()).toInt()
+            .coerceIn(1, LocalHealthProtocol.MAX_PAGE_ROWS.toLong()).toInt()
         val where = buildList {
             add(VISIBLE_RECORDS)
             add("HASH COLLATE BINARY<=${sqlKey(upper)}")

@@ -75,7 +75,7 @@ ready 的 version 为 3，表示同一连接提供持久的增量批次和入库
 ### 3.1 changes
 
 ```json
-{"op":"changes","table":"data_point","receiver":"<本地档案 ID>","run":"<本轮随机 ID>","full":false,"limit":128}
+{"op":"changes","table":"data_point","receiver":"<本地档案 ID>","run":"<本轮随机 ID>","full":false,"limit":1024}
 ```
 
 table 只能是五个固定的逻辑表之一：`data_point / data_session / fitness_summary / fitness_record / fitness_point`。receiver 是手机持久的本地档案 ID，不是云账号；run 标识一次任务，重连时沿用，重启任务时可以接着手表上未完成的采集。`full=true` 强制重新读取全部启用的来源；手机没有该表的本地接收基线时也必须请求全量。可选的 `window` 是首次同步的时间窗（毫秒，见 [4.6](#46-首次同步的时间窗)），自动和普通同步都带，手动全量不带。可选的 `ack` 是这张表上一页的批次 ID，见 [3.2](#32-ack)；`compression` 见上文。旧版本的桥接忽略这三个字段。手机不传 SQL、URI、projection、路径或官方的分页位置。
@@ -97,7 +97,7 @@ table 只能是五个固定的逻辑表之一：`data_point / data_session / fit
 
 | 字段 | 含义 |
 |---|---|
-| rows | 有变化、未确认或全量要求的完整原始行，最多 128 条；保留未知字段 |
+| rows | 有变化、未确认或全量要求的完整原始行，最多 1024 条，还受单帧大小限制；保留未知字段。批次大小由手表决定，不看请求的 `limit`：1.0.5 起最多 1024 条，更早的版本最多 128 条 |
 | batch | 手表上持久的批次 ID；确认前内容固定，重连时可以重放 |
 | bridgeEpoch / bridgeRevision / bridgeKey | 桥接库的代际、交付版本和比较身份；不是官方的修改时间 |
 | nextId | 批次进度，十进制 int64；**不是官方 ID，也不是 SPORT 的 occurrence** |
@@ -110,7 +110,7 @@ table 只能是五个固定的逻辑表之一：`data_point / data_session / fit
 | inlineAck | 这一批的 ACK 可以随同一张表的下一个 changes 请求发送，见 [3.2](#32-ack)。旧版本的桥接不带 |
 | sourceAbsent | 行级字段；完整范围观察后发现该行已从来源消失，见第 4.4 节 |
 
-每次 changes 按页读取，并原子保存观察结果、待传队列和采集位置；某页没有待传行时继续读下一页（最多连续 3 秒），然后生成持久批次。没有变化行时也可以发送带 batch 的空进度批次。单帧最大 1 MiB，行内容预留 8192 字节给元数据；放不下的行留待下一批，单行超限时报告 `row_exceeds_budget`，不静默跳过。
+每次 changes 按页读取（每页最多 1024 行），并原子保存观察结果、待传队列和采集位置；某页没有待传行时继续读下一页（最多连续 3 秒），然后生成持久批次。没有变化行时也可以发送带 batch 的空进度批次。单帧最大 1 MiB，行内容预留 8192 字节给元数据；放不下的行留待下一批，单行超限时报告 `row_exceeds_budget`，不静默跳过。
 
 ### 3.2 ack
 
@@ -164,7 +164,7 @@ POINT 和私有运动表读取 Cursor 返回的所有列。SESSION 通过 data_p
 |---|---|
 | SESSION | 比较全部会话；重开、延长、合并、删除标记和物理消失都会重新观察 |
 | 普通 POINT | 查大于已观察最大 ID 的新范围，再查最近一天和 `time_to<=0` 的范围；每小时最多一轮深度检查，把近期范围扩到三天，并轮查 256 条旧行 |
-| 与睡眠相关的 POINT | 未结束或最近一天有变化的 SESSION，会把重点复查范围扩展到它的 time_from；老会话被重开也不会因为日期旧而被排除 |
+| 与睡眠相关的 POINT | 未结束或最近一天有变化的 SESSION，会把重点复查范围扩展到它的 time_from；老会话被重开也不会因为日期旧而被排除。全量采集第一次看到的会话不算有变化，否则换手机或导入后的一天里，每次检查都会被扩展到最老的会话，读遍整张表 |
 | fitness_record | 比较全部训练摘要，包括进行中、收尾和 SYNCED/DELETED 的变化 |
 | fitness_point | 新 ID 范围，加上最多 8 个到期训练的全部明细；每小时最多一轮深度检查，另加 256 条旧行轮查；父摘要不变也照常轮查 |
 | fitness_summary | 比较 Provider 当前可见的所有摘要；权限被拒绝时保持不可用 |
@@ -213,7 +213,7 @@ POINT 和私有运动表读取 Cursor 返回的所有列。SESSION 通过 data_p
 
 所有 root helper（运动分页、运动库检查、手动导出的快照和变更日志）都必须以 `--mount-master` 在全局挂载空间中运行。不加时 su 沿用 Local Bridge 自己的挂载空间，Android 11 起的应用数据隔离会让 root 也看不到其他应用的数据目录：运动库被当成“没有数据”返回空页，变更日志报 `journal_database_missing`。
 
-helper 以 `OPEN_READONLY | NO_LOCALIZED_COLLATORS` 打开数据库，只查询固定的 RECORD / POINT 有界页，保留所有可读的列和类型；每页最多 128 行并预读一行，按 `_id` 数字分页，训练范围使用 RECORD_ID。结果写入普通 UID 预先创建的私有临时 JSON，普通 UID 比较内容并持久排队后通过蓝牙发送，随后删除临时文件。不复制整个数据库，不修改 SYNCED/DELETED，不停止官方服务，不修改官方目录的权限和属主。
+helper 以 `OPEN_READONLY | NO_LOCALIZED_COLLATORS` 打开数据库，只查询固定的 RECORD / POINT 有界页，保留所有可读的列和类型；每页最多 1024 行（按请求的 `limit`）并预读一行，按 `_id` 数字分页，训练范围使用 RECORD_ID。结果写入普通 UID 预先创建的私有临时 JSON，普通 UID 比较内容并持久排队后通过蓝牙发送，随后删除临时文件。不复制整个数据库，不修改 SYNCED/DELETED，不停止官方服务，不修改官方目录的权限和属主。
 
 每页的只读视图包含已提交的 WAL；跨页、跨表不构成原子快照，等待蓝牙时也不持有事务。helper 截止 20 秒，su 等待最多 25 秒。原始数据和 SQL 错误正文不进入状态或日志。SQLite 可能使用读锁和共享内存，不能声称完全没有元数据开销。
 
@@ -265,7 +265,7 @@ SQLite 的 OR IGNORE、OR FAIL 和其他触发器可能中断 AFTER 触发器而
 
 启用前核对实际的包名、UID、版本名和版本号，以及完整 APK 的 SHA-256；目前精确支持 TicHealth 5.5.0-3292.2931、5.6.0-3234.2686 和 TicFitness 5.5.0-2536.2932（白名单在代码中）。随后校验 user_version、Room hash、目标表的完整结构、外键、约束、索引和永久触发器。同一版本中已确认的结构变体（HASH UNIQUE、POINT AUTOINCREMENT）单独识别；更早或未确认的结构拒绝启用，退回独立读取。不通过修改 Room hash 或 user_version 绕过验证。
 
-数据目录、数据库和已有的辅助文件必须是预期 UID 拥有的普通文件，拒绝符号链接。一次性的 su helper 先验证来源，打开 Local Bridge 自己的请求和回复文件，再不可逆地降到官方应用的 UID/GID 后打开数据库，避免新的 WAL/SHM 归 root 所有。写连接使用观察到的 journal 模式，辅助连接自身使用 FULL 同步；不修改官方连接的 synchronous、recursive_triggers 或 checkpoint 配置。helper 截止 20 秒，su 等待 25 秒；等待蓝牙时不持有源事务，消费时只读打开，不自动修复。
+数据目录、数据库和已有的辅助文件必须是预期 UID 拥有的普通文件，拒绝符号链接。一次性的 su helper 先验证来源，打开 Local Bridge 自己的请求和回复文件，再不可逆地降到官方应用的 UID/GID 后打开数据库，避免新的 WAL/SHM 归 root 所有。helper 在创建系统 context 之前先打开一个内存数据库：进程里有 Application 时，SQLite 第一次打开数据库会经它读取一项全局设置，而系统 context 的包名 `android` 与 root 和官方应用的 UID 都不符，这次读取会被系统拒绝，之后的每次打开都会失败；没有 Application 时 SQLite 跳过这项设置，使用默认值。写连接使用观察到的 journal 模式，辅助连接自身使用 FULL 同步；不修改官方连接的 synchronous、recursive_triggers 或 checkpoint 配置。helper 截止 20 秒，su 等待 25 秒；等待蓝牙时不持有源事务，消费时只读打开，不自动修复。
 
 ### 6.5 消费与恢复
 
@@ -320,6 +320,6 @@ adb shell am start -W -n dev.ticbox.companion/dev.ticbox.companion.healthbridge.
 
 手表在每个回复里带 `watchMillis` 时，手机把 read 拆成 `watch`（手表处理）和 `transfer`（其余时间：请求和回复的蓝牙传输、手表序列化和压缩、手机解压和解析），并累计每页收到的字节数。每轮结束后，手机为每张表写一条 `run_timing` 诊断（各阶段的毫秒数、次数和字节数，压缩时为压缩后的大小，不含健康数据），另有一条带总耗时的汇总。
 
-变更日志的每次操作（读状态、开启、关闭）结束后，手机写一条 `journal_result` 诊断：来源、操作、结果（`ok`、稳定的错误码、手机等满 90 秒的 `phone_timeout` 或异常类型）和耗时。手表的 root 辅助进程遇到非预期异常时，在回复里附上失败的步骤（context、verify、stat、sqlite、uid、open、validate 或操作名）、异常类型和抛出位置（最多 4 个“类.方法”，跳过 Binder 转发的帧），Local Bridge 把它们连同超时和退出码写入 `TicBoxHealthBridge` 日志；异常消息可能含有 SQL 或数据，不记录。
+变更日志的每次操作（读状态、开启、关闭）结束后，手机写一条 `journal_result` 诊断：来源、操作、结果（`ok`、稳定的错误码、手机等满 90 秒的 `phone_timeout` 或异常类型）和耗时。手表的 root 辅助进程遇到非预期异常时，在回复里附上失败的步骤（sqlite、context、verify、stat、uid、open、validate 或操作名）、异常类型和抛出位置（最多 4 个“类.方法”，跳过 Binder 转发的帧），Local Bridge 把它们连同超时和退出码写入 `TicBoxHealthBridge` 日志；异常消息可能含有 SQL 或数据，不记录。
 
-手表每开始一次新的采集，记录一行 `Capture planned`：表、是否全量、是否重发、是否走变更日志，以及计划的范围种类（new、recent、deep、workout、all、probe），不含 ID 或时间。近期范围被未结束或最近一天有变化的会话向前扩展时，记录这样的会话数（`Recent range widened`）。每次预读结束记录一行 `Read-ahead`：读取的源行数、待传行数、采集是否结束和耗时。
+手表每开始一次新的采集，记录一行 `Capture planned`：表、是否全量、是否重发、是否走变更日志，以及计划的范围种类（new、recent、deep、workout、all、probe），不含 ID 或时间。近期范围被未结束或最近一天有变化的会话向前扩展时，记录这样的会话数（`Recent range widened`）。每次预读结束记录一行 `Read-ahead`：读取的源行数、待传行数、采集是否结束和耗时。`Local changes sent`（每个 changes 回复一行）和 `Read-ahead` 还把耗时拆成读源数据（`source`）、写本地账本（`ledger`）和组装批次（`pack`，只有回复有）各用的毫秒数。

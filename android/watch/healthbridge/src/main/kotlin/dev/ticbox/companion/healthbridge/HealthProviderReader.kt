@@ -22,7 +22,7 @@ class HealthProviderReader(private val resolver: ContentResolver, private val pr
             "_id DESC LIMIT 1", cancellation) ?: return error("provider_missing")).use { cursor -> if (cursor.moveToFirst()) cursor.healthRowId() else null }
         if (upper == null) response(emptyList(), after, null, complete = true)
         else {
-            val limit = (request.number("limit") ?: LocalHealthProtocol.PAGE_SIZE.toLong()).coerceIn(1, LocalHealthProtocol.PAGE_SIZE.toLong()).toInt()
+            val limit = (request.number("limit") ?: LocalHealthProtocol.PAGE_SIZE.toLong()).coerceIn(1, LocalHealthProtocol.MAX_PAGE_ROWS.toLong()).toInt()
             val names = if (request.number("since") != null || request.number("before") != null) (resolver.query(URI, null, "0", null, null, cancellation)
                 ?: return error("provider_missing")).use { it.columnNames.toList() } else null
             val (bounds, args) = sourceSelection(table, JsonObject(request.toMutableMap().apply { put("upperId", JsonPrimitive(upper)) }), names)

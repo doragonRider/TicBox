@@ -69,7 +69,7 @@ class HealthWakeService : WearableListenerService() {
                         if (request.text("op") == "changes") {
                             pages++; rows += (page["rows"] as? JsonArray)?.size ?: 0
                             Log.i(TAG, "Local changes sent; pages=$pages rows=$rows scanned=${page.number("scannedRows") ?: 0} " +
-                                "partial=${page.flag("partial") == true} error=${page.text("error") ?: "none"} millis=${page.number("watchMillis")}")
+                                "partial=${page.flag("partial") == true} error=${page.text("error") ?: "none"} millis=${page.number("watchMillis")} ${reader.lastStages}")
                             // While this reply travels and the phone saves it, read the rows of the next one.
                             if (page.text("error") == null && page.flag("complete") != true) reader.prefetch(request, cancellation)
                         }

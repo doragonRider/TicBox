@@ -30,7 +30,13 @@ object LocalHealthProtocol {
     const val WAKE_PATH = "/ticbox_local_health/wake"
     const val RFCOMM_UUID = "a701ba60-6fa4-4acb-b3e7-0d29b381f6ce"
     const val MAX_FRAME_BYTES = 1_048_576
+    /** Rows a source read returns when a request doesn't ask for a number. */
     const val PAGE_SIZE = 128
+    /**
+     * Most rows per source read and per batch, which is what incremental sync uses. Each page costs a round trip and a few
+     * transactions, so pages are large; the frame budget still bounds them by size.
+     */
+    const val MAX_PAGE_ROWS = 1024
     const val SESSION_MILLIS = 25_000L
     /** The current self-owned protocol uses persistent batches and commit acknowledgements. */
     const val INCREMENTAL_VERSION = 3
@@ -132,7 +138,7 @@ object LocalHealthProtocol {
     fun changes(table: LocalHealthTable, receiver: String, run: String, full: Boolean, window: Long? = null,
         ack: String? = null, zlib: Boolean = false) = buildJsonObject {
         put("op", "changes"); put("table", table.wireName); put("receiver", receiver)
-        put("run", run); put("full", full); put("limit", PAGE_SIZE)
+        put("run", run); put("full", full); put("limit", MAX_PAGE_ROWS)
         window?.let { put("window", it) }; ack?.let { put("ack", it) }
         if (zlib) put("compression", ZLIB)
     }

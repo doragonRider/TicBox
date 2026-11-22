@@ -24,9 +24,9 @@ internal data class HealthScanScope(
         upperKey?.let { put("upperKey", it) }; put("token", token); put("partial", partial); put("changed", changed)
         before?.let { put("before", it) }; if (probe) put("probe", true)
     }
-    fun request(table: LocalHealthTable): JsonObject = JsonObject(json().toMutableMap().apply {
+    fun request(table: LocalHealthTable, pageRows: Int): JsonObject = JsonObject(json().toMutableMap().apply {
         put("table", JsonPrimitive(table.wireName)); put("op", JsonPrimitive("page"))
-        put("limit", JsonPrimitive(minOf(remaining ?: LocalHealthProtocol.PAGE_SIZE, LocalHealthProtocol.PAGE_SIZE)))
+        put("limit", JsonPrimitive(minOf(remaining ?: pageRows, pageRows)))
     })
     companion object {
         fun parse(json: JsonObject) = HealthScanScope(json.number("start"), json.number("afterId"), json.number("upperId"),
