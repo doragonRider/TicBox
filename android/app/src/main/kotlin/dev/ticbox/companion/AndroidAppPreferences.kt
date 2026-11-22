@@ -200,14 +200,14 @@ class AndroidAppPreferences(private val context: Context) : AppPreferences {
         const val TAG = "AppPreferences"
 
         /**
-         * The launcher entries in the manifest, one per icon. The names are 1.0.15's, whose icons
-         * these replace, so an entry chosen then is still there after the update.
+         * The launcher entries in the manifest, one per icon. Their names don't describe the icons,
+         * so redrawing one keeps the entry a user chose.
          */
         val LAUNCHERS =
             mapOf(
                 AppIconStyle.WARM_WHITE to "dev.ticbox.companion.MainActivity",
-                AppIconStyle.NAVY to "dev.ticbox.companion.IconSlate",
-                AppIconStyle.MIST to "dev.ticbox.companion.IconWhiteDial",
+                AppIconStyle.NAVY to "dev.ticbox.companion.LauncherIcon2",
+                AppIconStyle.MIST to "dev.ticbox.companion.LauncherIcon3",
             )
         const val FILE = "frontend-appearance"
         const val THEME_MODE = "color-mode"
