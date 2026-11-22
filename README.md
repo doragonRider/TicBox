@@ -14,6 +14,21 @@ By default, data flows **watch → local Bluetooth → phone → local database*
 - Toolbox over wireless ADB or root: app installs (including split APKs and data files), app management, files, clipboard, terminal and remote screen.
 - Do Not Disturb sync, and exporting and importing the phone's data.
 
+## Installing
+
+Install the phone APK with ADB from a computer. Opening the APK on the phone (from a browser, chat app or file manager) may be stopped with "App blocked to protect your device" and only a "Got it" button. This is because TicBox needs notification access, which Google Play Protect blocks for apps installed that way, and its developer is not registered for Android developer verification. Neither check applies to installs over ADB.
+
+1. On the phone, turn on Developer options, then USB debugging (or Wireless debugging), and connect it to the computer.
+2. Install or update the APK; `-r` keeps the app's data:
+
+   ```bash
+   adb install -r ticbox-phone-1.0.0-release-<commit>.apk
+   ```
+
+3. If the notification access switch is greyed out, open the app's App info, tap ⋮ and choose "Allow restricted settings", then turn notification access on.
+
+The watch's Local Bridge doesn't need a separate download: it ships inside the phone app, which installs it on the watch over wireless debugging (see [watch components](docs/dev/watch.md)).
+
 ## Documentation
 
 The documentation is written in Chinese.

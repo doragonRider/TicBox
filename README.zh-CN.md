@@ -14,6 +14,21 @@ TicBox 是 TicWatch 手表（TicWatch Pro 5、Pro 5 Enduro、Atlas）的本地�
 - 工具箱：经无线 ADB 或 root 的应用安装（含分包和数据包）、应用管理、文件管理、剪贴板、终端和远程屏幕。
 - 勿扰同步、手机数据的导出与导入。
 
+## 安装
+
+请在电脑上用 ADB 安装手机 APK。直接在手机上打开 APK（从浏览器、聊天软件或文件管理器）可能会被拦截，提示“App blocked to protect your device”，只能点“Got it”。原因是 TicBox 需要通知访问权限，Google Play Protect 会拦截以这种方式安装、且申请该权限的应用；另外，本应用的开发者没有在 Android 开发者验证中登记。这两项检查都不适用于 ADB 安装。
+
+1. 在手机上开启开发者选项，再开启 USB 调试（或无线调试），连接电脑。
+2. 安装或更新 APK，`-r` 会保留应用数据：
+
+   ```bash
+   adb install -r ticbox-phone-1.0.0-release-<commit>.apk
+   ```
+
+3. 如果通知访问权限的开关是灰色的，打开本应用的“应用信息”，点右上角 ⋮ →“允许受限制的设置”，再开启通知访问。
+
+手表上的 Local Bridge 不需要单独下载：它内置在手机 App 中，由手机经无线调试安装到手表（见[手表组件](docs/dev/watch.md)）。
+
 ## 文档
 
 - [协议规范](docs/spec/README.md)：官方 Wear OS 伴侣协议和本应用私有协议的完整说明。
