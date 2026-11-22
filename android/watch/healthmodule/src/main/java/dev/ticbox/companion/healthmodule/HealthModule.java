@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Process;
 import android.util.Log;
@@ -18,6 +19,7 @@ public final class HealthModule {
     private static final String TAG = "TicHealthModule";
     private static final AtomicBoolean STARTED = new AtomicBoolean();
     private static volatile HealthModuleServer server;
+    private static volatile HealthJournalAccess journal;
     private HealthModule() { }
 
     public static void start(Context context) {
@@ -48,6 +50,7 @@ public final class HealthModule {
             String hash = sha256(new File(source.sourceDir));
             HealthProfile profile = HealthProfile.match(info.packageName, info.getLongVersionCode(), info.versionName, hash);
             if (profile == null) { Log.w(TAG, "health_module_profile_not_supported"); return; }
+            startJournal(application, profile);
             main.post(() -> {
                 try {
                     OemHealthStore store = new OemHealthStore(application, profile, main);
@@ -60,6 +63,19 @@ public final class HealthModule {
             });
         } catch (Exception unsupported) { Log.w(TAG, "health_module_source_verification_failed"); }
         catch (LinkageError unsupported) { Log.w(TAG, "health_module_source_verification_failed"); }
+    }
+
+    /** Change-log reads for Local Bridge; independent of the settings socket, so either can fail alone. */
+    private static void startJournal(Application application, HealthProfile profile) {
+        try {
+            HealthJournalAccess access = new HealthJournalAccess(application, profile);
+            HandlerThread thread = new HandlerThread("TicHealthJournal");
+            thread.setDaemon(true); thread.start();
+            access.register(new Handler(thread.getLooper()));
+            journal = access;
+            Log.i(TAG, "health_module_journal_ready");
+        } catch (Exception unavailable) { Log.w(TAG, "health_module_journal_unavailable"); }
+        catch (LinkageError unavailable) { Log.w(TAG, "health_module_journal_unavailable"); }
     }
 
     static String sha256(File file) throws Exception {

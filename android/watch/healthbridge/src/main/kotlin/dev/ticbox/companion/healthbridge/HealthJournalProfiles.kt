@@ -198,7 +198,10 @@ internal object HealthJournalProfiles {
         "MIN_ELEVATION" to real(), "CUMULATIVE_UP" to real(), "CUMULATIVE_DOWN" to real(), "SCORE" to real(), "EXTRA" to text(),
     ), "_id", indexes = listOf(index("IDX_RECORD_HASH", "HASH")))
 
-    fun validateDatabase(db: SQLiteDatabase, source: String) = guarded("journal_schema_unavailable") {
+    fun validateDatabase(db: SQLiteDatabase, source: String) = validateDatabase(FileJournalSql(db), source)
+    fun schemaFingerprint(db: SQLiteDatabase, source: String) = schemaFingerprint(FileJournalSql(db), source)
+
+    fun validateDatabase(db: JournalSql, source: String) = guarded("journal_schema_unavailable") {
         val profile = source(source)
         if (db.version != profile.version) fail("journal_schema_unsupported")
         validateTable(db, master)
@@ -218,7 +221,7 @@ internal object HealthJournalProfiles {
     }
 
     /** Full OEM schema identity, excluding only the installer's independently checked namespace. */
-    fun schemaFingerprint(db: SQLiteDatabase, source: String): String = guarded("journal_schema_unavailable") {
+    fun schemaFingerprint(db: JournalSql, source: String): String = guarded("journal_schema_unavailable") {
         validateDatabase(db, source)
         val hash = MessageDigest.getInstance("SHA-256")
         fun add(value: String) {
@@ -245,7 +248,7 @@ internal object HealthJournalProfiles {
         hex(hash.digest())
     }
 
-    private fun validateTable(db: SQLiteDatabase, expected: Table) {
+    private fun validateTable(db: JournalSql, expected: Table) {
         val declared = declaredTable(db, expected.name)
         if (declared.columns != expected.columns || declared.autoIncrement != expected.autoIncrement || declared.unique != expected.unique) fail("journal_schema_unsupported")
         val actual = linkedMapOf<String, Column>()
@@ -294,7 +297,7 @@ internal object HealthJournalProfiles {
     private fun quote(value: String) = "\"${value.replace("\"", "\"\"")}\""
 
     /** Small allowlist parser: rejects hidden CHECK/collation/conflict/generated/rowid clauses. */
-    private fun declaredTable(db: SQLiteDatabase, name: String): Table {
+    private fun declaredTable(db: JournalSql, name: String): Table {
         val sql = db.rawQuery("SELECT sql FROM sqlite_master WHERE type='table' AND name=?", arrayOf(name)).use { cursor ->
             if (!cursor.moveToFirst() || cursor.isNull(0)) fail("journal_schema_unsupported")
             cursor.getString(0).also { if (cursor.moveToNext()) fail("journal_schema_unsupported") }

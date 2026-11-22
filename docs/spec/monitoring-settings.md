@@ -178,7 +178,8 @@ monitoring.set(MonitoringSettingId.SLEEP_EXPECTED_BEDTIME, MonitoringValue.Text(
 - 帧为 4 字节大端长度 + UTF-8 JSON，最大 64 KiB，每个连接处理一个请求。RPC 协议 `version=1`，实现的 `moduleVersionCode=1`。
 - `op="settings"`：带固定的设置 `id` 和规范化的字符串 `value` 时写入，不带时读取。`op="status"`：只返回构建 ID 和官方应用身份，不读取设置。
 - `op="provider"`（`providerVersion=1`）：在模块的工作线程中，以真实 Application 的 ContentResolver 执行固定的操作：app_ctrl 白名单的 get、put 和通知，`auto_motion` 只读，StepProvider 布尔更新和通知，类型 16 的读写。每个 authority 的所属包都单独核对；不修改 UID，不授予签名权限。
-- 不接受类名、方法名、文件路径、URI、表名、SQL 或代码；值域在模块内再次校验。
+- 这个 socket 不接受类名、方法名、文件路径、URI、表名、SQL 或代码；值域在模块内再次校验。
+- 模块另外为 Local Bridge 提供健康变更日志的只读查询。普通应用连不上另一个应用的 socket，所以它走 Binder，凭模块写在官方私有目录里的随机令牌交接，只能只读查询健康库，见[本地桥接协议 §6.6](local-bridge.md#66-读取)。这个接口与设置接口互相独立，任何一个失败都不影响另一个。
 
 ```json
 {"version":1,"op":"settings","id":"SLEEP_EXPECTED_BEDTIME","value":"23:30"}
