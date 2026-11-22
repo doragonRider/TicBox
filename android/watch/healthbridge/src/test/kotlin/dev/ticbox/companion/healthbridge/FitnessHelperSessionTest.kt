@@ -6,8 +6,8 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ticbox.companion.protocol.*
 import java.io.InputStream
 import java.io.OutputStream
-import java.io.PipedInputStream
-import java.io.PipedOutputStream
+import java.nio.channels.Channels
+import java.nio.channels.Pipe
 import kotlin.concurrent.thread
 import kotlin.test.*
 import kotlinx.serialization.json.*
@@ -21,18 +21,25 @@ import org.robolectric.annotation.Config
 class FitnessHelperSessionTest {
     private val context = ApplicationProvider.getApplicationContext<Application>()
 
-    /** A helper process whose other end runs [helper] on a thread of its own. */
+    /**
+     * A helper process whose other end runs [helper] on a thread of its own. Its pipes are the system's, as a real process's
+     * are: java.io's piped streams refuse a write once the last thread that read from them has ended ("Read end dead"), and
+     * the session reads the ready frame of a start that [FitnessHelperSession.warm] began on a thread that ends right after.
+     */
     private class FakeHelper(helper: (InputStream, OutputStream) -> Unit) : Process() {
-        private val toHelper = PipedOutputStream(); private val helperIn = PipedInputStream(toHelper, 1 shl 20)
-        private val fromHelper = PipedOutputStream(); private val ours = PipedInputStream(fromHelper, 1 shl 20)
-        private val worker = thread(isDaemon = true) { try { helper(helperIn, fromHelper) } catch (_: Exception) { } finally { fromHelper.close() } }
+        private val toHelper = Pipe.open(); private val fromHelper = Pipe.open()
+        private val ours = Channels.newInputStream(fromHelper.source()); private val theirs = Channels.newOutputStream(toHelper.sink())
+        private val helperOut = Channels.newOutputStream(fromHelper.sink())
+        private val worker = thread(isDaemon = true) {
+            try { helper(Channels.newInputStream(toHelper.source()), helperOut) } catch (_: Exception) { } finally { runCatching { helperOut.close() } }
+        }
         @Volatile var destroyed = false
-        override fun getOutputStream(): OutputStream = toHelper
+        override fun getOutputStream(): OutputStream = theirs
         override fun getInputStream(): InputStream = ours
         override fun getErrorStream(): InputStream = InputStream.nullInputStream()
         override fun waitFor(): Int { worker.join(); return 0 }
         override fun exitValue() = 0
-        override fun destroy() { destroyed = true; runCatching { toHelper.close() }; runCatching { fromHelper.close() } }
+        override fun destroy() { destroyed = true; runCatching { theirs.close() }; runCatching { helperOut.close() } }
     }
 
     private fun page(table: String) = buildJsonObject { put("table", table) }
