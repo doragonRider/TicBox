@@ -1,0 +1,5 @@
+<resources>
+    <!-- Backgrounds of the launcher icons; the app's mipmaps and the icon previews in Appearance share them. -->
+    <color name="ic_launcher_background">#D0DFE6</color>
+    <color name="ic_launcher_background_slate">#406370</color>
+</resources>

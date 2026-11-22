@@ -1,0 +1,9 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- The watch in one color, with the face left open so a themed icon shows its hands. All three colorways share it. -->
+    <path android:fillColor="#FF000000" android:pathData="M45.53,4H62.47L68.3,23.42H39.7Z M39.7,84.58H68.3L62.47,104H45.53Z" />
+    <path android:fillColor="#FF000000" android:pathData="M54,26.5a27.5,27.5 0,1 1,0 55a27.5,27.5 0,0 1,0 -55Z M34.75,34.31L37.06,24.85Q37.5,22.65 39.7,22.65H68.3Q70.5,22.65 70.94,24.85L73.25,34.31L54,30.9Z M54,77.1L73.25,73.69L70.94,83.15Q70.5,85.35 68.3,85.35H39.7Q37.5,85.35 37.06,83.15L34.75,73.69Z M54,31.78a22.22,22.22 0,1 0,0 44.44a22.22,22.22 0,0 0,0 -44.44Z" />
+    <path android:fillColor="#FF000000" android:pathData="M80.4,50.92L81.94,50.92Q83.59,50.92 83.59,52.57L83.59,55.43Q83.59,57.08 81.94,57.08L80.4,57.08Z M72.77,35.15L73.73,34.4Q74.51,33.79 75.11,34.57L77.96,38.21Q78.57,38.99 77.79,39.6L76.84,40.35Z" />
+    <path android:fillColor="#00000000" android:strokeColor="#FF000000" android:strokeWidth="4.84" android:strokeLineCap="round" android:pathData="M55.12,54.7L45.04,48.4" />
+    <path android:fillColor="#00000000" android:strokeColor="#FF000000" android:strokeWidth="3.74" android:strokeLineCap="round" android:pathData="M52.86,54.66L67.15,46.41" />
+</vector>
