@@ -186,6 +186,12 @@ class FakeJournal(
         return status.getValue(source)
     }
 
+    // Delegated, this would go to base, which doesn't know these statuses.
+    override suspend fun journalStatuses(
+        sources: List<LocalHealthJournalSource>,
+        each: suspend (LocalHealthJournalSource, Result<LocalHealthJournalStatus>) -> Unit,
+    ) = super<LocalHealthSyncClient>.journalStatuses(sources, each)
+
     override suspend fun setJournalEnabled(
         source: LocalHealthJournalSource,
         enabled: Boolean,

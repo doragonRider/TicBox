@@ -64,10 +64,23 @@ class HealthJournalViewModel(dependencies: CompanionDependencies) : SessionViewM
         MutableStateFlow(emptyMap<LocalHealthJournalSource, JournalSourceUi>())
     val sources = mutableSources.asStateFlow()
 
-    /** One at a time: the backend refuses journal operations that overlap. */
+    /**
+     * One after another over one connection, each shown as soon as it's read: the backend refuses
+     * journal operations that overlap.
+     */
     fun readAll() =
         command(READ) { session ->
-            LocalHealthJournalSource.entries.forEach { show(it, load(session, it)) }
+            session.services.localHealth.journalStatuses(LocalHealthJournalSource.entries) {
+                source,
+                result ->
+                show(
+                    source,
+                    result.fold(
+                        { JournalSourceUi(it) },
+                        { JournalSourceUi(problem = (it as LocalHealthJournalException).code) },
+                    ),
+                )
+            }
             null
         }
 

@@ -48,6 +48,29 @@ class LocalHealthSyncEngineTest {
         assertFalse(engine.setJournalEnabled(LocalHealthJournalSource.HEALTH, false).installed!!)
         engine.close()
     }
+    @Test fun theChangeLogPageReadsEverySourceOverOneConnectionAndOneThatFailsDoesNotStopTheRest() = runTest {
+        val now = 10_000L; var opens = 0; val asked = mutableListOf<LocalHealthJournalSource>()
+        val engine = LocalHealthSyncEngine(backgroundScope, Store().apply { lastSuccess = now }, LocalHealthRemote {
+            opens++
+            object : LocalHealthConnection {
+                override suspend fun page(table: LocalHealthTable, checkpoint: LocalHealthCheckpoint): LocalHealthPage = error("unexpected scan")
+                override suspend fun journal(source: LocalHealthJournalSource, enabled: Boolean?): LocalHealthJournalStatus {
+                    asked += source
+                    if (source == LocalHealthJournalSource.HEALTH) throw LocalHealthJournalException("journal_invalid_reply")
+                    return LocalHealthJournalStatus(source, true, true)
+                }
+                override fun close() = Unit
+            }
+        }, now = { now })
+        engine.attach(link); runCurrent()
+        val results = mutableListOf<Pair<LocalHealthJournalSource, Result<LocalHealthJournalStatus>>>()
+        engine.journalStatuses(LocalHealthJournalSource.entries) { source, result -> results += source to result }
+        assertEquals(1, opens); assertEquals(LocalHealthJournalSource.entries.toList(), asked)
+        assertEquals(LocalHealthJournalSource.entries.toList(), results.map { it.first })
+        assertEquals("journal_invalid_reply", (results[0].second.exceptionOrNull() as LocalHealthJournalException).code)
+        assertTrue(results[1].second.getOrThrow().installed!!)
+        engine.close()
+    }
     @Test fun journalTimeoutIsAnUnconfirmedBusinessFailureButCallerCancellationStillPropagates() = runTest {
         var writes = 0; var closes = 0
         val now = 10_000L

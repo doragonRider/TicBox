@@ -125,13 +125,26 @@ class LocalHealthSyncEngine(scope: CoroutineScope, private val store: LocalHealt
     }
     override suspend fun journalStatus(source: LocalHealthJournalSource) = journal(source, null)
     override suspend fun setJournalEnabled(source: LocalHealthJournalSource, enabled: Boolean) = journal(source, enabled)
+    // Each read on a connection of its own costs a wake, a connection and a read window on the watch.
+    override suspend fun journalStatuses(sources: List<LocalHealthJournalSource>,
+        each: suspend (LocalHealthJournalSource, Result<LocalHealthJournalStatus>) -> Unit) = journal(sources.map { it to null }, each)
 
     private suspend fun journal(source: LocalHealthJournalSource, enabled: Boolean?): LocalHealthJournalStatus {
+        var result: Result<LocalHealthJournalStatus>? = null
+        journal(listOf(source to enabled)) { _, it -> result = it }
+        return checkNotNull(result).getOrThrow()
+    }
+
+    /**
+     * Journal operations one after another over one connection, each reported as it ends. One that fails with a
+     * LocalHealthJournalException is reported and the rest go on; after a timeout the next opens a connection of its
+     * own. Any other failure ends them all.
+     */
+    private suspend fun journal(operations: List<Pair<LocalHealthJournalSource, Boolean?>>,
+        each: suspend (LocalHealthJournalSource, Result<LocalHealthJournalStatus>) -> Unit) {
         // A second RFCOMM client cannot share the watch's current acquisition window.
         if (!runs.tryLock()) throw LocalHealthJournalException("journal_sync_in_progress")
-        val started = elapsedMillis()
-        // A stable code, or an exception type; tells a phone-side timeout from an error the watch reported.
-        var outcome = "ok"
+        var connection: LocalHealthConnection? = null
         try {
             val (current, selectedGeneration) = synchronized(this) {
                 if (closed) throw BackendClosedException()
@@ -141,27 +154,35 @@ class LocalHealthSyncEngine(scope: CoroutineScope, private val store: LocalHealt
                 if (closed || generation != selectedGeneration || link != current)
                     throw LocalHealthJournalException("journal_connection_replaced")
             }
-            val status = withTimeoutOrNull(90_000) {
-                remote.open(current).use { connection ->
-                    checkLink()
-                    // A lost result can mean a completed schema transaction. Never retry this write.
-                    val result = connection.journal(source, enabled)
-                    checkLink(); result
+            for ((source, enabled) in operations) {
+                val started = elapsedMillis()
+                // A stable code, or an exception type; tells a phone-side timeout from an error the watch reported.
+                var outcome = "ok"
+                val result = try {
+                    val status = withTimeoutOrNull(90_000) {
+                        val open = connection ?: remote.open(current).also { connection = it }
+                        checkLink()
+                        // A lost result can mean a completed schema transaction. Never retry this write.
+                        open.journal(source, enabled).also { checkLink() }
+                    } ?: run { outcome = "phone_timeout"; throw LocalHealthJournalException("journal_operation_unconfirmed") }
+                    status.reason?.let { outcome = it }
+                    Result.success(status)
+                } catch (problem: LocalHealthJournalException) {
+                    if (outcome == "ok") outcome = problem.code
+                    Result.failure(problem)
+                } catch (cancelled: CancellationException) { outcome = "cancelled"; throw cancelled }
+                catch (problem: Exception) { outcome = problem.javaClass.simpleName; throw problem }
+                finally {
+                    runCatching { diagnostics.record(ProtocolDiagnostic("local_health", "journal_result",
+                        if (outcome == "ok") DiagnosticSeverity.INFO else DiagnosticSeverity.WARNING, details = mapOf(
+                            "source" to source.wireName, "action" to when (enabled) { null -> "status"; true -> "enable"; false -> "disable" },
+                            "outcome" to outcome, "millis" to (elapsedMillis() - started).toString()))) }
                 }
-            } ?: run { outcome = "phone_timeout"; throw LocalHealthJournalException("journal_operation_unconfirmed") }
-            status.reason?.let { outcome = it }
-            return status
-        } catch (problem: LocalHealthJournalException) {
-            if (outcome == "ok") outcome = problem.code
-            throw problem
-        } catch (cancelled: CancellationException) { outcome = "cancelled"; throw cancelled }
-        catch (problem: Exception) { outcome = problem.javaClass.simpleName; throw problem }
-        finally {
-            runs.unlock()
-            runCatching { diagnostics.record(ProtocolDiagnostic("local_health", "journal_result",
-                if (outcome == "ok") DiagnosticSeverity.INFO else DiagnosticSeverity.WARNING, details = mapOf(
-                    "source" to source.wireName, "action" to when (enabled) { null -> "status"; true -> "enable"; false -> "disable" },
-                    "outcome" to outcome, "millis" to (elapsedMillis() - started).toString()))) }
+                if (outcome == "phone_timeout") { connection?.close(); connection = null }
+                each(source, result)
+            }
+        } finally {
+            try { connection?.close() } finally { runs.unlock() }
         }
     }
     @Synchronized override fun close() {

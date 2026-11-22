@@ -128,6 +128,17 @@ class ModuleJournalReadTest {
         } finally { reply.recycle() }
     }
 
+    @Test fun theHealthLogsStatusComesFromTheModuleWithoutAHelper() {
+        val generation = HealthJournalRead.generation("health", version, 7, 9, HealthJournalProfiles.schemaFingerprint(db, "health"))
+        val onFile = JsonObject(AtomicHealthJournal.status(FileJournalSql(db), "health") + HealthJournalRead.identity(generation, version))
+        assertEquals(onFile, HealthModuleJournal(context) { module() }.status(signal))
+        BridgeSettings.setRootFitnessEnabled(context, true)
+        // There is no su here, so a helper would have answered with an error.
+        val reply = RootHealthJournalReader(context, HealthModuleJournal(context) { module() })
+            .control(buildJsonObject { put("source", "health"); put("action", "status") }, signal)
+        assertNull(reply.text("error")); assertEquals(true, reply.flag("installed")); assertEquals(generation, reply.text("generation"))
+    }
+
     @Test fun aFileReplacedDuringTheReadIsReportedAndAMissingModuleLeavesTheReadToTheHelper() {
         val replaced = assertFailsWith<HealthJournalException> {
             HealthModuleJournal(context) { module(inodes = listOf(9L, 10L).iterator()) }.read(JsonObject(emptyMap()), signal)
