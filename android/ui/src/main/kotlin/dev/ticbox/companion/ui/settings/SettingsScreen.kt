@@ -201,23 +201,26 @@ fun SettingsScreen(navigate: (Any) -> Unit) {
 private val AppIconStyle.label: Int
     get() =
         when (this) {
-            AppIconStyle.DARK_DIAL -> R.string.app_icon_dark_dial
-            AppIconStyle.SLATE -> R.string.app_icon_slate
-            AppIconStyle.WHITE_DIAL -> R.string.app_icon_white_dial
+            AppIconStyle.WARM_WHITE -> R.string.app_icon_warm_white
+            AppIconStyle.NAVY -> R.string.app_icon_navy
+            AppIconStyle.MIST -> R.string.app_icon_mist
         }
 
 private val AppIconStyle.foreground: Int
     get() =
         when (this) {
-            AppIconStyle.DARK_DIAL -> R.drawable.ic_launcher_foreground
-            AppIconStyle.SLATE -> R.drawable.ic_launcher_foreground_slate
-            AppIconStyle.WHITE_DIAL -> R.drawable.ic_launcher_foreground_white_dial
+            AppIconStyle.WARM_WHITE -> R.drawable.ic_launcher_foreground
+            AppIconStyle.NAVY -> R.drawable.ic_launcher_foreground_navy
+            AppIconStyle.MIST -> R.drawable.ic_launcher_foreground_mist
         }
 
 private val AppIconStyle.background: Int
     get() =
-        if (this == AppIconStyle.SLATE) R.color.ic_launcher_background_slate
-        else R.color.ic_launcher_background
+        when (this) {
+            AppIconStyle.WARM_WHITE -> R.color.ic_launcher_background
+            AppIconStyle.NAVY -> R.color.ic_launcher_background_navy
+            AppIconStyle.MIST -> R.color.ic_launcher_background_mist
+        }
 
 /** A launcher icon the way a round launcher shows it: the middle two thirds of its layers. */
 @Composable

@@ -15,16 +15,16 @@ enum class ThemeMode {
  * launcher entry of its own, of which one is enabled.
  */
 enum class AppIconStyle {
-    DARK_DIAL,
-    SLATE,
-    WHITE_DIAL,
+    WARM_WHITE,
+    NAVY,
+    MIST,
 }
 
 data class AppearanceSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     /** Wallpaper-based Material You colors; off uses the app's own palette. */
     val dynamicColor: Boolean = true,
-    val appIcon: AppIconStyle = AppIconStyle.DARK_DIAL,
+    val appIcon: AppIconStyle = AppIconStyle.WARM_WHITE,
 )
 
 enum class AppLanguage(val languageTag: String) {

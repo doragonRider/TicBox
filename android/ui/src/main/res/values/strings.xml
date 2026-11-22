@@ -416,9 +416,9 @@
     <string name="appearance_dynamic_color">Wallpaper colors</string>
     <string name="appearance_dynamic_color_summary">Match the app\'s colors to your wallpaper</string>
     <string name="appearance_app_icon">App icon</string>
-    <string name="app_icon_dark_dial">Dark dial</string>
-    <string name="app_icon_slate">Slate</string>
-    <string name="app_icon_white_dial">White dial</string>
+    <string name="app_icon_warm_white">Warm white</string>
+    <string name="app_icon_navy">Navy</string>
+    <string name="app_icon_mist">Mist</string>
     <string name="app_icon_face">Current watch face</string>
     <string name="app_icon_face_summary">A home screen shortcut that shows the watch\'s face, and changes with it</string>
     <string name="app_icon_face_waiting">Available once the watch\'s face has loaded</string>

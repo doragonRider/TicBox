@@ -146,10 +146,10 @@ class AndroidAppPreferences(private val context: Context) : AppPreferences {
     /** The other icons are off unless turned on, so the default is whichever isn't. */
     private fun readAppIcon(): AppIconStyle =
         AppIconStyle.entries.firstOrNull { icon ->
-            icon != AppIconStyle.DARK_DIAL &&
+            icon != AppIconStyle.WARM_WHITE &&
                 packageManager.getComponentEnabledSetting(launcher(icon)) ==
                     PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-        } ?: AppIconStyle.DARK_DIAL
+        } ?: AppIconStyle.WARM_WHITE
 
     private fun readRemoteScreen(): RemoteScreenSettings {
         val defaults = RemoteScreenSettings()
@@ -199,12 +199,15 @@ class AndroidAppPreferences(private val context: Context) : AppPreferences {
     private companion object {
         const val TAG = "AppPreferences"
 
-        /** The launcher entries in the manifest, one per icon. */
+        /**
+         * The launcher entries in the manifest, one per icon. The names are 1.0.15's, whose icons
+         * these replace, so an entry chosen then is still there after the update.
+         */
         val LAUNCHERS =
             mapOf(
-                AppIconStyle.DARK_DIAL to "dev.ticbox.companion.MainActivity",
-                AppIconStyle.SLATE to "dev.ticbox.companion.IconSlate",
-                AppIconStyle.WHITE_DIAL to "dev.ticbox.companion.IconWhiteDial",
+                AppIconStyle.WARM_WHITE to "dev.ticbox.companion.MainActivity",
+                AppIconStyle.NAVY to "dev.ticbox.companion.IconSlate",
+                AppIconStyle.MIST to "dev.ticbox.companion.IconWhiteDial",
             )
         const val FILE = "frontend-appearance"
         const val THEME_MODE = "color-mode"

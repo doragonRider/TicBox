@@ -415,9 +415,9 @@
     <string name="appearance_dynamic_color">桌布配色</string>
     <string name="appearance_dynamic_color_summary">讓應用程式配色與桌布一致</string>
     <string name="appearance_app_icon">應用程式圖示</string>
-    <string name="app_icon_dark_dial">深色錶盤</string>
-    <string name="app_icon_slate">石板藍</string>
-    <string name="app_icon_white_dial">白色錶盤</string>
+    <string name="app_icon_warm_white">暖白</string>
+    <string name="app_icon_navy">海軍藍</string>
+    <string name="app_icon_mist">霧藍</string>
     <string name="app_icon_face">目前錶面</string>
     <string name="app_icon_face_summary">在主畫面新增一個捷徑，圖示是手錶目前的錶面，換錶面時跟著換</string>
     <string name="app_icon_face_waiting">手錶的錶面載入後可用</string>

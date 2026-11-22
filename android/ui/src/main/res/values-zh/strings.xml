@@ -415,9 +415,9 @@
     <string name="appearance_dynamic_color">壁纸配色</string>
     <string name="appearance_dynamic_color_summary">让应用配色与壁纸一致</string>
     <string name="appearance_app_icon">应用图标</string>
-    <string name="app_icon_dark_dial">深色表盘</string>
-    <string name="app_icon_slate">石板蓝</string>
-    <string name="app_icon_white_dial">白色表盘</string>
+    <string name="app_icon_warm_white">暖白</string>
+    <string name="app_icon_navy">海军蓝</string>
+    <string name="app_icon_mist">雾蓝</string>
     <string name="app_icon_face">当前表盘</string>
     <string name="app_icon_face_summary">在主屏幕上添加一个快捷方式，图标是手表当前的表盘，换表盘时跟着换</string>
     <string name="app_icon_face_waiting">手表的表盘加载后可用</string>
