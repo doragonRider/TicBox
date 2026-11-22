@@ -17,6 +17,9 @@ internal class RootFitnessPageReader(private val context: Context, private val s
     private fun fitnessInfo() = try { context.packageManager.getApplicationInfo(RootFitnessSnapshot.FITNESS_PACKAGE, 0) }
     catch (_: android.content.pm.PackageManager.NameNotFoundException) { null }
 
+    /** Whether the workout app is here; without it, pages are empty and no helper starts. */
+    fun installed() = fitnessInfo() != null
+
     /**
      * How the database files look right now, or null if that can't be told. Far cheaper than
      * starting the page helper, so unchanged files can skip it. Only times and sizes are read.

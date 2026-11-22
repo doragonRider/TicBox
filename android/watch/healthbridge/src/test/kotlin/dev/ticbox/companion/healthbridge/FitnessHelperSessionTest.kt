@@ -60,6 +60,42 @@ class FitnessHelperSessionTest {
         assertTrue(launches.single().endsWith("dev.ticbox.companion.healthbridge.FitnessHelperMain"))
     }
 
+    @Test fun aHelperStartedAheadAnswersTheFirstReadWithoutAnotherStart() {
+        var launches = 0
+        val session = FitnessHelperSession(context) {
+            launches++
+            FakeHelper { input, output ->
+                Thread.sleep(300)
+                LocalHealthProtocol.write(output, buildJsonObject { put("ready", true) })
+                FitnessHelperMain.serve(input, output) { buildJsonObject { put("table", "POINT") } }
+            }
+        }
+        session.use {
+            it.warm(); Thread.sleep(50)
+            assertEquals("POINT", it.page(page("POINT"), CancellationSignal())!!.text("table"))
+            it.warm()
+            assertEquals("POINT", it.page(page("POINT"), CancellationSignal())!!.text("table"))
+        }
+        assertEquals(1, launches)
+    }
+
+    @Test fun closingTheWindowEndsAStartStillUnderWayWithoutCountingItAsAFailure() {
+        val helpers = mutableListOf<FakeHelper>()
+        val session = FitnessHelperSession(context) { FakeHelper { _, _ -> Thread.sleep(60_000) }.also { helpers += it } }
+        session.warm(); Thread.sleep(200)
+        val started = System.nanoTime()
+        session.close()
+        assertTrue(System.nanoTime() - started < 5_000_000_000L)
+        assertTrue(helpers.single().destroyed)
+        // The next window starts one as usual.
+        FitnessHelperSession(context) {
+            FakeHelper { input, output ->
+                LocalHealthProtocol.write(output, buildJsonObject { put("ready", true) })
+                FitnessHelperMain.serve(input, output) { buildJsonObject { put("table", "POINT") } }
+            }
+        }.use { assertEquals("POINT", it.page(page("POINT"), CancellationSignal())!!.text("table")) }
+    }
+
     @Test fun aFailedReadIsTheHelpersReasonNotAFallback() {
         val session = FitnessHelperSession(context) {
             FakeHelper { input, output ->

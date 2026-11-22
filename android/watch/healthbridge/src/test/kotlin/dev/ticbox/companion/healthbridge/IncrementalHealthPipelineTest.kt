@@ -228,6 +228,19 @@ class IncrementalHealthPipelineTest {
         }
     }
 
+    @Test fun aFullSyncStartsTheWorkoutHelperAheadOnceAndAnIncrementalOneDoesNot() {
+        var warmUps = 0
+        repeat(10) { provider.insertFixture(it + 1L, "70", 1) }
+        val provided = HealthProviderReader(context.contentResolver, "synthetic")
+        reader.close(); reader = IncrementalHealthReader(ledger, { request, signal -> provided.page(request, signal) }, tables, warmUp = { warmUps++ })
+        val receiver = source.localUserId; val table = LocalHealthTable.POINT
+        reader.handle(LocalHealthProtocol.changes(table, receiver, UUID.randomUUID().toString(), full = false), CancellationSignal())
+        assertEquals(0, warmUps)
+        val run = UUID.randomUUID().toString()
+        repeat(2) { reader.handle(LocalHealthProtocol.changes(table, receiver, run, full = true), CancellationSignal()) }
+        assertEquals(1, warmUps)
+    }
+
     @Test fun whileAReplyTravelsTheNextBatchesAreMadeAndAnotherPageIsRead() {
         streamlined = true
         // Some values a row's text could be cut at, if a stored batch were split without reading its strings.

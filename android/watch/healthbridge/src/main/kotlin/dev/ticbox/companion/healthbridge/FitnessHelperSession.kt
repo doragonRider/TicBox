@@ -16,6 +16,7 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 import kotlin.system.exitProcess
 import kotlinx.serialization.json.*
 
@@ -32,6 +33,21 @@ internal class FitnessHelperSession(private val context: Context,
     private var output: OutputStream? = null
     private var broken = false
     private val timer = Executors.newSingleThreadScheduledExecutor { Thread(it, "TicBoxFitnessHelper").apply { isDaemon = true } }
+    /** Cancelled by [close], so a start that [warm] began ends with the window. */
+    private val warming = CancellationSignal()
+
+    /**
+     * Starts the helper on a thread of its own, so it's ready by the first workout read, which waits for this start rather
+     * than making another. For a full sync, which reads every workout page through it while the other tables go first.
+     */
+    fun warm() {
+        thread(isDaemon = true, name = "TicBoxFitnessHelperStart") {
+            synchronized(this) {
+                if (broken || process != null || warming.isCanceled) return@synchronized
+                try { start(warming) } catch (_: android.os.OperationCanceledException) { stop() }
+            }
+        }
+    }
 
     /** A workout table page, or null when the one-shot helper has to read it. */
     fun page(request: JsonObject, cancellation: CancellationSignal): JsonObject? =
@@ -113,7 +129,11 @@ internal class FitnessHelperSession(private val context: Context,
         runCatching { input?.close() }; runCatching { output?.close() }; input = null; output = null
     }
 
-    @Synchronized override fun close() { stop(); timer.shutdownNow() }
+    override fun close() {
+        // Ends a start still under way, which holds the lock taken below.
+        warming.cancel()
+        synchronized(this) { stop(); timer.shutdownNow() }
+    }
 
     private companion object {
         const val TAG = "TicBoxHealthBridge"
