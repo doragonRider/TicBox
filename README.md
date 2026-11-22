@@ -208,7 +208,7 @@ If the watch won't connect after the transfer, restart it here too.
 1. **Phone**: download the new APK and open it as in [step 1](#step-1-download-and-install-the-phone-app); your data stays. Play Protect may say "App scan recommended": tap "Scan app" to install after a scan, which takes about half a minute, or "More details" → "Install without scanning". From a computer, use `adb install -r`.
 2. **Watch**: open the Local Bridge page on the phone and follow its prompt to update. As in [step 5](#step-5-install-local-bridge-for-health-data), the watch's wireless debugging has to be connected; with root it can update without it (see below).
 
-Each version's [release notes](docs/releases/) (in Chinese) say whether to update the phone, the watch, or both. When the private protocol between them changes, updating only one side makes the advanced tools refuse to connect, so if in doubt, update both.
+Each version's release notes, on the [Releases page](https://github.com/doragonRider/TicBox/releases) and in more detail in Chinese in [docs/releases](docs/releases/), say whether to update the phone, the watch, or both. When the private protocol between them changes, updating only one side makes the advanced tools refuse to connect, so if in doubt, update both.
 
 ### Troubleshooting
 
@@ -289,7 +289,7 @@ The documentation is written in Chinese.
 
 - [Protocol specifications](docs/spec/README.md): the official Wear OS companion protocols and this app's private protocols.
 - [Developer documentation](docs/dev/README.md): building, architecture, how each feature works, and known gaps.
-- [Release notes](docs/releases/): what changed in each version.
+- [Release notes](docs/releases/) (in Chinese; English ones from 1.0.16 on in [docs/releases/en](docs/releases/en/)): what changed in each version.
 
 ## Building
 
