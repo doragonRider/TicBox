@@ -188,7 +188,9 @@ POINT 和私有运动表读取 Cursor 返回的所有列。SESSION 通过 data_p
 
 普通 UID 读不到运动明细（见[健康数据](health.md#23-sportfitness_summary-的-10-列)）。手表可以单独开启“读取完整运动记录（root）”，默认关闭，需要 Magisk 授权；未授权时无法开启。手机不需要 root。它不需要 LSPosed，不修改官方 APK、签名或 Provider 权限。
 
-每个请求通过 `su -c` 启动本应用 APK 中的 `FitnessPageMain`（系统 `app_process`），只加载本应用的代码和系统 SQLite，不加载官方应用，也不要求设备上有 sqlite3。来源固定为 `com.mobvoi.wear.fitness.at` 当前数据目录下的 `databases/fitness.db`；不接受手机传入的路径、SQL 或 projection。
+每个请求通过 `su --mount-master -c` 启动本应用 APK 中的 `FitnessPageMain`（系统 `app_process`），只加载本应用的代码和系统 SQLite，不加载官方应用，也不要求设备上有 sqlite3。来源固定为 `com.mobvoi.wear.fitness.at` 当前数据目录下的 `databases/fitness.db`；不接受手机传入的路径、SQL 或 projection。
+
+所有 root helper（运动分页、运动库检查、手动导出的快照和变更日志）都必须以 `--mount-master` 在全局挂载空间中运行。不加时 su 沿用 Local Bridge 自己的挂载空间，Android 11 起的应用数据隔离会让 root 也看不到其他应用的数据目录：运动库被当成“没有数据”返回空页，变更日志报 `journal_database_missing`。
 
 helper 以 `OPEN_READONLY | NO_LOCALIZED_COLLATORS` 打开数据库，只查询固定的 RECORD / POINT 有界页，保留所有可读的列和类型；每页最多 128 行并预读一行，按 `_id` 数字分页，训练范围使用 RECORD_ID。结果写入普通 UID 预先创建的私有临时 JSON，普通 UID 比较内容并持久排队后通过蓝牙发送，随后删除临时文件。不复制整个数据库，不修改 SYNCED/DELETED，不停止官方服务，不修改官方目录的权限和属主。
 

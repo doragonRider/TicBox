@@ -22,7 +22,7 @@ Install the phone APK with ADB from a computer. Opening the APK on the phone (fr
 2. Install or update the APK; `-r` keeps the app's data:
 
    ```bash
-   adb install -r ticbox-phone-1.0.0-release-<commit>.apk
+   adb install -r ticbox-phone-<version>-release-<commit>.apk
    ```
 
 3. If the notification access switch is greyed out, open the app's App info, tap ⋮ and choose "Allow restricted settings", then turn notification access on.

@@ -144,6 +144,7 @@ adb -s <watch> logcat -d -t 300 -s "TicBoxHealthBridge:D" "*:S"
 
 - Provider 查询可能冷启动官方进程并触发它的初始化和联网任务；需要确保离线时，先关闭手表的 Wi-Fi，用 USB ADB 测试。
 - 系统强行停止、禁用应用、撤销蓝牙权限，或 GMS 不派送唤醒事件时，手机显示不可用并保留已入库的记录。
+- 变更日志页显示“数据源不在手表上”（`journal_database_missing`），或开了 root 运动采集却始终没有训练：root helper 没有在全局挂载空间运行，看不到官方应用的数据目录（见[本地桥接协议 §5](../spec/local-bridge.md#5-root-运动采集)）。1.0.0 及更早的 Local Bridge 都是这样，更新到 1.0.1 后重新开启日志。在手表上对比 `su -c 'ls <dataDir>/databases'` 和 `su -c 'nsenter -t $(pidof dev.ticbox.companion) -m ls <dataDir>/databases'` 可以确认。
 
 ## 7. 待验证
 
