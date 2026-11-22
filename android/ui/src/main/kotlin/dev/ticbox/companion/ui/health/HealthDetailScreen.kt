@@ -60,12 +60,16 @@ import java.time.temporal.ChronoUnit
 
 @Composable
 fun HealthDetailScreen(metric: HealthMetric, viewModel: HealthViewModel, onBack: () -> Unit) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
+    val live by viewModel.state.collectAsStateWithLifecycle()
     var period by rememberSaveable { mutableStateOf(HealthPeriod.DAY) }
-    val week = remember(state.date) { (6 downTo 0).map { state.date.minusDays(it.toLong()) } }
-    LaunchedEffect(period, state.date) {
-        viewModel.ensureLoaded(if (period == HealthPeriod.WEEK) week else listOf(state.date))
+    val range = remember(period, live.date) { period.days(live.date) }
+    LaunchedEffect(period, live.date) {
+        viewModel.ensureLoaded(range)
+        viewModel.ensureLoaded(nextLikely(range))
     }
+    // Until the days asked for are read, the page goes on showing the ones it had, so each part
+    // changes in place (the ring and all) instead of the page emptying and filling up again.
+    val state = settled(live, ready = range.none(live::isLoading), key = period)
     var showAll by rememberSaveable(metric, period, state.date) { mutableStateOf(false) }
     val goal = if (metric == HealthMetric.ACTIVITY) stepGoal(viewModel) else null
     LifecycleStartEffect(viewModel) {
@@ -76,18 +80,37 @@ fun HealthDetailScreen(metric: HealthMetric, viewModel: HealthViewModel, onBack:
         PageList(padding, spacing = 16.dp) {
             item(key = "date") {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    DateSelector(state.date, state.today, state.earliest, viewModel::selectDate)
+                    DateSelector(live.date, live.today, live.earliest, viewModel::selectDate)
                     PeriodSelector(period) { period = it }
                 }
             }
             when (period) {
                 HealthPeriod.DAY -> dayContent(metric, state, goal, showAll) { showAll = true }
-                HealthPeriod.WEEK -> weekContent(metric, state, week, goal)
+                HealthPeriod.WEEK,
+                HealthPeriod.MONTH ->
+                    daysContent(metric, state, period, period.days(state.date), goal)
             }
             item(key = "about") { FootnoteText(stringResource(metric.explanation())) }
         }
     }
 }
+
+/** The days before [range] and the one after it: where the arrows go next, and a Day's Week. */
+private fun nextLikely(range: List<LocalDate>): List<LocalDate> =
+    (1L..7L).map { range.first().minusDays(it) } + range.last().plusDays(1)
+
+/**
+ * [value] once it is [ready], and until then the last one that was. A new [key] starts again from
+ * [value], ready or not.
+ */
+@Composable
+private fun <T> settled(value: T, ready: Boolean, key: Any?): T {
+    val last = remember(key) { Settled(value) }
+    if (ready) last.value = value
+    return last.value
+}
+
+private class Settled<T>(var value: T)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -323,17 +346,19 @@ private fun SleepCard(sleep: SleepPeriod, title: String?) {
     }
 }
 
-private fun LazyListScope.weekContent(
+/** A week or a month, a value for each day. */
+private fun LazyListScope.daysContent(
     metric: HealthMetric,
     state: HealthUiState,
-    week: List<LocalDate>,
+    period: HealthPeriod,
+    days: List<LocalDate>,
     goal: Int?,
 ) {
-    val daily = week.mapNotNull { date ->
+    val daily = days.mapNotNull { date ->
         state.result(date)?.day?.takeIf { it.hasData(metric) }?.let { date to it.summary(metric) }
     }
-    val loading = week.any { state.isLoading(it) }
-    val incomplete = week.any { date ->
+    val loading = days.any { state.isLoading(it) }
+    val incomplete = days.any { date ->
         state.result(date)?.state(metric).let {
             it == HealthReadState.FAILED || it == HealthReadState.PARTIAL
         }
@@ -363,7 +388,7 @@ private fun LazyListScope.weekContent(
                     R.plurals.health_days_recorded,
                     daily.size,
                     daily.size,
-                    week.size,
+                    days.size,
                 )
             },
         )
@@ -380,10 +405,17 @@ private fun LazyListScope.weekContent(
         // The latest day is read out until a bar is picked; only a picked bar dims the others.
         var picked by remember(points) { mutableStateOf<Int?>(null) }
         val formatter = metricFormatter()
-        val weekday =
-            remember(locale) {
+        // A week names each day; a month marks every seventh, counting back from the last.
+        val labelled =
+            if (period == HealthPeriod.WEEK) days
+            else days.asReversed().filterIndexed { index, _ -> index % 7 == 0 }
+        val label =
+            remember(locale, period) {
                 DateTimeFormatter.ofPattern(
-                    DateFormat.getBestDateTimePattern(locale, "EEEEE"),
+                    DateFormat.getBestDateTimePattern(
+                        locale,
+                        if (period == HealthPeriod.WEEK) "EEEEE" else "Md",
+                    ),
                     locale,
                 )
             }
@@ -400,14 +432,14 @@ private fun LazyListScope.weekContent(
             TimeSeriesChart(
                 points = points,
                 metric = metric,
-                axisStart = week.first().atStartOfDay(zone).toInstant(),
-                axisEnd = week.last().plusDays(1).atStartOfDay(zone).toInstant(),
+                axisStart = days.first().atStartOfDay(zone).toInstant(),
+                axisEnd = days.last().plusDays(1).atStartOfDay(zone).toInstant(),
                 labels =
-                    week.map {
-                        AxisLabel(it.atTime(12, 0).atZone(zone).toInstant(), weekday.format(it))
+                    labelled.map {
+                        AxisLabel(it.atTime(12, 0).atZone(zone).toInstant(), label.format(it))
                     },
                 bars = true,
-                weekly = true,
+                days = days.size,
                 selected = picked,
                 onSelect = { picked = it },
                 description = chartDescription(metric, points, formatter),

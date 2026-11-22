@@ -125,6 +125,18 @@ enum class HealthMetric(
 enum class HealthPeriod(@param:StringRes val title: Int) {
     DAY(R.string.period_day),
     WEEK(R.string.period_week),
+    MONTH(R.string.period_month);
+
+    /** The days shown for [date], ending on it: the day itself, 7 days, or back to a month ago. */
+    fun days(date: LocalDate): List<LocalDate> {
+        val first =
+            when (this) {
+                DAY -> date
+                WEEK -> date.minusDays(6)
+                MONTH -> date.minusMonths(1).plusDays(1)
+            }
+        return generateSequence(first) { it.plusDays(1) }.takeWhile { it <= date }.toList()
+    }
 }
 
 /** A sample, or a projected half-open aggregate whose time is the bucket start. */

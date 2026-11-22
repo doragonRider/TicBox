@@ -63,6 +63,7 @@ import dev.ticbox.companion.api.WatchUnpairResult
 import dev.ticbox.companion.api.WatchUnpairState
 import dev.ticbox.companion.api.WatchUnpairSupport
 import dev.ticbox.companion.demo.DemoWatch
+import dev.ticbox.companion.ui.health.HealthPeriod
 import dev.ticbox.companion.ui.navigation.AccountRoute
 import dev.ticbox.companion.ui.navigation.CallingRoute
 import dev.ticbox.companion.ui.navigation.ConnectionRoute
@@ -80,6 +81,7 @@ import dev.ticbox.companion.ui.navigation.closePage
 import dev.ticbox.companion.ui.navigation.resetToHome
 import dev.ticbox.companion.ui.navigation.returnToWatchHome
 import dev.ticbox.companion.ui.session.SessionState
+import java.time.LocalDate
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -492,6 +494,14 @@ class CompanionAppTest {
         compose.onNodeWithText("Heart rate").assertIsDisplayed()
         compose.onNodeWithTag("period_WEEK").performClick()
         compose.onNodeWithText("Daily average").assertIsDisplayed()
+        compose.onNodeWithTag("period_MONTH").performClick()
+        val month = HealthPeriod.MONTH.days(LocalDate.now().minusDays(1)).size
+        compose.waitUntil(5_000) {
+            compose
+                .onAllNodes(hasText("of $month days recorded", substring = true))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
 
         compose.runOnUiThread { navigation().navigateUp() }
         compose.onNodeWithTag("metric_HEART").assertIsDisplayed()

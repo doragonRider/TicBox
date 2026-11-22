@@ -52,6 +52,7 @@ import kotlin.math.log10
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
+import kotlin.math.round
 
 /** A labelled position on the time axis. */
 data class AxisLabel(val time: Instant, val text: String)
@@ -60,22 +61,23 @@ data class ValueRange(val min: Double, val max: Double) {
     fun fraction(value: Double) = ((value - min) / (max - min)).coerceIn(0.0, 1.0).toFloat()
 }
 
-/** Bounds that start from a sensible baseline for each metric and end on a round number. */
-fun valueRange(metric: HealthMetric, values: List<Double>, weekly: Boolean): ValueRange {
+/**
+ * Bounds that start from a sensible baseline for each metric and end on a round number. [daily]
+ * values are whole days, as a week or a month charts them.
+ */
+fun valueRange(metric: HealthMetric, values: List<Double>, daily: Boolean): ValueRange {
     val low = values.minOrNull() ?: 0.0
     val high = values.maxOrNull() ?: 0.0
     return when (metric) {
         HealthMetric.HEART ->
             ValueRange(min(40.0, floor(low / 10) * 10), max(120.0, ceil(high / 20) * 20))
         HealthMetric.OXYGEN -> ValueRange(min(90.0, floor(low)), 100.0)
-        HealthMetric.ACTIVITY -> ValueRange(0.0, niceCeil(max(high, if (weekly) 4_000.0 else 50.0)))
+        HealthMetric.ACTIVITY -> ValueRange(0.0, niceCeil(max(high, if (daily) 4_000.0 else 50.0)))
         HealthMetric.SLEEP -> ValueRange(0.0, max(10.0, ceil(high)))
-        HealthMetric.CALORIES -> ValueRange(0.0, niceCeil(max(high, if (weekly) 400.0 else 50.0)))
-        HealthMetric.DISTANCE ->
-            ValueRange(0.0, niceCeil(max(high, if (weekly) 4_000.0 else 500.0)))
-        HealthMetric.EXERCISE ->
-            ValueRange(0.0, niceCeil(max(high, if (weekly) 3_600.0 else 600.0)))
-        HealthMetric.CLIMBING -> ValueRange(0.0, niceCeil(max(high, if (weekly) 30.0 else 10.0)))
+        HealthMetric.CALORIES -> ValueRange(0.0, niceCeil(max(high, if (daily) 400.0 else 50.0)))
+        HealthMetric.DISTANCE -> ValueRange(0.0, niceCeil(max(high, if (daily) 4_000.0 else 500.0)))
+        HealthMetric.EXERCISE -> ValueRange(0.0, niceCeil(max(high, if (daily) 3_600.0 else 600.0)))
+        HealthMetric.CLIMBING -> ValueRange(0.0, niceCeil(max(high, if (daily) 30.0 else 10.0)))
         HealthMetric.STRESS -> ValueRange(0.0, max(100.0, ceil(high / 10) * 10))
         HealthMetric.RESPIRATION -> ValueRange(min(10.0, floor(low)), max(30.0, ceil(high)))
         HealthMetric.TEMPERATURE,
@@ -106,12 +108,12 @@ fun TimeSeriesChart(
     description: String,
     modifier: Modifier = Modifier,
     formatter: MetricFormatter = metricFormatter(),
-    weekly: Boolean = false,
+    days: Int = 0,
     goal: Double? = null,
 ) {
     val range =
-        remember(points, metric, weekly, goal) {
-            valueRange(metric, points.map { it.value } + listOfNotNull(goal), weekly)
+        remember(points, metric, days, goal) {
+            valueRange(metric, points.map { it.value } + listOfNotNull(goal), daily = days > 0)
         }
     PlotChart(
         points = points,
@@ -126,7 +128,7 @@ fun TimeSeriesChart(
         onSelect = onSelect,
         description = description,
         modifier = modifier,
-        weekly = weekly,
+        days = days,
         goal = goal,
     )
 }
@@ -136,6 +138,9 @@ fun TimeSeriesChart(
  * nearest point; the caller shows the selected value next to the chart. A line breaks where two
  * samples are more than [gapMillis] apart, and a lone sample shows as a dot. With a [goal], a
  * dashed line marks it and bars below it are lighter.
+ *
+ * Over [days] days, each day is a rounded bar of its own. Within a day, bars cover their whole
+ * interval and meet edge to edge.
  */
 @Composable
 fun PlotChart(
@@ -151,7 +156,7 @@ fun PlotChart(
     onSelect: (Int) -> Unit,
     description: String,
     modifier: Modifier = Modifier,
-    weekly: Boolean = false,
+    days: Int = 0,
     gapMillis: Long = Long.MAX_VALUE,
     goal: Double? = null,
 ) {
@@ -234,33 +239,42 @@ fun PlotChart(
         }
 
         if (bars) {
-            val slot = if (weekly) plotWidth / 7f else plotWidth / 24f
+            val slot = if (days > 0) plotWidth / days else plotWidth / 24f
             points.forEachIndexed { index, point ->
-                val top = y(point.value)
-                val intervalWidth = point.endExclusive?.let { x(it) - x(point.time) }
-                val barWidth = ((intervalWidth ?: slot) * 0.6f).coerceAtLeast(1.dp.toPx())
-                val center =
-                    when {
-                        point.endExclusive != null -> x(point.plotTime)
-                        weekly -> x(point.time) + slot / 2
-                        else -> x(point.time)
-                    }
                 val reached = goal == null || point.value >= goal
                 val alpha =
                     when {
                         selected == null || selected == index -> if (reached) 1f else 0.55f
                         else -> if (reached) 0.45f else 0.25f
                     }
-                drawRoundRect(
-                    color.copy(alpha = alpha),
-                    topLeft = Offset(center - barWidth / 2, top),
-                    size =
-                        Size(
-                            barWidth,
-                            (plotBottom - top).coerceAtLeast(barWidth.coerceAtMost(4.dp.toPx())),
-                        ),
-                    cornerRadius = CornerRadius(barWidth.coerceAtMost(12.dp.toPx()) / 2),
-                )
+                // A value too small to see still shows, growing up from the axis, never below it.
+                if (days > 0) {
+                    val intervalWidth = point.endExclusive?.let { x(it) - x(point.time) }
+                    val barWidth = ((intervalWidth ?: slot) * 0.6f).coerceAtLeast(1.dp.toPx())
+                    val center =
+                        if (point.endExclusive != null) x(point.plotTime)
+                        else x(point.time) + slot / 2
+                    val height =
+                        (plotBottom - y(point.value)).coerceAtLeast(min(barWidth, 4.dp.toPx()))
+                    drawRoundRect(
+                        color.copy(alpha = alpha),
+                        topLeft = Offset(center - barWidth / 2, plotBottom - height),
+                        size = Size(barWidth, height),
+                        cornerRadius = CornerRadius(barWidth.coerceAtMost(12.dp.toPx()) / 2),
+                    )
+                } else if (point.value > range.min) {
+                    // Whole pixels, so two bars that meet leave no faint seam between them.
+                    val from =
+                        point.endExclusive?.let { x(point.time) } ?: (x(point.time) - slot / 2)
+                    val to = point.endExclusive?.let(::x) ?: (x(point.time) + slot / 2)
+                    val left = round(from)
+                    val top = min(y(point.value), plotBottom - 2.dp.toPx())
+                    drawRect(
+                        color.copy(alpha = alpha),
+                        topLeft = Offset(left, top),
+                        size = Size(max(round(to) - left, 1f), plotBottom - top),
+                    )
+                }
             }
         } else {
             lineSegments(points, gapMillis).forEach { segment ->
@@ -321,7 +335,7 @@ fun PlotChart(
             val center =
                 when {
                     point.endExclusive != null -> x(point.plotTime)
-                    bars && weekly -> x(point.time) + plotWidth / 14f
+                    bars && days > 0 -> x(point.time) + plotWidth / days / 2
                     else -> x(point.time)
                 }
             drawLine(
@@ -395,7 +409,7 @@ fun MiniChart(
                 ?: day.date.atStartOfDay(ZoneId.systemDefault()).toInstant()
         }
     val range =
-        remember(points, metric) { valueRange(metric, points.map { it.value }, weekly = false) }
+        remember(points, metric) { valueRange(metric, points.map { it.value }, daily = false) }
     // Totals show by the hour, which a card this small can still tell apart.
     val hours =
         remember(points, day.date) {
@@ -407,7 +421,7 @@ fun MiniChart(
             }
         }
     val hourly =
-        remember(hours, metric) { valueRange(metric, hours.map { it.value }, weekly = false) }
+        remember(hours, metric) { valueRange(metric, hours.map { it.value }, daily = false) }
     Canvas(modifier.fillMaxWidth().height(40.dp).clearAndSetSemantics {}) {
         val span = 86_400_000f
         fun x(time: Instant) =

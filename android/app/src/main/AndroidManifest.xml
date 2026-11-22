@@ -32,7 +32,9 @@
                 navigation"
             android:exported="true" />
         <!-- One launcher entry per icon in Appearance, of which one is enabled at a time. The default
-             keeps the name the Activity had, so icons already on a home screen survive the update. -->
+             keeps the name the Activity had, so icons already on a home screen survive the update.
+             The other two keep the names they had in 1.0.15 for the same reason: an alias chosen
+             then has to still exist, or the app would be left with no launcher entry at all. -->
         <activity-alias
             android:name=".MainActivity"
             android:targetActivity=".CompanionActivity"
@@ -47,8 +49,8 @@
         <activity-alias
             android:name=".IconSlate"
             android:targetActivity=".CompanionActivity"
-            android:icon="@mipmap/ic_launcher_slate"
-            android:roundIcon="@mipmap/ic_launcher_slate"
+            android:icon="@mipmap/ic_launcher_navy"
+            android:roundIcon="@mipmap/ic_launcher_navy"
             android:enabled="false"
             android:exported="true">
             <intent-filter>
@@ -59,8 +61,8 @@
         <activity-alias
             android:name=".IconWhiteDial"
             android:targetActivity=".CompanionActivity"
-            android:icon="@mipmap/ic_launcher_white_dial"
-            android:roundIcon="@mipmap/ic_launcher_white_dial"
+            android:icon="@mipmap/ic_launcher_mist"
+            android:roundIcon="@mipmap/ic_launcher_mist"
             android:enabled="false"
             android:exported="true">
             <intent-filter>

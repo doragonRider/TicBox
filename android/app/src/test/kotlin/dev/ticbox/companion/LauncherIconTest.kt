@@ -23,8 +23,8 @@ class LauncherIconTest {
         for (id in
             listOf(
                 R.mipmap.ic_launcher,
-                R.mipmap.ic_launcher_slate,
-                R.mipmap.ic_launcher_white_dial,
+                R.mipmap.ic_launcher_navy,
+                R.mipmap.ic_launcher_mist,
             )) {
             val icon = context.getDrawable(id) as AdaptiveIconDrawable
             assertNotNull(icon.foreground)
@@ -37,8 +37,8 @@ class LauncherIconTest {
     fun choosingAnIconTurnsOnItsLauncherEntryAndTheOthersOff() {
         val context = RuntimeEnvironment.getApplication()
         val preferences = AndroidAppPreferences(context)
-        assertEquals(AppIconStyle.DARK_DIAL, preferences.appearance.value.appIcon)
-        preferences.setAppIcon(AppIconStyle.WHITE_DIAL)
+        assertEquals(AppIconStyle.WARM_WHITE, preferences.appearance.value.appIcon)
+        preferences.setAppIcon(AppIconStyle.MIST)
         val packages = context.packageManager
         fun state(name: String) =
             packages.getComponentEnabledSetting(
@@ -47,10 +47,10 @@ class LauncherIconTest {
         assertEquals(PackageManager.COMPONENT_ENABLED_STATE_ENABLED, state("IconWhiteDial"))
         assertEquals(PackageManager.COMPONENT_ENABLED_STATE_DISABLED, state("MainActivity"))
         assertEquals(PackageManager.COMPONENT_ENABLED_STATE_DISABLED, state("IconSlate"))
-        assertEquals(AppIconStyle.WHITE_DIAL, preferences.appearance.value.appIcon)
+        assertEquals(AppIconStyle.MIST, preferences.appearance.value.appIcon)
         // Read back as a new start would, from the launcher entries rather than memory.
         assertEquals(
-            AppIconStyle.WHITE_DIAL,
+            AppIconStyle.MIST,
             AndroidAppPreferences(context).appearance.value.appIcon,
         )
     }

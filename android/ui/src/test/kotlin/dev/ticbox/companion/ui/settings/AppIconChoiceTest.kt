@@ -74,12 +74,12 @@ class AppIconChoiceTest {
     @Test
     fun choosingAnIconKeepsItAndMarksItAsChosen() {
         openAppearance()
-        compose.onNodeWithTag("app_icon_DARK_DIAL").performScrollTo().assertIsSelected()
-        compose.onNodeWithTag("app_icon_SLATE").performClick()
+        compose.onNodeWithTag("app_icon_WARM_WHITE").performScrollTo().assertIsSelected()
+        compose.onNodeWithTag("app_icon_NAVY").performClick()
         compose.waitForIdle()
-        assertEquals(AppIconStyle.SLATE, dependencies.preferences.appearance.value.appIcon)
-        compose.onNodeWithTag("app_icon_SLATE").assertIsSelected()
-        compose.onNodeWithTag("app_icon_DARK_DIAL").assertIsNotSelected()
+        assertEquals(AppIconStyle.NAVY, dependencies.preferences.appearance.value.appIcon)
+        compose.onNodeWithTag("app_icon_NAVY").assertIsSelected()
+        compose.onNodeWithTag("app_icon_WARM_WHITE").assertIsNotSelected()
     }
 
     @Test
