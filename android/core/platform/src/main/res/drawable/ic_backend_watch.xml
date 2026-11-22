@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The launcher icon's watch, redrawn for the status bar: open face, flared lugs, a button at two
-     and a crown at four, hands at ten past ten. The bezel's teeth are too fine to show at this size. -->
+<!-- The launcher icon's watch, redrawn for the status bar: open face, square shoulders, straps
+     tapering away, a crown at three and a button at two, hands at ten past ten. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
@@ -8,24 +8,23 @@
     android:viewportHeight="24">
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M8,2.2H14.6V6.1Q14.6,6.6 15.1,6.8L15.3,7.6H7.3L7.5,6.8Q8,6.6 8,6.1Z M7.3,16.4H15.3L15.1,17.2Q14.6,17.4 14.6,17.9V21.8H8V17.9Q8,17.4 7.5,17.2Z" />
+        android:pathData="M8.39,1.4H14.41L15.17,3.94H7.63Z M7.63,20.06H15.17L14.41,22.6H8.39Z" />
     <path
         android:fillColor="#FFFFFFFF"
-        android:fillType="evenOdd"
-        android:pathData="M11.3,4.6a7.4,7.4 0,1 1,0 14.8a7.4,7.4 0,0 1,0 -14.8Z M11.3,6.5a5.5,5.5 0,1 0,0 11a5.5,5.5 0,0 0,0 -11Z" />
+        android:pathData="M11.4,4.75a7.25,7.25 0,1 1,0 14.5a7.25,7.25 0,0 1,0 -14.5Z M6.33,6.81L6.93,4.32Q7.05,3.74 7.63,3.74H15.17Q15.75,3.74 15.87,4.32L16.48,6.81L11.4,5.91Z M11.4,18.09L16.48,17.19L15.87,19.68Q15.75,20.27 15.17,20.27H7.63Q7.05,20.27 6.93,19.68L6.33,17.19Z M11.4,6.7a5.3,5.3 0,1 0,0 10.6a5.3,5.3 0,0 0,0 -10.6Z" />
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M17.82,9.22 L19.01,8.48 L17.84,6.62 L16.65,7.36Z M16.56,16.89 L18.21,17.84 L19.81,15.06 L18.16,14.11Z M18.73,18.14 L19.16,18.39 L20.76,15.61 L20.33,15.36Z" />
+        android:pathData="M18.36,11.07L18.88,11.07Q19.4,11.07 19.4,11.59L19.4,12.41Q19.4,12.93 18.88,12.93L18.36,12.93Z M16.3,6.96L16.62,6.71Q16.87,6.51 17.06,6.77L17.85,7.77Q18.05,8.02 17.79,8.22L17.47,8.47Z" />
     <path
         android:fillColor="#00000000"
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.5"
+        android:strokeWidth="1.6"
         android:strokeLineCap="round"
-        android:pathData="M11.64,12.21L8.76,10.41" />
+        android:pathData="M11.7,12.18L9.04,10.52" />
     <path
         android:fillColor="#00000000"
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="1.2"
+        android:strokeWidth="1.25"
         android:strokeLineCap="round"
-        android:pathData="M10.95,12.2L14.94,9.9" />
+        android:pathData="M11.1,12.17L14.87,10" />
 </vector>
