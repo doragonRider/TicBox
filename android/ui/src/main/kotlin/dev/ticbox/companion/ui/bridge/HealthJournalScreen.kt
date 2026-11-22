@@ -126,6 +126,11 @@ private fun journalMessage(code: String): UiText =
         else -> uiText(R.string.toolbox_error_code, code)
     }
 
+/** Reading the state writes nothing, so an unknown result only means the state wasn't read. */
+private fun statusMessage(code: String): UiText =
+    if (code == HealthJournalViewModel.UNCONFIRMED) uiText(R.string.journal_error_status_unread)
+    else journalMessage(code)
+
 @get:StringRes
 private val LocalHealthJournalSource.label: Int
     get() =
@@ -231,7 +236,7 @@ private fun JournalGroup(
                     icon = AppIcons.Refresh,
                     summary =
                         (current?.problem ?: current?.status?.reason)?.let {
-                            journalMessage(it).asString()
+                            statusMessage(it).asString()
                         },
                     enabled = enabled,
                     trailingIcon = null,

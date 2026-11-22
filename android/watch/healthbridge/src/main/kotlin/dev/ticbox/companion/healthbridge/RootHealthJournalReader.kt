@@ -5,6 +5,7 @@ import android.database.DatabaseErrorHandler
 import android.database.sqlite.SQLiteDatabase
 import android.os.CancellationSignal
 import android.system.Os
+import android.util.Log
 import dev.ticbox.companion.protocol.*
 import java.io.File
 import java.io.FileOutputStream
@@ -73,6 +74,7 @@ internal class RootHealthJournalReader(private val context: Context) : HealthJou
             }
         } catch (cancelled: android.os.OperationCanceledException) { throw cancelled }
         catch (problem: Exception) { buildJsonObject {
+            if (problem !is HealthJournalException) Log.w("TicBoxHealthBridge", "Journal $action failed; exception=${problem.javaClass.simpleName}")
             put("error", (problem as? HealthJournalException)?.code ?: "journal_operation_unconfirmed")
         } }
         return JsonObject(result + mapOf("op" to JsonPrimitive("journal"), "source" to JsonPrimitive(source),
@@ -89,13 +91,25 @@ internal class RootHealthJournalReader(private val context: Context) : HealthJou
             // Open both bridge-owned files before the helper drops to the OEM UID. Never chown OEM files/sidecars.
             val command = "CLASSPATH=${shellQuote(context.applicationInfo.sourceDir)} exec /system/bin/app_process /system/bin " +
                 "dev.ticbox.companion.healthbridge.HealthJournalMain ${shellQuote(input.path)} ${shellQuote(output.path)}"
+            val action = request.text("action")
+            val started = android.os.SystemClock.elapsedRealtime()
             val result = RootProcess.run(command, cancellation, 25_000)
-            if (result.timedOut || result.exitCode == 124) throw HealthJournalException("journal_operation_unconfirmed")
-            if (result.exitCode != 0 || result.output.lineSequence().none { it == "JOURNAL_OK" })
+            val millis = android.os.SystemClock.elapsedRealtime() - started
+            if (result.timedOut || result.exitCode == 124) {
+                Log.w("TicBoxHealthBridge", "Journal helper timed out; action=$action exit=${result.exitCode} millis=$millis")
+                throw HealthJournalException("journal_operation_unconfirmed")
+            }
+            if (result.exitCode != 0 || result.output.lineSequence().none { it == "JOURNAL_OK" }) {
+                Log.w("TicBoxHealthBridge", "Journal helper unavailable; action=$action exit=${result.exitCode} millis=$millis")
                 throw HealthJournalException("journal_root_unavailable")
+            }
             cancellation.throwIfCanceled()
             if (output.length() !in 1..LocalHealthProtocol.MAX_FRAME_BYTES.toLong()) throw HealthJournalException("journal_invalid_reply")
-            return LocalHealthProtocol.parse(output.readBytes())
+            return LocalHealthProtocol.parse(output.readBytes()).also { reply ->
+                // The step and exception type say where an unexpected failure happened; neither carries data.
+                reply.text("error")?.let { error -> Log.w("TicBoxHealthBridge", "Journal helper failed; action=$action error=$error " +
+                    "step=${reply.text("step") ?: "none"} exception=${reply.text("exception") ?: "none"} millis=$millis") }
+            }
         } finally { input.delete(); output.delete() }
     }
 }
@@ -116,18 +130,22 @@ object HealthJournalMain {
             val input = File(args[0]); require(input.length() in 1..4096)
             val request = LocalHealthProtocol.parse(input.readBytes())
             FileOutputStream(args[1]).use { output ->
+                var step = "request"
                 val result = try {
                     val source = request.text("source") ?: throw HealthJournalException("journal_invalid_source")
                     val action = request.text("action") ?: throw HealthJournalException("journal_invalid_action")
                     if (action !in setOf("status", "enable", "disable", "page")) throw HealthJournalException("journal_invalid_action")
-                    val context = systemContext()
-                    val verified = HealthJournalProfiles.verify(context, source, forRemoval = action == "disable")
-                    val before = Os.stat(verified.file.path)
-                    Os.setgid(verified.uid); Os.setuid(verified.uid)
+                    step = "context"; val context = systemContext()
+                    step = "verify"; val verified = HealthJournalProfiles.verify(context, source, forRemoval = action == "disable")
+                    step = "stat"; val before = Os.stat(verified.file.path)
+                    step = "uid"; Os.setgid(verified.uid); Os.setuid(verified.uid)
                     check(android.os.Process.myUid() == verified.uid && Os.getgid() == verified.uid)
                     val write = action == "enable" || action == "disable"
+                    step = "open"
                     openJournalDatabase(verified.file, write).use { database ->
+                        step = "validate"
                         if (action != "disable") HealthJournalProfiles.validateDatabase(database, source)
+                        step = action
                         val generation = if (action == "disable") "" else generation(source, verified.providerVersion, before.st_dev, before.st_ino,
                             HealthJournalProfiles.schemaFingerprint(database, source))
                         val body = when (action) {
@@ -145,7 +163,11 @@ object HealthJournalMain {
                         if (before.st_dev != after.st_dev || before.st_ino != after.st_ino) throw HealthJournalException("journal_source_replaced")
                         JsonObject(body + mapOf("generation" to JsonPrimitive(generation), "providerVersion" to JsonPrimitive(verified.providerVersion)))
                     }
-                } catch (problem: Exception) { buildJsonObject { put("error", (problem as? HealthJournalException)?.code ?: "journal_operation_unconfirmed") } }
+                } catch (problem: Exception) { buildJsonObject {
+                    put("error", (problem as? HealthJournalException)?.code ?: "journal_operation_unconfirmed")
+                    // Only for unexpected failures: where it happened and the exception type. Messages may carry SQL or values.
+                    if (problem !is HealthJournalException) { put("step", step); put("exception", problem.javaClass.simpleName) }
+                } }
                 val bytes = result.toString().toByteArray(Charsets.UTF_8)
                 require(bytes.size <= LocalHealthProtocol.MAX_FRAME_BYTES)
                 output.write(bytes); output.flush()

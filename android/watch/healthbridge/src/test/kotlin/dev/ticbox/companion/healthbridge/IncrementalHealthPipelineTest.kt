@@ -40,6 +40,10 @@ class IncrementalHealthPipelineTest {
     private var dropAck = false
     /** Whether the phone's first-sync window goes on the wire, as in production. */
     private var windowed = false
+    /** Whether ACKs ride on the next request, replies may be compressed and the watch reads ahead, as in production. */
+    private var streamlined = false
+    private var held: String? = null
+    private var zlibFrames = 0
 
     @Before fun setup() {
         provider = LocalHealthPipelineTest.ReadOnlyFixtureProvider()
@@ -57,19 +61,26 @@ class IncrementalHealthPipelineTest {
     private fun exchange(request: JsonObject): JsonObject {
         val decoded = LocalHealthProtocol.read(ByteArrayInputStream(LocalHealthProtocol.frame(request)))!!
         val reply = reader.handle(decoded, CancellationSignal())
-        return LocalHealthProtocol.read(ByteArrayInputStream(LocalHealthProtocol.frame(reply)))!!
+        val wire = LocalHealthProtocol.frame(reply, zlib = decoded.text("compression") == LocalHealthProtocol.ZLIB)
+        if (LocalHealthProtocol.header(java.nio.ByteBuffer.wrap(wire, 0, 4).int).second) zlibFrames++
+        // As HealthWakeService does once the reply is written.
+        if (streamlined && decoded.text("op") == "changes" && reply.text("error") == null && reply.flag("complete") != true)
+            reader.prefetch(decoded, CancellationSignal())
+        return LocalHealthProtocol.read(ByteArrayInputStream(wire))!!
     }
     private val remote = LocalHealthRemote { link ->
         object : LocalHealthConnection {
             override val servesAllTables = true
             override val supportedTables = tables.toSet()
             override suspend fun page(table: LocalHealthTable, checkpoint: LocalHealthCheckpoint): LocalHealthPage {
+                val ack = held; held = null
                 val page = LocalHealthProtocol.page(exchange(LocalHealthProtocol.changes(table, link.source.localUserId,
-                    checkpoint.run!!, checkpoint.full, checkpoint.window.takeIf { windowed })))
+                    checkpoint.run!!, checkpoint.full, checkpoint.window.takeIf { windowed }, ack, zlib = streamlined)))
                 transmitted += page.rows.size
                 return page
             }
             override suspend fun acknowledge(table: LocalHealthTable, page: LocalHealthPage) {
+                if (streamlined && page.inlineAck && !page.complete) { held = page.batchId; return }
                 if (dropAck && page.rows.isNotEmpty()) {
                     dropAck = false
                     // The pending batch survives a killed watch process before its ACK was handled.
@@ -147,6 +158,22 @@ class IncrementalHealthPipelineTest {
         SQLiteDataSyncStore(context, "recent-phone.sqlite").use { database ->
             val first = sync(SQLiteLocalHealthStore(database, now = { now }))
             assertEquals(3, first.recordsCommitted); assertNull(first.deferredBeforeMillis)
+        }
+    }
+
+    @Test fun acksOnTheNextRequestCompressedRepliesAndReadingAheadLoseAndRepeatNothing() = runBlocking {
+        streamlined = true
+        repeat(300) { provider.insertFixture(it + 1L, (60 + it % 40).toString(), 1) }
+        SQLiteDataSyncStore(context, "streamlined-phone.sqlite").use { database ->
+            val phone = SQLiteLocalHealthStore(database, now = { now })
+            assertEquals(300, sync(phone).recordsCommitted)
+            assertEquals(300, transmitted) // No batch came twice.
+            assertEquals(2, acknowledged) // Only the last page of each table needed an ACK of its own.
+            assertTrue(zlibFrames > 0)
+            assertEquals(0L, ledger.pendingCount(source.localUserId, LocalHealthTable.POINT))
+            assertEquals(300, phone.records(HealthRecordKind.POINT, HealthRecordQuery(source, limit = 500)).items.size)
+            now += HOUR
+            assertEquals(0, sync(phone).recordsCommitted)
         }
     }
 

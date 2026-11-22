@@ -129,6 +129,9 @@ class LocalHealthSyncEngine(scope: CoroutineScope, private val store: LocalHealt
     private suspend fun journal(source: LocalHealthJournalSource, enabled: Boolean?): LocalHealthJournalStatus {
         // A second RFCOMM client cannot share the watch's current acquisition window.
         if (!runs.tryLock()) throw LocalHealthJournalException("journal_sync_in_progress")
+        val started = elapsedMillis()
+        // A stable code, or an exception type; tells a phone-side timeout from an error the watch reported.
+        var outcome = "ok"
         try {
             val (current, selectedGeneration) = synchronized(this) {
                 if (closed) throw BackendClosedException()
@@ -138,15 +141,28 @@ class LocalHealthSyncEngine(scope: CoroutineScope, private val store: LocalHealt
                 if (closed || generation != selectedGeneration || link != current)
                     throw LocalHealthJournalException("journal_connection_replaced")
             }
-            return withTimeoutOrNull(90_000) {
+            val status = withTimeoutOrNull(90_000) {
                 remote.open(current).use { connection ->
                     checkLink()
                     // A lost result can mean a completed schema transaction. Never retry this write.
                     val result = connection.journal(source, enabled)
                     checkLink(); result
                 }
-            } ?: throw LocalHealthJournalException("journal_operation_unconfirmed")
-        } finally { runs.unlock() }
+            } ?: run { outcome = "phone_timeout"; throw LocalHealthJournalException("journal_operation_unconfirmed") }
+            status.reason?.let { outcome = it }
+            return status
+        } catch (problem: LocalHealthJournalException) {
+            if (outcome == "ok") outcome = problem.code
+            throw problem
+        } catch (cancelled: CancellationException) { outcome = "cancelled"; throw cancelled }
+        catch (problem: Exception) { outcome = problem.javaClass.simpleName; throw problem }
+        finally {
+            runs.unlock()
+            runCatching { diagnostics.record(ProtocolDiagnostic("local_health", "journal_result",
+                if (outcome == "ok") DiagnosticSeverity.INFO else DiagnosticSeverity.WARNING, details = mapOf(
+                    "source" to source.wireName, "action" to when (enabled) { null -> "status"; true -> "enable"; false -> "disable" },
+                    "outcome" to outcome, "millis" to (elapsedMillis() - started).toString()))) }
+        }
     }
     @Synchronized override fun close() {
         if (closed) return

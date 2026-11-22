@@ -1667,6 +1667,7 @@
     <string name="journal_error_connection">The connection changed. Read the status again.</string>
     <string name="journal_error_root_switch">Turn on \"Read full workouts (root)\" in Local Bridge on the watch first.</string>
     <string name="journal_error_unconfirmed">Couldn\'t confirm the result, so the status was read again.</string>
+    <string name="journal_error_status_unread">Couldn\'t read the log\'s state from the watch.</string>
     <string name="journal_error_unsupported">This version of the watch\'s health app doesn\'t support the change log.</string>
     <string name="journal_error_source_missing">This data source isn\'t on the watch.</string>
     <string name="journal_error_broken">The log is incomplete. Remove it, then turn it on again.</string>

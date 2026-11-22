@@ -64,12 +64,14 @@ class HealthWakeService : WearableListenerService() {
                         val page = JsonObject(handled + ("watchMillis" to JsonPrimitive(SystemClock.elapsedRealtime() - started)))
                         if (request.text("op") == "journal" && request.text("action") in setOf("enable", "disable") &&
                             (page.text("error") == null || request.text("action") == "disable")) reader.invalidateJournal(request.text("source")!!)
-                        LocalHealthProtocol.write(socket.outputStream, page)
+                        LocalHealthProtocol.write(socket.outputStream, page, zlib = request.text("compression") == LocalHealthProtocol.ZLIB)
                         window.touch(60_000)
                         if (request.text("op") == "changes") {
                             pages++; rows += (page["rows"] as? JsonArray)?.size ?: 0
                             Log.i(TAG, "Local changes sent; pages=$pages rows=$rows scanned=${page.number("scannedRows") ?: 0} " +
                                 "partial=${page.flag("partial") == true} error=${page.text("error") ?: "none"} millis=${page.number("watchMillis")}")
+                            // While this reply travels and the phone saves it, read the rows of the next one.
+                            if (page.text("error") == null && page.flag("complete") != true) reader.prefetch(request, cancellation)
                         }
                     }
                 }
