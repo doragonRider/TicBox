@@ -52,7 +52,9 @@ internal data class JournalHealthCapture(val position: HealthJournalPosition, va
 
 /** Delivery state lives here. The optional OEM journal never stores phone ACKs or health payloads. */
 internal class HealthIncrementalStore(context: Context, name: String = "health-incremental.sqlite",
-    private val now: () -> Long = System::currentTimeMillis) : AutoCloseable {
+    private val now: () -> Long = System::currentTimeMillis,
+    /** Most rows per source read and per batch; tests lower it to cross page boundaries with few rows. */
+    val pageRows: Int = LocalHealthProtocol.MAX_PAGE_ROWS) : AutoCloseable {
     // Version 1 is the baseline shipped in 0.2.0. Any format change must raise it and add a migration.
     private val helper = object : SQLiteOpenHelper(context, File(context.noBackupFilesDir, name).path, null, 1) {
         override fun onCreate(db: SQLiteDatabase) {
@@ -397,7 +399,10 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
         } else db.insertWithOnConflict("observations", null, ContentValues().apply {
             put("receiver", receiver); put("kind", table.wireName); put("row_key", key); put("source_id", row.id)
             put("parent_id", row.number("RECORD_ID")); put("fingerprint", fingerprint); put("present", 1)
-            put("last_changed", now()); put("seen", scope.token)
+            // A session a full capture sees for the first time hasn't changed. Counting it would stretch the recent POINT
+            // range back to the oldest such session on every sync for a day, although this first sync already read those
+            // points or left them behind on purpose under its window.
+            put("last_changed", if (previous == null && capture.full && table == LocalHealthTable.SESSION) 0L else now()); put("seen", scope.token)
             if (table == LocalHealthTable.SESSION || table == LocalHealthTable.FITNESS_RECORD || table == LocalHealthTable.SPORT)
                 put("payload", row.raw.toString())
         }, SQLiteDatabase.CONFLICT_REPLACE).also { check(it != -1L) }
@@ -440,9 +445,9 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
         if (existing != null) return@transaction JsonObject(existing.toMutableMap().apply { if (!capture.done) put("complete", JsonPrimitive(false)) })
         val epoch = it.rawQuery("SELECT value FROM metadata WHERE name='epoch'", null).use { c -> c.moveToFirst(); c.getString(0) }
         val rows = mutableListOf<JsonObject>(); var bytes = 0
-        it.rawQuery("SELECT revision,row_key,payload FROM pending WHERE receiver=? AND kind=? ORDER BY revision LIMIT ?", args(receiver, table) + (LocalHealthProtocol.PAGE_SIZE + 1).toString()).use { c ->
+        it.rawQuery("SELECT revision,row_key,payload FROM pending WHERE receiver=? AND kind=? ORDER BY revision LIMIT ?", args(receiver, table) + (pageRows + 1).toString()).use { c ->
             while (c.moveToNext()) {
-                if (rows.size >= LocalHealthProtocol.PAGE_SIZE) break
+                if (rows.size >= pageRows) break
                 val raw = LocalHealthProtocol.parse(c.getString(2).toByteArray())
                 val row = JsonObject(raw.toMutableMap().apply {
                     put("bridgeRevision", JsonPrimitive(c.getLong(0).toString())); put("bridgeEpoch", JsonPrimitive(epoch)); put("bridgeKey", JsonPrimitive(c.getString(1)))

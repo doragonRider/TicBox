@@ -44,6 +44,10 @@ class IncrementalHealthPipelineTest {
     private var streamlined = false
     private var held: String? = null
     private var zlibFrames = 0
+    /** Small pages let a few hundred rows cross page boundaries. */
+    private var pageRows = 128
+    /** Source rows the watch read for the last POINT capture. */
+    private var pointScans = 0L
 
     @Before fun setup() {
         provider = LocalHealthPipelineTest.ReadOnlyFixtureProvider()
@@ -52,7 +56,7 @@ class IncrementalHealthPipelineTest {
         reopenWatch()
     }
     private fun reopenWatch() {
-        ledger = HealthIncrementalStore(context, now = { now })
+        ledger = HealthIncrementalStore(context, now = { now }, pageRows = pageRows)
         val providerReader = HealthProviderReader(context.contentResolver, "synthetic")
         reader = IncrementalHealthReader(ledger, { request, signal -> providerReader.page(request, signal) }, tables)
     }
@@ -77,6 +81,7 @@ class IncrementalHealthPipelineTest {
                 val page = LocalHealthProtocol.page(exchange(LocalHealthProtocol.changes(table, link.source.localUserId,
                     checkpoint.run!!, checkpoint.full, checkpoint.window.takeIf { windowed }, ack, zlib = streamlined)))
                 transmitted += page.rows.size
+                if (table == LocalHealthTable.POINT) pointScans = page.scannedRows
                 return page
             }
             override suspend fun acknowledge(table: LocalHealthTable, page: LocalHealthPage) {
@@ -335,6 +340,18 @@ class IncrementalHealthPipelineTest {
             val last = LocalHealthProtocol.parse(phone.raw(400).json.toByteArray())
             assertEquals(9007199254740993L, last["columns"]!!.jsonObject.number("future_sensor"))
             assertEquals(0, sync(phone).recordsCommitted)
+        }
+    }
+    @Test fun oldSessionsFromTheFirstSyncDoNotMakeLaterSyncsRereadTheirPoints() = runBlocking {
+        provider.insertSession(1, "sleep-old", now - 10 * DAY, now - 9 * DAY)
+        for (id in 1L..200L) provider.db.execSQL("INSERT INTO data_point VALUES(?,?,?,?,?,?,?,?,?,?)",
+            arrayOf<Any?>(id, "60", "watch-id", "no-login-required", 1, now - 10 * DAY + id * 60_000, now - 10 * DAY + id * 60_000, 0, 0, null))
+        SQLiteDataSyncStore(context, "old-session-phone.sqlite").use { database ->
+            val phone = SQLiteLocalHealthStore(database)
+            assertEquals(LocalHealthSyncPhase.COMPLETED, sync(phone).phase)
+            now += 10 * 60_000L // Before the hourly check, so only new and recent rows are due.
+            assertEquals(LocalHealthSyncPhase.COMPLETED, sync(phone).phase)
+            assertEquals(0L, pointScans) // The session's points stay outside the recent range.
         }
     }
     companion object {

@@ -20,6 +20,17 @@ internal class IncrementalHealthReader(
         { cancellation -> if (BridgeSettings.rootFitnessEnabled(context)) RootFitnessPageReader(context).stamp(cancellation) else null }, RootHealthJournalReader(context))
 
     private var stamped: Pair<String, String?>? = null
+    /** Where the last reply or read-ahead spent its time, for the log: reading the source and this side's ledger. */
+    private var sourceNanos = 0L
+    private var ledgerNanos = 0L
+    var lastStages = ""
+        private set
+    private inline fun <T> timed(into: (Long) -> Unit, block: () -> T): T {
+        val started = System.nanoTime()
+        try { return block() } finally { into(System.nanoTime() - started) }
+    }
+    private fun stages(vararg extra: Pair<String, Long>) = (listOf("source" to sourceNanos, "ledger" to ledgerNanos) + extra)
+        .joinToString(" ") { (name, nanos) -> "$name=${nanos / 1_000_000}ms" }
     private var journalRun: String? = null
     private val journalWindows = mutableMapOf<String, HealthJournalWindow?>()
 
@@ -38,6 +49,7 @@ internal class IncrementalHealthReader(
     }
 
     fun handle(request: JsonObject, cancellation: CancellationSignal): JsonObject = try {
+        sourceNanos = 0; ledgerNanos = 0; lastStages = ""
         cancellation.throwIfCanceled()
         val table = tables.firstOrNull { it.wireName == request.text("table") }
             ?: return queryError("unsupported_table")
@@ -56,7 +68,8 @@ internal class IncrementalHealthReader(
                 error?.let { return it }
                 capture = read
             }
-            store.batch(receiver, table, capture)
+            var packNanos = 0L
+            timed({ packNanos = it }) { store.batch(receiver, table, capture) }.also { lastStages = stages("pack" to packNanos) }
         }
     } catch (problem: FitnessSourceException) {
         Log.w("TicBoxHealthBridge", "Fitness source unavailable; reason=${problem.code}")
@@ -81,10 +94,11 @@ internal class IncrementalHealthReader(
             cancellation.throwIfCanceled()
             if (capture.scopes.isNotEmpty()) {
                 val scope = capture.scopes.first()
-                val page = LocalHealthProtocol.page(read(scope.request(table), cancellation))
+                val page = timed({ sourceNanos += it }) { LocalHealthProtocol.page(read(scope.request(table, store.pageRows), cancellation)) }
                 if (page.error != null) return capture to queryError(page.error!!)
-                capture = if (scope.probe) store.probed(receiver, table, capture, page.rows.isNotEmpty())
-                    else store.observe(receiver, table, capture, page)
+                capture = timed({ ledgerNanos += it }) {
+                    if (scope.probe) store.probed(receiver, table, capture, page.rows.isNotEmpty()) else store.observe(receiver, table, capture, page)
+                }
             } else {
                 val selected = checkNotNull(capture.journal)
                 val page = try {
@@ -97,7 +111,7 @@ internal class IncrementalHealthReader(
                         } else {
                             capture = store.finishJournal(receiver, table, capture); continue
                         }
-                    } else journal?.page(table, selected.position, selected.upper, cancellation)
+                    } else timed({ sourceNanos += it }) { journal?.page(table, selected.position, selected.upper, cancellation) }
                 } catch (cancelled: android.os.OperationCanceledException) { throw cancelled }
                 catch (_: Exception) { null }
                 val current = page?.let(HealthJournalWindow::parse)
@@ -106,7 +120,7 @@ internal class IncrementalHealthReader(
                     page.flag("reset") == true || page.flag("wide") == true -> store.resetJournal(receiver, table, capture, current)
                     (page["rows"] as? kotlinx.serialization.json.JsonArray).orEmpty().any { (it as JsonObject).flag("partial") == true } ->
                         store.withoutJournal(receiver, table, capture, stamp(table, run, cancellation))
-                    else -> store.observeJournal(receiver, table, capture, page)
+                    else -> timed({ ledgerNanos += it }) { store.observeJournal(receiver, table, capture, page) }
                 }
             }
         }
@@ -123,14 +137,15 @@ internal class IncrementalHealthReader(
             val receiver = request.text("receiver") ?: return
             val run = request.text("run") ?: return
             val capture = begin(request, table, receiver, run, cancellation)
+            sourceNanos = 0; ledgerNanos = 0
             val started = android.os.SystemClock.elapsedRealtime()
             // The batch on its way still counts as pending until its ACK, so this stops one page ahead.
             val (next, error) = fill(receiver, table, run, capture, cancellation) {
-                store.pendingCount(receiver, table) >= 2 * LocalHealthProtocol.PAGE_SIZE
+                store.pendingCount(receiver, table) >= 2 * store.pageRows
             }
             Log.i("TicBoxHealthBridge", "Read-ahead; table=${table.wireName} scanned=${next.scanned - capture.scanned} " +
                 "pending=${store.pendingCount(receiver, table)} done=${next.done} error=${error?.text("error") ?: "none"} " +
-                "millis=${android.os.SystemClock.elapsedRealtime() - started}")
+                "millis=${android.os.SystemClock.elapsedRealtime() - started} ${stages()}")
         } catch (_: android.os.OperationCanceledException) {
         } catch (problem: Exception) {
             Log.w("TicBoxHealthBridge", "Read-ahead stopped; exception=${problem.javaClass.simpleName}")

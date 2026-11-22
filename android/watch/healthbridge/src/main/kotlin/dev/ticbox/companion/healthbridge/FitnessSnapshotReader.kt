@@ -42,7 +42,7 @@ internal fun fitnessDatabasePage(database: android.database.sqlite.SQLiteDatabas
             cancellation).use { if (it.moveToFirst()) it.healthRowId() else null }
         return if (upper == null) localHealthPage(emptyList(), after, null, true, providerVersion)
         else {
-            val limit = (request.number("limit") ?: LocalHealthProtocol.PAGE_SIZE.toLong()).coerceIn(1, LocalHealthProtocol.PAGE_SIZE.toLong()).toInt()
+            val limit = (request.number("limit") ?: LocalHealthProtocol.PAGE_SIZE.toLong()).coerceIn(1, LocalHealthProtocol.MAX_PAGE_ROWS.toLong()).toInt()
             val (bounds, args) = sourceSelection(table, JsonObject(request.toMutableMap().apply { put("upperId", JsonPrimitive(upper)) }))
             database.rawQuery("SELECT * FROM $sqlTable WHERE $bounds ORDER BY _id ASC LIMIT ${limit + 1}", args,
                 cancellation).use { cursor ->

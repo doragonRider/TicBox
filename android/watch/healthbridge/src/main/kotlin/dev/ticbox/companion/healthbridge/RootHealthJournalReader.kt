@@ -135,13 +135,14 @@ object HealthJournalMain {
                     val source = request.text("source") ?: throw HealthJournalException("journal_invalid_source")
                     val action = request.text("action") ?: throw HealthJournalException("journal_invalid_action")
                     if (action !in setOf("status", "enable", "disable", "page")) throw HealthJournalException("journal_invalid_action")
+                    // The first database a process opens makes SQLite read a global setting through the process's
+                    // application, if it has one. The system context below would make that call as package "android",
+                    // which the system refuses from this UID, root included, and every open would then throw
+                    // SecurityException. Opened before that context exists, SQLite skips the setting and keeps its defaults.
+                    step = "sqlite"; SQLiteDatabase.create(null).close()
                     step = "context"; val context = systemContext()
                     step = "verify"; val verified = HealthJournalProfiles.verify(context, source, forRemoval = action == "disable")
                     step = "stat"; val before = Os.stat(verified.file.path)
-                    // The first database this process opens makes SQLite read a global setting through the system context
-                    // created above. Under the vendor UID that binder call is refused, as the context's package no longer
-                    // matches the caller, and every open then throws SecurityException. Root skips that check.
-                    step = "sqlite"; SQLiteDatabase.create(null).close()
                     step = "uid"; Os.setgid(verified.uid); Os.setuid(verified.uid)
                     check(android.os.Process.myUid() == verified.uid && Os.getgid() == verified.uid)
                     val write = action == "enable" || action == "disable"
