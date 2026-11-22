@@ -835,7 +835,11 @@
     <string name="faces_photo_show_battery">Battery level</string>
     <string name="faces_photo_show_battery_summary">Shown near the bottom</string>
     <string name="faces_photo_send">Send to watch</string>
-    <string name="faces_photo_sending">Sending…</string>
+    <string name="faces_photo_stage_preparing">Preparing the photo…</string>
+    <string name="faces_photo_stage_sending">Sending the photo to the watch…</string>
+    <string name="faces_photo_stage_switching">Switching the watch to the photo face…</string>
+    <string name="faces_photo_stage_done">Done</string>
+    <string name="faces_photo_done">The watch is showing your photo.</string>
     <string name="faces_photo_face_missing">Couldn\'t switch the watch to the photo face. In Watch faces, add “%1$s” under More faces, then choose it.</string>
     <string name="faces_photo_face_missing_unnamed">Couldn\'t switch the watch to the photo face. In Watch faces, add it under More faces, then choose it.</string>
     <string name="faces_photo_face_added">The photo face was added to the watch\'s faces. Choose it in Watch faces to show it.</string>

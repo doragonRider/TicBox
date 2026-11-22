@@ -816,7 +816,11 @@
     <string name="faces_photo_show_battery">电量</string>
     <string name="faces_photo_show_battery_summary">显示在底部</string>
     <string name="faces_photo_send">发送到手表</string>
-    <string name="faces_photo_sending">正在发送…</string>
+    <string name="faces_photo_stage_preparing">正在处理照片…</string>
+    <string name="faces_photo_stage_sending">正在把照片发送到手表…</string>
+    <string name="faces_photo_stage_switching">正在把手表切换到照片表盘…</string>
+    <string name="faces_photo_stage_done">完成</string>
+    <string name="faces_photo_done">手表已经在显示这张照片了。</string>
     <string name="faces_photo_face_missing">没能把手表切换到照片表盘。请在“表盘”页的“更多表盘”里添加“%1$s”，然后选择它。</string>
     <string name="faces_photo_face_missing_unnamed">没能把手表切换到照片表盘。请在“表盘”页的“更多表盘”里找到并添加照片表盘，然后选择它。</string>
     <string name="faces_photo_face_added">照片表盘已经添加到手表的表盘里，请在“表盘”页选择它。</string>

@@ -10,6 +10,7 @@ import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
@@ -18,6 +19,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,11 +54,14 @@ import dev.ticbox.companion.ui.common.uiText
 import dev.ticbox.companion.ui.designsystem.AppIcon
 import dev.ticbox.companion.ui.designsystem.AppIcons
 import dev.ticbox.companion.ui.designsystem.FadeSwitch
+import dev.ticbox.companion.ui.designsystem.FadingText
 import dev.ticbox.companion.ui.designsystem.FootnoteText
 import dev.ticbox.companion.ui.designsystem.GrowingGaps
 import dev.ticbox.companion.ui.designsystem.PageColumn
 import dev.ticbox.companion.ui.designsystem.PageScaffold
+import dev.ticbox.companion.ui.designsystem.ProgressBar
 import dev.ticbox.companion.ui.designsystem.Reveal
+import dev.ticbox.companion.ui.designsystem.RevealValue
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileNotFoundException
@@ -123,6 +129,9 @@ data class PhotoEdit(
         get() = RenderKey(crop, filter, sharpening)
 }
 
+/** What sending or switching is waiting for, and how far along it is when that's known. */
+data class PhotoProgress(@param:StringRes val text: Int, val fraction: Float?)
+
 /** The photo as it will be sent, at the watch's size. */
 class PhotoOutput(val key: RenderKey, val pixels: IntArray, val image: ImageBitmap)
 
@@ -143,6 +152,11 @@ class PhotoFaceViewModel(dependencies: CompanionDependencies, private val store:
     val editor = editing.asStateFlow()
 
     private val sent = MutableStateFlow(0)
+
+    private val working = MutableStateFlow<PhotoProgress?>(null)
+
+    /** Shown on both pages, so leaving the editor early doesn't hide that the watch isn't done. */
+    val progress = working.asStateFlow()
 
     /** Counts photos the watch confirmed, so the editor can close after one. */
     val delivered = sent.asStateFlow()
@@ -289,29 +303,47 @@ class PhotoFaceViewModel(dependencies: CompanionDependencies, private val store:
     }
 
     /**
-     * Sends the edited photo with its layout, then makes the photo face the watch's face. Without
-     * the watch's settings, only the photo goes, and the face stays as it is.
+     * Sends the edited photo with its layout, then makes the photo face the watch's face, showing
+     * each step. Without the watch's settings, only the photo goes, and the face stays as it is.
+     * The editor closes once all of it is done.
      */
     fun send() {
         val state = editing.value
         val source = state.source ?: return
         val edit = state.edit ?: return
         val settings = current.value.photo?.settings?.let { edit.layout?.applyTo(it) ?: it }
+        val steps = if (settings == null) 2 else 3
+        fun step(index: Int, text: Int) {
+            working.value = PhotoProgress(text, (index + 1f) / (steps + 1))
+        }
         command(SET) { session ->
-            val output =
-                state.output?.takeIf { it.key == edit.render } ?: render(source, edit.render)
-            val bytes = withContext(Dispatchers.Default) { encode(output.pixels) }
-            val faces = session.services.watchFaces
-            val result = faces.setPhoto(settings, bytes)
-            if (result.outcome != WatchFaceOutcome.ACKNOWLEDGED)
-                return@command result.outcome.message()
-            current.update { page ->
-                val photo = page.photo?.let { it.copy(settings = settings ?: it.settings) }
-                page.copy(photo = photo, image = output.image)
+            try {
+                step(0, R.string.faces_photo_stage_preparing)
+                val output =
+                    state.output?.takeIf { it.key == edit.render } ?: render(source, edit.render)
+                val bytes = withContext(Dispatchers.Default) { encode(output.pixels) }
+                step(1, R.string.faces_photo_stage_sending)
+                val faces = session.services.watchFaces
+                val result = faces.setPhoto(settings, bytes)
+                if (result.outcome != WatchFaceOutcome.ACKNOWLEDGED)
+                    return@command result.outcome.message()
+                current.update { page ->
+                    val photo = page.photo?.let { it.copy(settings = settings ?: it.settings) }
+                    page.copy(photo = photo, image = output.image)
+                }
+                keep(source, edit)
+                val switched = settings?.let {
+                    step(2, R.string.faces_photo_stage_switching)
+                    showPhotoFace(faces, it, store)
+                }
+                working.value = PhotoProgress(R.string.faces_photo_stage_done, 1f)
+                // Long enough to see the bar full before the editor closes.
+                delay(DoneMillis)
+                sent.update { it + 1 }
+                switched ?: settings?.let { uiText(R.string.faces_photo_done) }
+            } finally {
+                working.value = null
             }
-            keep(source, edit)
-            sent.update { it + 1 }
-            settings?.let { showPhotoFace(faces, it, store) }
         }
     }
 
@@ -332,7 +364,14 @@ class PhotoFaceViewModel(dependencies: CompanionDependencies, private val store:
     /** Makes the photo face the watch's face, adding it to the favorites when it isn't one. */
     fun usePhotoFace() {
         val settings = current.value.photo?.settings ?: return
-        command(USE) { session -> showPhotoFace(session.services.watchFaces, settings, store) }
+        command(USE) { session ->
+            try {
+                working.value = PhotoProgress(R.string.faces_photo_stage_switching, null)
+                showPhotoFace(session.services.watchFaces, settings, store)
+            } finally {
+                working.value = null
+            }
+        }
     }
 
     private suspend fun render(source: PhotoSource, key: RenderKey): PhotoOutput =
@@ -357,6 +396,7 @@ class PhotoFaceViewModel(dependencies: CompanionDependencies, private val store:
         const val USE = "photo_use"
         private const val TAG = "PhotoFace"
         private const val RenderDelayMillis = 150L
+        private const val DoneMillis = 600L
     }
 }
 
@@ -410,6 +450,7 @@ fun PhotoFaceScreen(viewModel: PhotoFaceViewModel, onBack: () -> Unit, onEdit: (
     val pending by viewModel.pending.collectAsStateWithLifecycle()
     val linkReady by viewModel.linkReady.collectAsStateWithLifecycle()
     val battery by viewModel.battery.collectAsStateWithLifecycle()
+    val progress by viewModel.progress.collectAsStateWithLifecycle()
     val ready = linkReady == true
     val sending = PhotoFaceViewModel.SET in pending
     val context = LocalContext.current.applicationContext
@@ -463,12 +504,13 @@ fun PhotoFaceScreen(viewModel: PhotoFaceViewModel, onBack: () -> Unit, onEdit: (
                 Reveal(state.photo?.settings != null) {
                     FilledTonalButton(
                         onClick = viewModel::usePhotoFace,
-                        enabled = ready && PhotoFaceViewModel.USE !in pending,
+                        enabled = ready && PhotoFaceViewModel.USE !in pending && !sending,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Text(stringResource(R.string.faces_photo_use))
                     }
                 }
+                PhotoProgressView(progress)
             }
             FootnoteText(
                 stringResource(
@@ -476,6 +518,35 @@ fun PhotoFaceScreen(viewModel: PhotoFaceViewModel, onBack: () -> Unit, onEdit: (
                 )
             )
         }
+    }
+}
+
+/** About how long a [RevealValue] takes to unroll. */
+private const val UnrollMillis = 320L
+
+/** The steps of sending a photo or switching faces, as they happen. */
+@Composable
+internal fun PhotoProgressView(progress: PhotoProgress?, modifier: Modifier = Modifier) {
+    // Below the button that started it, which may be the last thing on the screen.
+    val requester = remember { BringIntoViewRequester() }
+    val showing = progress != null
+    LaunchedEffect(showing) {
+        if (showing) {
+            delay(UnrollMillis)
+            requester.bringIntoView()
+        }
+    }
+    RevealValue(
+        progress,
+        modifier.fillMaxWidth().bringIntoViewRequester(requester),
+        spacing = 8.dp,
+    ) { shown ->
+        ProgressBar(shown.fraction)
+        FadingText(
+            stringResource(shown.text),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

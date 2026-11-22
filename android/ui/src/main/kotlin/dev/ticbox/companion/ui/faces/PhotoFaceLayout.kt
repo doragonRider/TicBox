@@ -13,6 +13,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalConfiguration
@@ -23,6 +25,9 @@ import dev.ticbox.companion.ui.R
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Where the photo face puts the time. [wire] is the protocol's `time_place`; a watch that has none
@@ -187,6 +192,29 @@ class PhotoFacePictures(private val store: PhotoFaceStore, private val context: 
     /** Whether [component] is the photo face, as far as the photo face page found. Reads a file. */
     fun isPhotoFace(component: String): Boolean =
         store.component()?.let { fullComponentName(it) == fullComponentName(component) } == true
+
+    /**
+     * [component] drawn as the photo face, for pages that show faces as pictures: the watch's own
+     * preview of it is a stock picture. Draws [known], the photo a page already has, or else what
+     * [ask] gets from the watch. Null for any other face, or without a photo to draw.
+     */
+    suspend fun picture(
+        component: String,
+        known: WatchFacePhoto?,
+        battery: Int?,
+        ask: suspend () -> WatchFacePhoto?,
+    ): ImageBitmap? =
+        try {
+            if (!withContext(Dispatchers.IO) { isPhotoFace(component) }) null
+            else
+                (known?.takeIf { it.image != null } ?: ask())
+                    ?.let { withContext(Dispatchers.Default) { draw(it, battery) } }
+                    ?.asImageBitmap()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
+        }
 
     fun draw(photo: WatchFacePhoto, battery: Int?): Bitmap? {
         val bytes = photo.image?.bytes ?: return null

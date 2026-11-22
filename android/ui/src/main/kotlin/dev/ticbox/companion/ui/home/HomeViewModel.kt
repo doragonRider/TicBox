@@ -1,7 +1,6 @@
 package dev.ticbox.companion.ui.home
 
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.viewModelScope
 import dev.ticbox.companion.api.ConnectionPhase
 import dev.ticbox.companion.api.ConnectionRecoveryPhase
@@ -28,7 +27,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
@@ -44,7 +42,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** The step count on the home page. [lastKnown] when the watch may have counted more since. */
@@ -326,19 +323,9 @@ class HomeViewModel(
     ): ImageBitmap? {
         val pictures = photoFace ?: return null
         val component = face.componentName ?: return null
-        return try {
-            if (!withContext(Dispatchers.IO) { pictures.isPhotoFace(component) }) return null
-            val link = session.client.state.value.connection.sessionId
-            val known =
-                photo?.takeIf { it.image != null }
-                    ?: if (photoAsked.add(link)) session.services.watchFaces.queryPhoto() else null
-            known
-                ?.let { withContext(Dispatchers.Default) { pictures.draw(it, battery) } }
-                ?.asImageBitmap()
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            null
+        val link = session.client.state.value.connection.sessionId
+        return pictures.picture(component, photo, battery) {
+            if (photoAsked.add(link)) session.services.watchFaces.queryPhoto() else null
         }
     }
 
