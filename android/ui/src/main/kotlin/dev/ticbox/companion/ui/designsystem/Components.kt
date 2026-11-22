@@ -52,6 +52,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
@@ -198,7 +199,12 @@ fun BottomNotice(
         ) {
             AppIcon(icon, contentDescription = null)
             Text(text, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
-            TextButton(onClick = onAction) { Text(actionLabel) }
+            TextButton(
+                onClick = onAction,
+                colors = ButtonDefaults.textButtonColors(contentColor = content),
+            ) {
+                Text(actionLabel)
+            }
         }
     }
 }
