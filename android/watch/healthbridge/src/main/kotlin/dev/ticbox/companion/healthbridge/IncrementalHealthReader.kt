@@ -149,8 +149,13 @@ internal class IncrementalHealthReader(
         var capture = start
         val deadline = System.nanoTime() + READ_BUDGET_NANOS
         var taken = 0
-        while (!capture.done && taken++ < steps && !enough() && System.nanoTime() < deadline) {
+        while (!capture.done && System.nanoTime() < deadline) {
             cancellation.throwIfCanceled()
+            // A finished baseline keeps the log head read before it, with no second read of the window: the next run checks
+            // its cursor against the window anyway and starts over if the log was cut, rebuilt or replaced meanwhile. It
+            // reads nothing, so it goes with the page that ended the scan, and the last batch made after it is the end.
+            if (capture.scopes.isEmpty() && checkNotNull(capture.journal).baseline) { capture = store.finishJournal(receiver, table, capture); continue }
+            if (taken++ >= steps || enough()) break
             if (capture.scopes.isNotEmpty()) {
                 val scope = capture.scopes.first()
                 val page = timed({ timing.source += it }) { LocalHealthProtocol.page(read(scope.request(table, store.pageRows), cancellation)) }
@@ -162,9 +167,6 @@ internal class IncrementalHealthReader(
                 }
             } else {
                 val selected = checkNotNull(capture.journal)
-                // A finished baseline keeps the log head read before it, with no second read of the window: the next run checks
-                // its cursor against the window anyway and starts over if the log was cut, rebuilt or replaced meanwhile.
-                if (selected.baseline) { capture = store.finishJournal(receiver, table, capture); continue }
                 val page = try {
                     timed({ timing.source += it }) { journal?.page(table, selected.position, selected.upper, cancellation) }
                 } catch (cancelled: android.os.OperationCanceledException) { throw cancelled }
@@ -185,9 +187,9 @@ internal class IncrementalHealthReader(
     enum class ReadAhead { IDLE, MORE, ENOUGH }
 
     /**
-     * Reads one source page ahead for the table [request] asked for, while replies go out from another thread, until a
-     * page's worth of rows is queued past the batches made. [ReadAhead.IDLE] when there was nothing to read. Errors are
-     * left for the next request to meet and report.
+     * Reads one source page ahead for the table [request] asked for, while replies go out from another thread, until
+     * [AHEAD_PAGES] pages' worth of rows are queued past the batches made. [ReadAhead.IDLE] when there was nothing to
+     * read. Errors are left for the next request to meet and report.
      */
     fun readAhead(request: JsonObject, cancellation: CancellationSignal): ReadAhead {
         val table = tables.firstOrNull { it.wireName == request.text("table") } ?: return ReadAhead.IDLE
@@ -195,10 +197,11 @@ internal class IncrementalHealthReader(
         val run = request.text("run") ?: return ReadAhead.IDLE
         val timing = Timing()
         val started = android.os.SystemClock.elapsedRealtime()
+        val ahead = AHEAD_PAGES * store.pageRows
         val (before, after, error) = try {
             scan.withLock {
                 val capture = current(request, table, receiver, run, cancellation)
-                if (capture.done || store.pendingBeyond(receiver, table) >= store.pageRows) return ReadAhead.IDLE
+                if (capture.done || store.pendingBeyond(receiver, table, ahead) >= ahead) return ReadAhead.IDLE
                 val (next, error) = fill(receiver, table, run, capture, cancellation, timing, steps = 1) { false }
                 Triple(capture, next, error)
             }
@@ -207,10 +210,10 @@ internal class IncrementalHealthReader(
             Log.w("TicBoxHealthBridge", "Read-ahead stopped; exception=${problem.javaClass.simpleName}")
             return ReadAhead.IDLE
         }
-        val queued = store.pendingBeyond(receiver, table)
+        val queued = store.pendingBeyond(receiver, table, ahead)
         Log.i("TicBoxHealthBridge", "Read-ahead; table=${table.wireName} scanned=${after.scanned - before.scanned} queued=$queued " +
             "done=${after.done} error=${error?.text("error") ?: "none"} millis=${android.os.SystemClock.elapsedRealtime() - started} ${timing.describe()}")
-        return if (error != null || after.done || queued >= store.pageRows) ReadAhead.ENOUGH else ReadAhead.MORE
+        return if (error != null || after.done || queued >= ahead) ReadAhead.ENOUGH else ReadAhead.MORE
     }
 
     /** Makes the table's next batch from rows read ahead while the one before it travels; true when one was made. */
@@ -248,6 +251,12 @@ internal class IncrementalHealthReader(
     private companion object {
         /** Well inside the phone's 30-second page timeout. */
         const val READ_BUDGET_NANOS = 3_000_000_000L
+        /**
+         * Pages read ahead past the batches made: one for the next batch to be made from, and one being read meanwhile.
+         * With only one, a request arrived while that page was still being read and waited for it, and reading resumed
+         * only after its reply was written, so reading and packing took turns.
+         */
+        const val AHEAD_PAGES = 2
     }
 }
 

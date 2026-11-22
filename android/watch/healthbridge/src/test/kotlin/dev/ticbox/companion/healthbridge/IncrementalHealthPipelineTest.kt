@@ -53,6 +53,8 @@ class IncrementalHealthPipelineTest {
     /** Whether this watch's `ready` says it takes requests ahead. */
     private var pipelineReady = true
     private var aheadRequests = 0
+    /** Source pages the watch read. */
+    private var sourceReads = 0
 
     @Before fun setup() {
         provider = LocalHealthPipelineTest.ReadOnlyFixtureProvider()
@@ -63,7 +65,7 @@ class IncrementalHealthPipelineTest {
     private fun reopenWatch() {
         ledger = HealthIncrementalStore(context, now = { now }, pageRows = pageRows)
         val providerReader = HealthProviderReader(context.contentResolver, "synthetic")
-        reader = IncrementalHealthReader(ledger, { request, signal -> providerReader.page(request, signal) }, tables)
+        reader = IncrementalHealthReader(ledger, { request, signal -> sourceReads++; providerReader.page(request, signal) }, tables)
     }
     @After fun cleanup() { reader.close(); provider.db.close() }
 
@@ -224,6 +226,19 @@ class IncrementalHealthPipelineTest {
             now += HOUR
             assertEquals(0, sync(phone).recordsCommitted)
         }
+    }
+
+    @Test fun whileAReplyTravelsTheNextBatchesAreMadeAndAnotherPageIsRead() {
+        streamlined = true
+        repeat(1000) { provider.insertFixture(it + 1L, "70", 1) }
+        val receiver = source.localUserId; val table = LocalHealthTable.POINT; val run = UUID.randomUUID().toString()
+        val first = exchange(LocalHealthProtocol.changes(table, receiver, run, full = true))
+        // Three batches wait for their ACKs, and two more pages are read past them.
+        assertEquals(2 * pageRows, ledger.pendingBeyond(receiver, table, 4 * pageRows))
+        val reads = sourceReads
+        val next = reader.handle(LocalHealthProtocol.changes(table, receiver, run, full = true, after = first.text("batch")), CancellationSignal())
+        assertEquals(reads, sourceReads) // Made already; nothing was read for it.
+        assertEquals((pageRows + 1..2 * pageRows).toList(), LocalHealthProtocol.page(next).rows.map { it.id!!.toInt() })
     }
 
     @Test fun aPageThatFailsToSaveAfterTheNextWasAskedForIsSentAgainInOrder() = runBlocking {

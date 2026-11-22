@@ -544,8 +544,9 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
         db.rawQuery("SELECT COUNT(*) FROM (SELECT 1 FROM pending WHERE receiver=? AND kind=? AND revision>? LIMIT ?)",
             args(receiver, table) + beyond(made).toString() + limit.toString()).use { it.moveToFirst(); it.getInt(0) }
 
-    /** Queued rows no made batch covers yet, counted up to one page: enough to make the next batch from. */
-    fun pendingBeyond(receiver: String, table: LocalHealthTable): Int = pendingBeyond(receiver, table, outstanding(receiver, table), pageRows)
+    /** Queued rows no made batch covers yet, counted up to [limit]; one page is enough to make the next batch from. */
+    fun pendingBeyond(receiver: String, table: LocalHealthTable, limit: Int = pageRows): Int =
+        pendingBeyond(receiver, table, outstanding(receiver, table), limit)
 
     /** Whether a request for the batch after [after] needs a new batch and no queued row is there to make it from. */
     fun needsRows(receiver: String, table: LocalHealthTable, after: String? = null): Boolean {

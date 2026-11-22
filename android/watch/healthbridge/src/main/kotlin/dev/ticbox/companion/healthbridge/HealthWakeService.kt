@@ -78,6 +78,9 @@ class HealthWakeService : WearableListenerService() {
                             val started = SystemClock.elapsedRealtime()
                             val handled = if (request.text("op") == "journal") RootHealthJournalReader(applicationContext).control(request, cancellation)
                                 else reader.handle(request, cancellation, deferAck = true)
+                            // Reading goes on at once, while this reply is written and travels, as it may have taken the rows read ahead.
+                            val going = request.text("op") == "changes" && handled.text("error") == null && handled.flag("complete") != true
+                            if (request.text("op") == "changes") ahead.want(request.takeIf { going })
                             // Lets the phone tell this side's work from the Bluetooth transfer in its sync timing.
                             val page = JsonObject(handled + ("watchMillis" to JsonPrimitive(SystemClock.elapsedRealtime() - started)) +
                                 ("queuedMillis" to JsonPrimitive((started - arrived).coerceAtLeast(0))))
@@ -91,9 +94,8 @@ class HealthWakeService : WearableListenerService() {
                                 Log.i(TAG, "Local changes sent; pages=$pages rows=$rows scanned=${page.number("scannedRows") ?: 0} " +
                                     "partial=${page.flag("partial") == true} error=${page.text("error") ?: "none"} millis=${page.number("watchMillis")} " +
                                     "queued=${page.number("queuedMillis")} ${reader.lastStages}")
-                                // While this reply travels and the phone saves it, read and pack the next ones.
-                                if (page.text("error") == null && page.flag("complete") != true) { reader.packAhead(request); ahead.want(request) }
-                                else ahead.want(null)
+                                // While this reply travels and the phone saves it, pack the next one from the rows read ahead.
+                                if (going && reader.packAhead(request)) ahead.want(request)
                             }
                         }
                     }
@@ -144,8 +146,9 @@ class HealthWakeService : WearableListenerService() {
     }
 
     /**
-     * Reads the source ahead on its own thread while the answering thread packs and sends, one page at a time, until a
-     * page's worth of rows waits past the batches made. [want] points it at a table after each reply, or stops it.
+     * Reads the source ahead on its own thread while the answering thread packs and sends, one page at a time, until
+     * two pages' worth of rows wait past the batches made (`AHEAD_PAGES` in the reader). [want] points it at a table
+     * as each request is answered, or stops it.
      */
     private class ReadAhead(private val reader: IncrementalHealthReader, private val cancellation: CancellationSignal,
         private val read: (JsonObject) -> Unit) : AutoCloseable {
