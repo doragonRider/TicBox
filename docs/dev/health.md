@@ -98,7 +98,7 @@ val samples = workouts.items.firstOrNull()?.id?.let { id ->
 {"id":"123","columns":{"_id":123,"values":"原始字符串","type":999,"time_from":1000,"time_to":2000,"deleted":0,"future_column":null},"storageTypes":{"_id":"integer","values":"string","future_column":"null"}}
 ```
 
-（合成数据。）`columns` 保留 Provider 返回的所有列；`storageTypes` 为 Cursor 的 null / integer / float / string / blob-base64 / unknown。整数保留 int64 精度，blob 为不换行的 Base64，非有限浮点保留为字符串。单元格读取失败时保留其他字段并记录 `partial` / `unavailableColumns`。这是 Cursor 数据的表示，不是 SQLite 文件或最初的 HTTP 响应。
+（合成数据。）`columns` 保留 Provider 返回的所有列；`storageTypes` 为 Cursor 的 null / integer / float / string / blob-base64 / unknown。整数保留 int64 精度，blob 为不换行的 Base64，非有限浮点保留为字符串。单元格读取失败时保留其他字段并记录 `partial` / `unavailableColumns`。一行太大、一帧放不下时，去掉最大的单元格并记入 `oversizedColumns`。这是 Cursor 数据的表示，不是 SQLite 文件或最初的 HTTP 响应。
 
 本地 SPORT 摘要的列为 `id, wwid, device_id, time_from, time_to, type, synced, during, calorie, heart`：`during` 为毫秒，`heart` 为平均心率（没有有效样本时可能为 0），`calorie` 为 kcal。它没有轨迹、步数或距离，不能套用云端 SPORT JSON 的格式。
 

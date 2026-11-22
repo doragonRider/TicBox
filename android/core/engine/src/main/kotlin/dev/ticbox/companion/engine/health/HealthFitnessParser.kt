@@ -194,8 +194,7 @@ object HealthFitnessParser {
             columns = root?.get("columns") as? JsonObject ?: root ?: JsonObject(emptyMap())
             if (root == null || (root["columns"] != null && root["columns"] !is JsonObject))
                 issue("row", HealthFitnessIssueKind.MALFORMED_ROW)
-            if ((root?.get("partial") as? JsonPrimitive)?.booleanOrNull == true)
-                issue("row", HealthFitnessIssueKind.PARTIAL_SOURCE_ROW)
+            if (root.lacksSourceCells()) issue("row", HealthFitnessIssueKind.PARTIAL_SOURCE_ROW)
             unknownColumns = columns.keys.filterTo(linkedSetOf()) { name -> knownColumns.none { it.equals(name, true) } }
         }
 

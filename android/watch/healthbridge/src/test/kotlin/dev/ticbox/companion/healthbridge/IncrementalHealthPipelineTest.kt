@@ -297,6 +297,51 @@ class IncrementalHealthPipelineTest {
         }
     }
 
+    @Test fun aRowTooLargeToDeliverGoesOnceWithoutItsLargestCellAndHoldsNothingBack() = runBlocking {
+        // As in production, where incremental reads don't measure rows against a frame.
+        val unframed = HealthProviderReader(context.contentResolver, "synthetic", framed = false)
+        reader.close(); reader = IncrementalHealthReader(ledger, { request, signal -> unframed.page(request, signal) }, tables)
+        val huge = "x".repeat(MAX_ROW_BYTES)
+        provider.insertFixture(1, "70", 1); provider.insertFixture(2, huge, 1); provider.insertFixture(3, "72", 1)
+        SQLiteDataSyncStore(context, "oversized-phone.sqlite").use { database ->
+            val phone = SQLiteLocalHealthStore(database, now = { now })
+            val first = sync(phone)
+            assertEquals(LocalHealthSyncPhase.COMPLETED, first.phase); assertEquals(3, first.recordsCommitted)
+            val point = phone.points(HealthPointQuery(source)).items.single { it.providerId == 2L }
+            assertNull(point.rawValues); assertTrue(HealthParseIssue.PARTIAL_SOURCE_ROW in point.issues)
+            assertTrue("oversizedColumns" in point.raw.json)
+            now += HOUR
+            assertEquals(0, sync(phone).recordsCommitted) // Settled, so it isn't sent again.
+            // A row the phone already holds keeps the cell it can no longer receive.
+            provider.db.execSQL("UPDATE data_point SET `values`=? WHERE _id=1", arrayOf(huge))
+            provider.insertFixture(4, "73", 1)
+            now += HOUR
+            assertEquals(2, sync(phone).recordsCommitted)
+            assertEquals("70", phone.points(HealthPointQuery(source)).items.single { it.providerId == 1L }.rawValues)
+        }
+    }
+
+    @Test fun aTooLargeRowQueuedBeforeRowsWereBoundedIsDeliveredWithoutItsLargestCell() = runBlocking {
+        fun row(id: Int, value: String) = buildJsonObject {
+            put("id", id.toString()); put("columns", buildJsonObject { put("_id", id); put("type", 1); put("values", value) })
+            put("storageTypes", buildJsonObject { put("_id", "integer"); put("type", "integer"); put("values", "string") })
+        }
+        // Rows straight from a source that doesn't bound them, as 1.0.6 queued them.
+        val rows = listOf(row(1, "x".repeat(LocalHealthProtocol.MAX_FRAME_BYTES)), row(2, "72"))
+        reader.close(); reader = IncrementalHealthReader(ledger, { request, _ ->
+            if (request.text("table") != LocalHealthTable.POINT.wireName) localHealthPage(emptyList(), null, null, true, null)
+            else rows.filter { it.number("id")!! > (request.number("afterId") ?: 0) }.let { left ->
+                localHealthPage(left, left.lastOrNull()?.number("id") ?: request.number("afterId"), 2, true, "synthetic")
+            }
+        }, tables)
+        SQLiteDataSyncStore(context, "queued-oversized-phone.sqlite").use { database ->
+            val phone = SQLiteLocalHealthStore(database, now = { now })
+            val state = sync(phone)
+            assertEquals(LocalHealthSyncPhase.COMPLETED, state.phase); assertEquals(2, state.recordsCommitted)
+            assertTrue("oversizedColumns" in phone.raw(1).json); assertFalse("xxxx" in phone.raw(1).json)
+        }
+    }
+
     @Test fun pagesWithNothingToDeliverShareOneRequest() {
         val table = LocalHealthTable.POINT
         var reads = 0

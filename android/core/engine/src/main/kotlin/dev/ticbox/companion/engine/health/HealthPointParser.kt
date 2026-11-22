@@ -54,7 +54,7 @@ object HealthPointParser {
         } else null
         if (layout == null ||
             values.any { it.semantic == null }) issues += HealthParseIssue.UNCONFIRMED_VALUE_LAYOUT
-        if ((root?.get("partial") as? JsonPrimitive)?.booleanOrNull == true) issues += HealthParseIssue.PARTIAL_SOURCE_ROW
+        if (root.lacksSourceCells()) issues += HealthParseIssue.PARTIAL_SOURCE_ROW
         return HealthPointRecord(raw, id, text("device_id"), text("wwid"), typeCode, start, end, synced, deleted,
             contents, values, motion, issues)
     }

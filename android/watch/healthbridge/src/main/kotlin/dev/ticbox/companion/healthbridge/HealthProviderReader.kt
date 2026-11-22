@@ -12,7 +12,7 @@ class HealthProviderReader(private val resolver: ContentResolver, private val pr
     private val sportProviderVersion: String? = null,
     /**
      * Whether a page goes out as it is and must fit one frame. Incremental sync keeps rows in its ledger and bounds its own
-     * batches, so it skips measuring every row here.
+     * batches, so it skips measuring every row here and only bounds what a page holds, from the lengths the cells have.
      */
     private val framed: Boolean = true) {
     fun page(request: JsonObject, cancellation: CancellationSignal = CancellationSignal()): JsonObject { return try {
@@ -36,7 +36,7 @@ class HealthProviderReader(private val resolver: ContentResolver, private val pr
                 ?: return error("provider_missing")
             cursor.use {
                 val rows = mutableListOf<JsonObject>(); var lastId = after; var complete = true
-                var bytes = 0
+                var bytes = 0; var chars = 0L
                 while (cursor.moveToNext()) {
                     cancellation.throwIfCanceled()
                     if (rows.size == limit) { complete = false; break }
@@ -50,10 +50,16 @@ class HealthProviderReader(private val resolver: ContentResolver, private val pr
                             complete = false; break
                         }
                         bytes += size
+                    } else {
+                        // The page waits in memory until the ledger takes it, so large rows end it early.
+                        val held = row.textChars()
+                        if (rows.isNotEmpty() && chars + held > UNFRAMED_PAGE_CHARS) { complete = false; break }
+                        chars += held
                     }
                     rows += row; lastId = id
                 }
-                response(session?.expand(rows, request, cancellation) ?: rows, lastId, upper, complete)
+                // Columns added by the projection count toward a row's size as well.
+                response(session?.expand(rows, request, cancellation)?.map { boundHealthRow(it) } ?: rows, lastId, upper, complete)
             }
         }
     } catch (_: SecurityException) { error("provider_denied") }
@@ -72,6 +78,8 @@ class HealthProviderReader(private val resolver: ContentResolver, private val pr
     private fun error(code: String) = queryError(code)
     companion object {
         val URI: Uri = LocalHealthProtocol.SOURCE_NAME.toUri()
+        /** Characters of row text an unframed page holds at most; ordinary pages of 1024 rows stay far below it. */
+        private const val UNFRAMED_PAGE_CHARS = 4L * 1024 * 1024
 
     }
 }

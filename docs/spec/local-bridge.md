@@ -111,7 +111,7 @@ table 只能是五个固定的逻辑表之一：`data_point / data_session / fit
 | inlineAck | 这一批的 ACK 可以随同一张表的下一个 changes 请求发送，见 [3.2](#32-ack)。旧版本的桥接不带 |
 | sourceAbsent | 行级字段；完整范围观察后发现该行已从来源消失，见第 4.4 节 |
 
-每次 changes 按页读取（每页最多 1024 行），并原子保存观察结果、待传队列和采集位置；某页没有待传行时继续读下一页（最多连续 3 秒），然后生成持久批次。没有变化行时也可以发送带 batch 的空进度批次。单帧最大 1 MiB，行内容预留 8192 字节给元数据；放不下的行留待下一批，单行超限时报告 `row_exceeds_budget`，不静默跳过。
+每次 changes 按页读取（每页最多 1024 行），并原子保存观察结果、待传队列和采集位置；某页没有待传行时继续读下一页（最多连续 3 秒），然后生成持久批次。没有变化行时也可以发送带 batch 的空进度批次。单帧最大 1 MiB，行内容预留 8192 字节给元数据；放不下的行留待下一批。一行的 JSON 超过 960 KiB（1 MiB 减 64 KiB）时，读取时就去掉它最大的单元格，直到放得下，列名记入 `oversizedColumns`（见[健康数据](health.md#24-原始行的封装)），所以单行不会卡住后面的行；1.0.7 之前已经排进队列的超大行，组批时同样处理。日常同步读取的一页最多保留约 4M 字符的行内容，大行多时提前结束这一页，下一页接着读。
 
 ### 3.2 ack
 
@@ -153,7 +153,7 @@ table 只能是五个固定的逻辑表之一：`data_point / data_session / fit
 
 POINT 和私有运动表读取 Cursor 返回的所有列。SESSION 通过 data_point 载体查询 `pragma_table_info('data_session')` 得到当前的列，并以带标识符转义的有界只读投影读取新增列（见[健康数据](health.md#22-session8-列)）。schema 探测失败时保留已读字段并标记 `partial / schemaCoverage=known_fields_only`。观察到列集合变化后，安排整表重新比较。
 
-原始行缺少部分单元格时不记为完整指纹；可读的内容照常入库，手机保留上次读到的缺失单元格的值，并保留 partial 和 unavailableColumns。实际读到的 NULL 可以覆盖旧值；之后完整的观察可以移除旧列。
+原始行缺少部分单元格时不记为完整指纹；可读的内容照常入库，手机保留上次读到的缺失单元格的值，并保留 partial 和 unavailableColumns。带 `oversizedColumns` 的行每次读到的都一样，所以照常计算指纹、只发一次，也不让这次扫描算作不完整；手机同样保留这些单元格上次读到的值。实际读到的 NULL 可以覆盖旧值；之后完整的观察可以移除旧列。
 
 记录身份：POINT 用 `_id`，SESSION 用不透明的 `columns.id`，SPORT 用 `[HASH, sourceOccurrence]`，私有运动表用 `_id`（POINT.RECORD_ID 关联 RECORD._id）。ID 被复用时比较新内容，不能因为“这个 ID 已确认过”就永久跳过。
 
@@ -295,7 +295,7 @@ root 或日志不可用时，保留旧的日志游标，先完成一次独立的
 2. Local Bridge 向 `com.mobvoi.wear.health.at` 发有序广播 `dev.ticbox.companion.healthmodule.JOURNAL`，附上令牌。令牌相符时，模块在结果的 extras 里交回 Binder（结果码 1）；不符时结果码为 2。没有模块时，广播立刻以 0 结束，不用等待。
 3. 每次查询是一次 Binder 调用：事务码为 `FIRST_CALL_TRANSACTION`，请求和回复都是 UTF-8 JSON 的字节数组，请求都带令牌。操作有两个：`journal_describe` 返回包名、版本号、版本名、APK 摘要，以及数据库文件的 device 和 inode；`journal_query` 执行一条 SQL，参数只能是字符串。
 4. 模块只接受单条 SELECT、WITH，以及校验用到的 PRAGMA（user_version、table_xinfo、foreign_key_list、index_list、index_xinfo），PRAGMA 不能带赋值。连接以 `OPEN_READONLY | NO_LOCALIZED_COLLATORS` 打开，文件被替换后重新打开，空闲 30 秒后关闭；每条查询 5 秒超时。
-5. 单元格带存储类型：`i` 整数、`f` 浮点、`s` 文本、`b` Base64 的 BLOB，或 null。Local Bridge 据此还原出与直接读文件相同的游标。一个进程的 Binder 缓冲只有约 1 MB，所以回复最多 256 KiB；按键取行时每次最多 128 个键，回复过大就分成两半再查。
+5. 单元格带存储类型：`i` 整数、`f` 浮点、`s` 文本、`b` Base64 的 BLOB，或 null。Local Bridge 据此还原出与直接读文件相同的游标。一个进程的 Binder 缓冲只有约 1 MB，所以回复最多 256 KiB；按键取行时每次最多 128 个键，回复过大就分成两半再查；单独一行就超过 256 KiB 时，这次读取改用辅助进程。
 
 所有检查都在 Local Bridge 里完成，用的是辅助进程读文件时的同一套代码：版本白名单、schema、日志命名空间和元数据，以及文件代际（来源、版本名、device、inode、schema 指纹）。所以两条路径算出的代际相同，游标在两条路径间通用，换路径不会重建基线。读取前后各取一次 device 和 inode，不同就报 `journal_source_replaced`。模块没有加载、令牌读不到、版本不在白名单或读取出错时，改用 root 辅助进程。开启和关闭日志总是由辅助进程完成。
 
