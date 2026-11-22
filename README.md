@@ -96,7 +96,7 @@ A reset erases everything on the watch, so keep it as the [last resort](#reset-t
 
 This needs Wear OS 4. Keep the watch connected to the old phone, with enough battery. Until the transfer has finished, don't unpair the watch on the old phone or forget it in the old phone's Bluetooth settings.
 
-A transfer starts from a confirmation page on the watch. TicBox's demo watch can open it from this phone: the demo's Advanced tools work on the real watch over wireless debugging. Opening the page doesn't need a Google account on the watch.
+A transfer starts from a confirmation page on the watch. TicBox's demo watch can open it from this phone: the demo's Advanced tools work on the real watch over wireless debugging. The watch doesn't need a Google account.
 
 1. Connect the watch to Wi-Fi and turn on its wireless debugging, as in [step 5](#step-5-install-local-bridge-for-health-data), items 1–3.
 2. On TicBox's first page, tap "Try the demo watch", open Watch → Manage → Advanced → Wireless debugging, and pair and connect to the watch as in [step 5](#step-5-install-local-bridge-for-health-data), items 5–6.
