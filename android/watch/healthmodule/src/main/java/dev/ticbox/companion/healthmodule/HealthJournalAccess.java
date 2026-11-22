@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.database.Cursor;
+import android.database.sqlite.SQLiteBlobTooBigException;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Binder;
 import android.os.Build;
@@ -13,7 +14,9 @@ import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Parcel;
+import android.os.SharedMemory;
 import android.system.Os;
+import android.system.OsConstants;
 import android.system.StructStat;
 import android.util.Base64;
 import org.json.JSONArray;
@@ -21,6 +24,7 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
@@ -46,8 +50,11 @@ final class HealthJournalAccess {
     static final int TRANSACTION = IBinder.FIRST_CALL_TRANSACTION;
     static final String TOKEN_FILE = "ticbox-health-token";
     static final String DATABASE = "health_common.db";
-    /** A process has about 1 MB for all its Binder transactions at once; the caller splits a larger answer. */
-    static final int MAX_REPLY = 256 * 1024;
+    /** A process has about 1 MB for all its Binder transactions at once, so a larger answer goes as shared memory. */
+    static final int MAX_INLINE = 256 * 1024;
+    /** The most one answer may take, which this app holds only while it answers; the caller splits a larger one. */
+    static final int MAX_REPLY = 4 * 1024 * 1024;
+    static final int REPLY_INLINE = 0, REPLY_SHARED = 1;
     static final int MAX_REQUEST = 64 * 1024;
     private static final int MAX_SQL = 16 * 1024;
     private static final long QUERY_MILLIS = 5_000, IDLE_MILLIS = 30_000;
@@ -70,7 +77,7 @@ final class HealthJournalAccess {
             byte[] answer;
             // A failure here must never reach the official app's Binder thread as anything but an answer.
             try { answer = handle(data.createByteArray()); } catch (Exception failed) { answer = bytes(error("journal_query_failed")); }
-            if (reply != null) reply.writeByteArray(answer);
+            if (reply != null) answer(reply, answer);
             return true;
         }
     };
@@ -126,6 +133,8 @@ final class HealthJournalAccess {
                 default: return error("journal_op_unsupported");
             }
         } catch (android.os.OperationCanceledException slow) { return error("journal_query_timeout"); }
+        // The caller reads such a row on its own, without its largest cells.
+        catch (SQLiteBlobTooBigException tooLarge) { return error("journal_row_too_big"); }
         catch (Exception failed) { return error("journal_query_failed"); }
     }
 
@@ -188,6 +197,24 @@ final class HealthJournalAccess {
 
     private synchronized void closeIdle() {
         if (users == 0 && database != null) { database.close(); database = null; }
+    }
+
+    /**
+     * The answer itself when it is small, otherwise read-only shared memory holding it. Shared memory that can't be made
+     * leaves an error in its place, so the caller reads this one the slow way.
+     */
+    static void answer(Parcel reply, byte[] answer) {
+        if (answer.length > MAX_INLINE) {
+            try (SharedMemory memory = SharedMemory.create("TicHealthJournal", answer.length)) {
+                ByteBuffer buffer = memory.mapReadWrite();
+                try { buffer.put(answer); } finally { SharedMemory.unmap(buffer); }
+                if (!memory.setProtect(OsConstants.PROT_READ)) throw new IOException("journal_reply_unprotected");
+                // The parcel keeps its own copy of the descriptor.
+                reply.writeInt(REPLY_SHARED); memory.writeToParcel(reply, 0);
+                return;
+            } catch (Exception failed) { answer = bytes(error("journal_reply_unavailable")); }
+        }
+        reply.writeInt(REPLY_INLINE); reply.writeByteArray(answer);
     }
 
     /** Each cell with its storage type, so the reader rebuilds exactly what a cursor on the file would give. */

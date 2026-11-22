@@ -50,6 +50,8 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
     maxHeapSize = "1g"
+    // Robolectric's SharedMemory reaches into FileDescriptor.
+    jvmArgs("--add-opens=java.base/java.io=ALL-UNNAMED", "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED")
     listOf("robolectric.dependency.repo.url", "https.proxyHost", "https.proxyPort", "http.proxyHost", "http.proxyPort").forEach { key ->
         System.getProperty(key)?.let { systemProperty(key, it) }
     }

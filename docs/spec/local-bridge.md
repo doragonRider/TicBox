@@ -111,7 +111,7 @@ table 只能是五个固定的逻辑表之一：`data_point / data_session / fit
 | inlineAck | 这一批的 ACK 可以随同一张表的下一个 changes 请求发送，见 [3.2](#32-ack)。旧版本的桥接不带 |
 | sourceAbsent | 行级字段；完整范围观察后发现该行已从来源消失，见第 4.4 节 |
 
-每次 changes 按页读取（每页最多 1024 行），并原子保存观察结果、待传队列和采集位置；某页没有待传行时继续读下一页（最多连续 3 秒），然后生成持久批次。没有变化行时也可以发送带 batch 的空进度批次。单帧最大 1 MiB，行内容预留 8192 字节给元数据；放不下的行留待下一批。一行的 JSON 超过 960 KiB（1 MiB 减 64 KiB）时，读取时就去掉它最大的单元格，直到放得下，列名记入 `oversizedColumns`（见[健康数据](health.md#24-原始行的封装)），所以单行不会卡住后面的行；1.0.7 之前已经排进队列的超大行，组批时同样处理。日常同步读取的一页最多保留约 4M 字符的行内容，大行多时提前结束这一页，下一页接着读。
+每次 changes 按页读取（每页最多 1024 行），并原子保存观察结果、待传队列和采集位置；某页没有待传行时继续读下一页（最多连续 3 秒），然后生成持久批次。没有变化行时也可以发送带 batch 的空进度批次。单帧最大 1 MiB，行内容预留 8192 字节给元数据；放不下的行留待下一批。一行的 JSON 超过 960 KiB（1 MiB 减 64 KiB）时，读取时就去掉它最大的单元格，直到放得下，列名记入 `oversizedColumns`（见[健康数据](health.md#24-原始行的封装)），所以单行不会卡住后面的行；1.0.7 之前已经排进队列的超大行，组批时同样处理。整行连 CursorWindow（约 2 MB）都装不下时，读到它会失败：它之前的行照常成页，它自己单独成页，先用 `length()` 量出各单元格的大小，再把最大的换成 NULL 重读，大单元格本身从不读出。官方 Provider 上借用 SESSION 已经在用的 point 形状载体（选择条件拼一个同列的 UNION）完成这两次查询，辅助进程和模块直接查文件。SESSION 的新增列逐列读取时，超过 960 KiB 的单元格在 SQL 里就换成 NULL，载体的空闲列标出是哪几行。日常同步读取的一页最多保留约 4M 字符的行内容，大行多时提前结束这一页，下一页接着读。
 
 ### 3.2 ack
 
@@ -295,7 +295,7 @@ root 或日志不可用时，保留旧的日志游标，先完成一次独立的
 2. Local Bridge 向 `com.mobvoi.wear.health.at` 发有序广播 `dev.ticbox.companion.healthmodule.JOURNAL`，附上令牌。令牌相符时，模块在结果的 extras 里交回 Binder（结果码 1）；不符时结果码为 2。没有模块时，广播立刻以 0 结束，不用等待。
 3. 每次查询是一次 Binder 调用：事务码为 `FIRST_CALL_TRANSACTION`，请求和回复都是 UTF-8 JSON 的字节数组，请求都带令牌。操作有两个：`journal_describe` 返回包名、版本号、版本名、APK 摘要，以及数据库文件的 device 和 inode；`journal_query` 执行一条 SQL，参数只能是字符串。
 4. 模块只接受单条 SELECT、WITH，以及校验用到的 PRAGMA（user_version、table_xinfo、foreign_key_list、index_list、index_xinfo），PRAGMA 不能带赋值。连接以 `OPEN_READONLY | NO_LOCALIZED_COLLATORS` 打开，文件被替换后重新打开，空闲 30 秒后关闭；每条查询 5 秒超时。
-5. 单元格带存储类型：`i` 整数、`f` 浮点、`s` 文本、`b` Base64 的 BLOB，或 null。Local Bridge 据此还原出与直接读文件相同的游标。一个进程的 Binder 缓冲只有约 1 MB，所以回复最多 256 KiB；按键取行时每次最多 128 个键，回复过大就分成两半再查；单独一行就超过 256 KiB 时，这次读取改用辅助进程。
+5. 单元格带存储类型：`i` 整数、`f` 浮点、`s` 文本、`b` Base64 的 BLOB，或 null。Local Bridge 据此还原出与直接读文件相同的游标。一个进程的 Binder 缓冲只有约 1 MB，由同一时刻所有进行中的调用共用，所以 256 KiB 以内的回复直接放在 Binder 回复里，更大的写进只读的共享内存（`SharedMemory`），回复里只带它的文件描述符。一次回复最多 4 MiB，这块内存由官方应用占用，答完就释放。按键取行时每次最多 128 个键，回复过大就分成两半再查。整行装不进 CursorWindow 时，模块返回 `journal_row_too_big`，Local Bridge 按上面的办法单独读这一行。
 
 所有检查都在 Local Bridge 里完成，用的是辅助进程读文件时的同一套代码：版本白名单、schema、日志命名空间和元数据，以及文件代际（来源、版本名、device、inode、schema 指纹）。所以两条路径算出的代际相同，游标在两条路径间通用，换路径不会重建基线。读取前后各取一次 device 和 inode，不同就报 `journal_source_replaced`。模块没有加载、令牌读不到、版本不在白名单或读取出错时，改用 root 辅助进程。开启和关闭日志总是由辅助进程完成。
 
@@ -339,6 +339,6 @@ adb shell am start -W -n dev.ticbox.companion/dev.ticbox.companion.healthbridge.
 
 变更日志的每次操作（读状态、开启、关闭）结束后，手机写一条 `journal_result` 诊断：来源、操作、结果（`ok`、稳定的错误码、手机等满 90 秒的 `phone_timeout` 或异常类型）和耗时。手表的 root 辅助进程遇到非预期异常时，在回复里附上失败的步骤（sqlite、context、verify、stat、uid、open、validate 或操作名）、异常类型和抛出位置（最多 4 个“类.方法”，跳过 Binder 转发的帧），Local Bridge 把它们连同超时和退出码写入 `TicBoxHealthBridge` 日志；异常消息可能含有 SQL 或数据，不记录。
 
-手表每读一次变更日志，记录走了哪条路：`Journal read through the module` 带查询次数和毫秒数，`Journal helper finished` 带操作和毫秒数，`Journal window unchanged` 表示运动库没变、沿用了上次的窗口。模块那条路失败时记录 `Journal read through the module failed` 和稳定的原因码，`Health module journal not available` 表示模块没有交回 Binder（没装模块，或令牌不符）。
+手表每读一次变更日志，记录走了哪条路：`Journal read through the module` 带查询次数和毫秒数，`Journal helper finished` 带操作和毫秒数，`Journal window unchanged` 表示运动库没变、沿用了上次的窗口。模块那条路失败时记录 `Journal read through the module failed` 和稳定的原因码，`Health module journal not available` 表示模块没有交回 Binder（没装模块，或令牌不符）。一行太大、去掉了单元格时记录 `Source row too large to deliver whole` 或 `Source row too large for a cursor`，带表名和去掉的单元格数，不带内容。
 
 手表每开始一次新的采集，记录一行 `Capture planned`：表、是否全量、是否重发、是否走变更日志，以及计划的范围种类（new、recent、deep、workout、all、probe），不含 ID 或时间。近期范围被未结束或最近一天有变化的会话向前扩展时，记录这样的会话数（`Recent range widened`）。每次预读结束记录一行 `Read-ahead`：读取的源行数、待传行数、采集是否结束和耗时。`Local changes sent`（每个 changes 回复一行）和 `Read-ahead` 还把耗时拆成读源数据（`source`）、算行的指纹（`hash`）、写本地账本（`ledger`）和组装批次（`pack`，只有回复有）各用的毫秒数；`Local changes sent` 的 `queued` 是请求等预读的时间。

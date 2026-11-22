@@ -52,6 +52,22 @@ class FitnessSnapshotPipelineTest {
     private fun FitnessSnapshotReader.read(table: LocalHealthTable, after: Long? = null, upper: Long? = null) =
         LocalHealthProtocol.page(page(LocalHealthProtocol.request(table, after, upper), CancellationSignal()))
 
+    @Test fun aWorkoutRowNoCursorCanHoldGoesOnItsOwnWithoutItsLargestCell() {
+        val (file, db) = database()
+        try {
+            db.point(1); db.point(2); db.point(3)
+            db.execSQL("UPDATE POINT SET FUTURE=? WHERE _id=2", arrayOf("x".repeat(3 * 1024 * 1024)))
+            fun page(after: Long?) = LocalHealthProtocol.page(fitnessDatabasePage(db, "fixture-version", LocalHealthTable.FITNESS_POINT,
+                LocalHealthProtocol.request(LocalHealthTable.FITNESS_POINT, after, null), CancellationSignal()))
+            val first = page(null)
+            assertEquals(listOf(1L), first.rows.map { it.id }); assertFalse(first.complete) // The rows before it go first.
+            val large = page(first.nextId).also { assertFalse(it.complete) }.rows.single()
+            assertEquals(2L, large.id); assertTrue(large.oversized); assertNull(large.columns["FUTURE"]); assertEquals(parent, large.number("RECORD_ID"))
+            val last = page(2)
+            assertEquals(listOf(3L), last.rows.map { it.id }); assertTrue(last.complete)
+        } finally { db.close(); file.delete() }
+    }
+
     @Test fun incrementalRootPagesRefreshOldGpsPointsWithoutRetransmittingStableTraining() = runBlocking {
         val (file, writer) = database()
         writer.use { db ->

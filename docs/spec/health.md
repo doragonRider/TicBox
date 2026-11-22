@@ -101,7 +101,7 @@ HASH 不要求是 UUID，官方会接受其他来源的不透明 ID。同一 HAS
 
 所有表都按 Cursor 实际返回的内容保留 `columns` 和 `storageTypes`。类型标签为 `null / integer / float / string / blob-base64 / unknown:<code>`；整数按 64 位保存，BLOB 为无换行的 Base64，非有限的 float 以字符串保存、类型仍标 float。需要精度的使用方不能先把所有 JSON 数字转成双精度浮点数。
 
-读取单个字段失败时，保留其他字段，把列名放入 `unavailableColumns` 并设置 `partial=true`，不补 0。一行的 JSON 超过 960 KiB、一帧放不下时，从最大的单元格开始去掉，直到放得下，列名放入 `oversizedColumns`；`_id`、`id` 和 `RECORD_ID` 不会去掉。这种行不设 `partial`，因为下次读到的还是一样，重读没有用；手机把它记为部分源行。缺少可用的逻辑 ID 时，缓存用 cursor 前缀或原始行内容的 SHA-256 作为后备 key，以免丢行；后备 key 不冒充官方 ID。
+读取单个字段失败时，保留其他字段，把列名放入 `unavailableColumns` 并设置 `partial=true`，不补 0。一行的 JSON 超过 960 KiB、一帧放不下时，从最大的单元格开始去掉，直到放得下，列名放入 `oversizedColumns`；`_id`、`id` 和 `RECORD_ID` 不会去掉。这种行不设 `partial`，因为下次读到的还是一样，重读没有用；手机把它记为部分源行。整行超过 CursorWindow（约 2 MB）、连读都读不出来时，先用 `length()` 量出各单元格的大小，再不带最大的那些重读，结果相同。缺少可用的逻辑 ID 时，缓存用 cursor 前缀或原始行内容的 SHA-256 作为后备 key，以免丢行；后备 key 不冒充官方 ID。
 
 ## 3. 官方健康消息
 

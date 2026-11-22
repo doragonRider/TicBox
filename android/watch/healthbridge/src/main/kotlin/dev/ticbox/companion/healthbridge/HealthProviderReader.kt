@@ -1,6 +1,7 @@
 package dev.ticbox.companion.healthbridge
 
 import android.content.ContentResolver
+import android.database.sqlite.SQLiteException
 import android.net.Uri
 import android.os.CancellationSignal
 import androidx.core.net.toUri
@@ -32,12 +33,20 @@ class HealthProviderReader(private val resolver: ContentResolver, private val pr
                 ?: return error("provider_missing")).use { it.columnNames.toList() } else null
             val (bounds, args) = sourceSelection(table, JsonObject(request.toMutableMap().apply { put("upperId", JsonPrimitive(upper)) }), names)
             val where = sessionSelect?.let { "$it WHERE $bounds" } ?: bounds
-            val cursor = resolver.query(URI, null, where, args, "_id ASC LIMIT ${limit + 1}", cancellation)
+            // A row no cursor can hold fails the query when it comes first, and the move to it otherwise.
+            val cursor = try { resolver.query(URI, null, where, args, "_id ASC LIMIT ${limit + 1}", cancellation) }
+                catch (tooLarge: SQLiteException) { return oversized(table, bounds, args, upper, cancellation) ?: throw tooLarge }
                 ?: return error("provider_missing")
             cursor.use {
                 val rows = mutableListOf<JsonObject>(); var lastId = after; var complete = true
                 var bytes = 0; var chars = 0L
-                while (cursor.moveToNext()) {
+                while (true) {
+                    val moved = try { cursor.moveToNext() } catch (tooLarge: SQLiteException) {
+                        // The rows before it go now, and it starts the next page.
+                        if (rows.isNotEmpty()) { complete = false; break }
+                        return oversized(table, bounds, args, upper, cancellation) ?: throw tooLarge
+                    }
+                    if (!moved) break
                     cancellation.throwIfCanceled()
                     if (rows.size == limit) { complete = false; break }
                     val id = cursor.healthRowId()
@@ -72,6 +81,17 @@ class HealthProviderReader(private val resolver: ContentResolver, private val pr
         android.util.Log.w("TicBoxHealthBridge", "Provider query failed; table=${request.text("table")}; exception=${problem.javaClass.simpleName}")
         error("query_failed")
     } }
+
+    /** The first point after the cursor, which no cursor can hold, without its largest cells; null when that isn't the failure. */
+    private fun oversized(table: LocalHealthTable, bounds: String, args: Array<String>, upper: Long, cancellation: CancellationSignal): JsonObject? {
+        // Sessions come through the point carrier with their known, small fields; only points can be this large.
+        if (table != LocalHealthTable.POINT) return null
+        val columns = (resolver.query(URI, null, "0", null, null, cancellation) ?: return null).use { it.columnNames.toList() }
+        val source = OversizedRows("data_point", columns) { selection, values, order -> resolver.query(URI, null, selection, values, order, cancellation) }
+        val id = source.first(setOf("_id"), bounds, args, "_id ASC")?.get("_id")?.toLongOrNull() ?: return null
+        val row = source.read("_id", id.toString()) { it.healthRawRow(id, table) } ?: return null
+        return response(listOf(row), id, upper, complete = id >= upper)
+    }
 
     private fun response(rows: List<JsonObject>, next: Long?, upper: Long?, complete: Boolean) =
         localHealthPage(rows, next, upper, complete, providerVersion)
