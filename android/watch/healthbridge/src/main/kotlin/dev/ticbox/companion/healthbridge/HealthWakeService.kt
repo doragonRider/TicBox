@@ -54,39 +54,47 @@ class HealthWakeService : WearableListenerService() {
                     val supplied = hello.text("token") ?: return@use
                     if (!MessageDigest.isEqual(token.toByteArray(Charsets.UTF_8), supplied.toByteArray(Charsets.UTF_8))) return@use
                     window.touch(60_000)
-                    LocalHealthProtocol.write(socket.outputStream, JsonObject(LocalHealthProtocol.ready(reader.tables) + ("journalVersion" to JsonPrimitive(1))))
+                    LocalHealthProtocol.write(socket.outputStream, JsonObject(LocalHealthProtocol.ready(reader.tables) +
+                        ("journalVersion" to JsonPrimitive(1)) + ("pipeline" to JsonPrimitive(LocalHealthProtocol.PIPELINE_VERSION))))
                     // Requests are read on their own thread, so a reply can say how long its request waited while this
-                    // side read ahead; that wait is neither Bluetooth nor work on the request.
-                    val arrivals = LinkedBlockingQueue<Result<Pair<JsonObject, Long>?>>()
+                    // side packed ahead; that wait is neither Bluetooth nor work on the request.
+                    val arrivals = LinkedBlockingQueue<Result<Arrival>>()
                     thread(isDaemon = true, name = "TicBoxHealthRequests") {
                         try {
                             do {
                                 val next = LocalHealthProtocol.read(socket.inputStream)
-                                arrivals.put(Result.success(next?.let { it to SystemClock.elapsedRealtime() }))
+                                arrivals.put(Result.success(next?.let { Arrival.Request(it, SystemClock.elapsedRealtime()) } ?: Arrival.Closed))
                             } while (next != null)
                         } catch (problem: Exception) { arrivals.put(Result.failure(problem)) }
                     }
-                    // One connection serves every table; the window ends when the phone closes it.
-                    while (!cancellation.isCanceled) {
-                        val (request, arrived) = arrivals.take().getOrThrow() ?: return
-                        if (request.text("op") !in setOf("changes", "ack", "journal")) continue
-                        val started = SystemClock.elapsedRealtime()
-                        val handled = if (request.text("op") == "journal") RootHealthJournalReader(applicationContext).control(request, cancellation)
-                            else reader.handle(request, cancellation)
-                        // Lets the phone tell this side's work from the Bluetooth transfer in its sync timing.
-                        val page = JsonObject(handled + ("watchMillis" to JsonPrimitive(SystemClock.elapsedRealtime() - started)) +
-                            ("queuedMillis" to JsonPrimitive((started - arrived).coerceAtLeast(0))))
-                        if (request.text("op") == "journal" && request.text("action") in setOf("enable", "disable") &&
-                            (page.text("error") == null || request.text("action") == "disable")) reader.invalidateJournal(request.text("source")!!)
-                        LocalHealthProtocol.write(socket.outputStream, page, zlib = request.text("compression") == LocalHealthProtocol.ZLIB)
-                        window.touch(60_000)
-                        if (request.text("op") == "changes") {
-                            pages++; rows += (page["rows"] as? JsonArray)?.size ?: 0
-                            Log.i(TAG, "Local changes sent; pages=$pages rows=$rows scanned=${page.number("scannedRows") ?: 0} " +
-                                "partial=${page.flag("partial") == true} error=${page.text("error") ?: "none"} millis=${page.number("watchMillis")} " +
-                                "queued=${page.number("queuedMillis")} ${reader.lastStages}")
-                            // While this reply travels and the phone saves it, read the rows of the next one.
-                            if (page.text("error") == null && page.flag("complete") != true) reader.prefetch(request, cancellation)
+                    // Source pages are read ahead on a third thread; each one read lets this thread pack the next batch.
+                    ReadAhead(reader, cancellation) { request -> arrivals.put(Result.success(Arrival.Read(request))) }.use { ahead ->
+                        // One connection serves every table; the window ends when the phone closes it.
+                        while (!cancellation.isCanceled) {
+                            val arrival = arrivals.take().getOrThrow()
+                            if (arrival is Arrival.Read) { if (reader.packAhead(arrival.request)) ahead.want(arrival.request); continue }
+                            val (request, arrived) = arrival as? Arrival.Request ?: return
+                            if (request.text("op") !in setOf("changes", "ack", "journal")) continue
+                            val started = SystemClock.elapsedRealtime()
+                            val handled = if (request.text("op") == "journal") RootHealthJournalReader(applicationContext).control(request, cancellation)
+                                else reader.handle(request, cancellation, deferAck = true)
+                            // Lets the phone tell this side's work from the Bluetooth transfer in its sync timing.
+                            val page = JsonObject(handled + ("watchMillis" to JsonPrimitive(SystemClock.elapsedRealtime() - started)) +
+                                ("queuedMillis" to JsonPrimitive((started - arrived).coerceAtLeast(0))))
+                            if (request.text("op") == "journal" && request.text("action") in setOf("enable", "disable") &&
+                                (page.text("error") == null || request.text("action") == "disable")) reader.invalidateJournal(request.text("source")!!)
+                            LocalHealthProtocol.write(socket.outputStream, page, zlib = request.text("compression") == LocalHealthProtocol.ZLIB)
+                            reader.afterReply()
+                            window.touch(60_000)
+                            if (request.text("op") == "changes") {
+                                pages++; rows += (page["rows"] as? JsonArray)?.size ?: 0
+                                Log.i(TAG, "Local changes sent; pages=$pages rows=$rows scanned=${page.number("scannedRows") ?: 0} " +
+                                    "partial=${page.flag("partial") == true} error=${page.text("error") ?: "none"} millis=${page.number("watchMillis")} " +
+                                    "queued=${page.number("queuedMillis")} ${reader.lastStages}")
+                                // While this reply travels and the phone saves it, read and pack the next ones.
+                                if (page.text("error") == null && page.flag("complete") != true) { reader.packAhead(request); ahead.want(request) }
+                                else ahead.want(null)
+                            }
                         }
                     }
                 }
@@ -128,6 +136,48 @@ class HealthWakeService : WearableListenerService() {
             cancellation.cancel()
         }
     }
+    private sealed interface Arrival {
+        data class Request(val json: JsonObject, val arrived: Long) : Arrival
+        /** The read-ahead thread queued a source page for this request's table. */
+        class Read(val request: JsonObject) : Arrival
+        data object Closed : Arrival
+    }
+
+    /**
+     * Reads the source ahead on its own thread while the answering thread packs and sends, one page at a time, until a
+     * page's worth of rows waits past the batches made. [want] points it at a table after each reply, or stops it.
+     */
+    private class ReadAhead(private val reader: IncrementalHealthReader, private val cancellation: CancellationSignal,
+        private val read: (JsonObject) -> Unit) : AutoCloseable {
+        private val lock = Object()
+        private var wanted: JsonObject? = null
+        /** Counts calls to [want], so a step that ends doesn't drop a request made during it. */
+        private var asked = 0L
+        private var closed = false
+        private val worker = thread(isDaemon = true, name = "TicBoxHealthReadAhead") { work() }
+
+        fun want(request: JsonObject?) = synchronized(lock) { wanted = request; asked++; lock.notifyAll() }
+
+        private fun work() {
+            while (true) {
+                val (request, since) = synchronized(lock) {
+                    while (!closed && wanted == null) lock.wait()
+                    if (closed) return
+                    wanted!! to asked
+                }
+                val step = reader.readAhead(request, cancellation)
+                if (step != IncrementalHealthReader.ReadAhead.IDLE) read(request)
+                if (step != IncrementalHealthReader.ReadAhead.MORE) synchronized(lock) { if (asked == since) wanted = null }
+            }
+        }
+
+        /** Waits for a page being read, so the reader isn't closed under it. */
+        override fun close() {
+            synchronized(lock) { closed = true; lock.notifyAll() }
+            worker.join()
+        }
+    }
+
     override fun onDestroy() { activeWindow?.close(); timer.shutdownNow(); super.onDestroy() }
     companion object { private const val TAG = "TicBoxHealthBridge" }
 }

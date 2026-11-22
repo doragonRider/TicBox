@@ -28,7 +28,7 @@
 - 健康读取开关只影响健康数据；找手表、勿扰和 root 工具不依赖它。
 - root 运动采集在应用私有目录中建立只读的一致快照，需要在设置页打开并允许 Magisk 授权。
 - 界面跟随手表系统语言显示英文、简体或繁体中文。Logcat 标签 `TicBoxHealthBridge`，不记录 nonce、健康值或数据库内容。
-- 手表增量状态是独立的 `health-incremental.sqlite`（版本 1，修改规则见[构建与检查 §5](building.md#5-数据库与格式的兼容)）。
+- 手表增量状态是独立的 `health-incremental.sqlite`（1.0.9 起为版本 2，使用 WAL；修改规则见[构建与检查 §5](building.md#5-数据库与格式的兼容)）。
 
 ### 1.1 安装与更新
 

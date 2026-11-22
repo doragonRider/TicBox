@@ -56,7 +56,9 @@ internal interface HealthJournalReader {
  * and only after the watch's existing root consent and explicit journal enablement.
  */
 internal class RootHealthJournalReader(private val context: Context,
-    private val module: HealthModuleJournal? = HealthModuleJournal(context)) : HealthJournalReader {
+    private val module: HealthModuleJournal? = HealthModuleJournal(context),
+    /** Answers the workout log's reads for the rest of a read window once it has started. */
+    private val fitness: FitnessHelperSession? = null) : HealthJournalReader {
     /** Pages the last read of each source brought along, by table, with the cursor and head they were read for. */
     private val pages = mutableMapOf<LocalHealthTable, Pair<Pair<HealthJournalPosition, Long>, JsonObject>>()
 
@@ -127,6 +129,8 @@ internal class RootHealthJournalReader(private val context: Context,
 
     private fun invoke(request: JsonObject, cancellation: CancellationSignal): JsonObject {
         cancellation.throwIfCanceled()
+        if (request.text("source") == "fitness" && request.text("action") in setOf("read", "page"))
+            fitness?.journal(request, cancellation)?.let { return it }
         val directory = File(context.noBackupFilesDir, "health-journal-requests").apply { check(mkdirs() || isDirectory) }
         val input = File.createTempFile("request-", ".json", directory)
         val output = File.createTempFile("reply-", ".json", directory)
@@ -193,26 +197,7 @@ object HealthJournalMain {
                     val write = action == "enable" || action == "disable"
                     step = "open"
                     openJournalDatabase(verified.file, write).use { database ->
-                        // The fingerprint validates the schema first, so this is the one validation.
-                        step = "validate"
-                        val generation = if (action == "disable") "" else HealthJournalRead.generation(source, verified.providerVersion,
-                            before.st_dev, before.st_ino, HealthJournalProfiles.schemaFingerprint(database, source))
-                        step = action
-                        val sql = FileJournalSql(database)
-                        val body = when (action) {
-                            "enable" -> AtomicHealthJournal.install(database, source)
-                            "disable" -> AtomicHealthJournal.remove(database, source)
-                            "status" -> AtomicHealthJournal.status(sql, source)
-                            "read" -> HealthJournalRead.read(sql, source, request["positions"] as? JsonObject, generation, verified.providerVersion)
-                            else -> {
-                                val table = LocalHealthTable.entries.firstOrNull { it.wireName == request.text("table") && journalSource(it) == source }
-                                    ?: throw HealthJournalException("journal_invalid_source")
-                                HealthJournalRead.page(sql, source, table, request, generation)
-                            }
-                        }
-                        val after = Os.stat(verified.file.path)
-                        if (before.st_dev != after.st_dev || before.st_ino != after.st_ino) throw HealthJournalException("journal_source_replaced")
-                        JsonObject(body + mapOf("generation" to JsonPrimitive(generation), "providerVersion" to JsonPrimitive(verified.providerVersion)))
+                        journalAnswer(database, verified, before, request, action) { step = it }
                     }
                 } catch (problem: Exception) { buildJsonObject {
                     put("error", (problem as? HealthJournalException)?.code ?: "journal_operation_unconfirmed")
@@ -229,8 +214,36 @@ object HealthJournalMain {
         } finally { deadline.shutdownNow() }
     }
 
+    /**
+     * One action on the journal's database, opened as the verified UID. The fingerprint validates the schema first, so
+     * this is the one validation, and a file replaced meanwhile fails the answer.
+     */
+    internal fun journalAnswer(database: SQLiteDatabase, verified: VerifiedHealthJournalSource, before: android.system.StructStat,
+        request: JsonObject, action: String, step: (String) -> Unit): JsonObject {
+        val source = verified.source
+        step("validate")
+        val generation = if (action == "disable") "" else HealthJournalRead.generation(source, verified.providerVersion,
+            before.st_dev, before.st_ino, HealthJournalProfiles.schemaFingerprint(database, source))
+        step(action)
+        val sql = FileJournalSql(database)
+        val body = when (action) {
+            "enable" -> AtomicHealthJournal.install(database, source)
+            "disable" -> AtomicHealthJournal.remove(database, source)
+            "status" -> AtomicHealthJournal.status(sql, source)
+            "read" -> HealthJournalRead.read(sql, source, request["positions"] as? JsonObject, generation, verified.providerVersion)
+            else -> {
+                val table = LocalHealthTable.entries.firstOrNull { it.wireName == request.text("table") && journalSource(it) == source }
+                    ?: throw HealthJournalException("journal_invalid_source")
+                HealthJournalRead.page(sql, source, table, request, generation)
+            }
+        }
+        val after = Os.stat(verified.file.path)
+        if (before.st_dev != after.st_dev || before.st_ino != after.st_ino) throw HealthJournalException("journal_source_replaced")
+        return JsonObject(body + mapOf("generation" to JsonPrimitive(generation), "providerVersion" to JsonPrimitive(verified.providerVersion)))
+    }
+
     /** Where an exception came from as code locations only, past the binder plumbing that rethrows remote ones. */
-    private fun origin(problem: Throwable) = problem.stackTrace.asSequence()
+    internal fun origin(problem: Throwable) = problem.stackTrace.asSequence()
         .filterNot { it.className.startsWith("android.os.Parcel") || it.className.startsWith("android.os.BinderProxy") }
         .take(4).joinToString(">") { "${it.className.substringAfterLast('.')}.${it.methodName}" }
 
@@ -240,7 +253,7 @@ object HealthJournalMain {
             request.number("after") ?: -1, request.number("upper") ?: -1)
 
     @android.annotation.SuppressLint("PrivateApi") // Isolated su app_process has no Application; never called in an OEM process.
-    private fun systemContext(): Context {
+    internal fun systemContext(): Context {
         if (android.os.Looper.getMainLooper() == null) android.os.Looper.prepareMainLooper()
         val type = Class.forName("android.app.ActivityThread")
         return type.getMethod("getSystemContext").invoke(type.getMethod("systemMain").invoke(null)) as Context

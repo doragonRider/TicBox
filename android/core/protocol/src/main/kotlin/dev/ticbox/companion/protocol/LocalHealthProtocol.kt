@@ -40,6 +40,11 @@ object LocalHealthProtocol {
     const val SESSION_MILLIS = 25_000L
     /** The current self-owned protocol uses persistent batches and commit acknowledgements. */
     const val INCREMENTAL_VERSION = 3
+    /**
+     * In `ready`: the bridge may be asked for a table's next batch before the one it follows is committed, by naming that
+     * one as `after`, and keeps up to three batches a table waiting for ACKs.
+     */
+    const val PIPELINE_VERSION = 2
     const val SOURCE_NAME = "content://com.mobvoi.heartrate.db.provider/data_point"
     /** Value of a request's `compression`: its reply may come as a zlib frame. */
     const val ZLIB = "zlib"
@@ -133,14 +138,17 @@ object LocalHealthProtocol {
 
     /**
      * [window]: a first sync reads only rows from the last this many milliseconds. [ack]: a batch of this table the phone
-     * has committed, for a bridge whose replies say `inlineAck`. [zlib]: the reply may be compressed. Older bridges ignore all three.
+     * has committed, for a bridge whose replies say `inlineAck`. [zlib]: the reply may be compressed. [after]: the batch this
+     * side received last and is still saving, for a bridge whose `ready` says [PIPELINE_VERSION]; the reply is the batch
+     * after it. Older bridges ignore all four.
      */
     fun changes(table: LocalHealthTable, receiver: String, run: String, full: Boolean, window: Long? = null,
-        ack: String? = null, zlib: Boolean = false) = buildJsonObject {
+        ack: String? = null, zlib: Boolean = false, after: String? = null) = buildJsonObject {
         put("op", "changes"); put("table", table.wireName); put("receiver", receiver)
         put("run", run); put("full", full); put("limit", MAX_PAGE_ROWS)
         window?.let { put("window", it) }; ack?.let { put("ack", it) }
         if (zlib) put("compression", ZLIB)
+        after?.let { put("after", it) }
     }
     fun acknowledge(receiver: String, table: LocalHealthTable, batch: String) = buildJsonObject {
         put("op", "ack"); put("receiver", receiver); put("table", table.wireName); put("batch", batch)

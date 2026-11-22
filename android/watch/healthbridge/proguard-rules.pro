@@ -9,3 +9,6 @@
 -keep class dev.ticbox.companion.healthbridge.HealthJournalMain {
     public static void main(java.lang.String[]);
 }
+-keep class dev.ticbox.companion.healthbridge.FitnessHelperMain {
+    public static void main(java.lang.String[]);
+}

@@ -13,7 +13,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 /** Normal synchronization reads one bounded source page; it never copies the whole fitness DB. */
-internal class RootFitnessPageReader(private val context: Context) {
+internal class RootFitnessPageReader(private val context: Context, private val session: FitnessHelperSession? = null) {
     private fun fitnessInfo() = try { context.packageManager.getApplicationInfo(RootFitnessSnapshot.FITNESS_PACKAGE, 0) }
     catch (_: android.content.pm.PackageManager.NameNotFoundException) { null }
 
@@ -34,6 +34,7 @@ internal class RootFitnessPageReader(private val context: Context) {
         cancellation.throwIfCanceled()
         // A watch that has never recorded a workout has nothing to read, which is not a failure.
         val info = fitnessInfo() ?: return noWorkouts()
+        session?.page(request, cancellation)?.let { page -> return withVersion(page) }
         val directory = File(context.noBackupFilesDir, "fitness-pages").apply { mkdirs() }
         directory.listFiles()?.filter { System.currentTimeMillis() - it.lastModified() > 600_000 }?.forEach { it.delete() }
         // Pre-created by the application so the root worker preserves its owner and private label.
@@ -52,10 +53,13 @@ internal class RootFitnessPageReader(private val context: Context) {
             }
             cancellation.throwIfCanceled()
             if (output.length() !in 1..LocalHealthProtocol.MAX_FRAME_BYTES.toLong()) throw FitnessSourceException("snapshot_failed")
-            val page = LocalHealthProtocol.parse(output.readBytes())
-            val version = runCatching { context.packageManager.getPackageInfo(RootFitnessSnapshot.FITNESS_PACKAGE, 0).versionName }.getOrNull()
-            return if (version == null) page else JsonObject(page + ("providerVersion" to JsonPrimitive(version)))
+            return withVersion(LocalHealthProtocol.parse(output.readBytes()))
         } finally { input.delete(); output.delete() }
+    }
+
+    private fun withVersion(page: JsonObject): JsonObject {
+        val version = runCatching { context.packageManager.getPackageInfo(RootFitnessSnapshot.FITNESS_PACKAGE, 0).versionName }.getOrNull()
+        return if (version == null) page else JsonObject(page + ("providerVersion" to JsonPrimitive(version)))
     }
 
     private companion object { const val NO_DATABASE = "no_database" }
