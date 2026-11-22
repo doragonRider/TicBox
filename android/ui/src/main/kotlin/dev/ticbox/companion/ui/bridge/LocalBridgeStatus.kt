@@ -30,13 +30,21 @@ enum class LocalBridgeStatus {
     /** Installed, but "Allow phone to read" is off on the watch. */
     NOT_ALLOWED,
 
-    /** It didn't answer, and the watch's app list can't say whether it's installed. */
+    /**
+     * It didn't answer, and the watch's app list can't say whether it's installed. The watch keeps
+     * a new install switched off and ignores the phone until "Allow phone to read" is on, so a
+     * bridge that was never turned on looks like this too.
+     */
     UNREACHABLE,
     READY;
 
     /** Something the Local Bridge page can help with. */
     val needsSetup: Boolean
         get() = this == NOT_INSTALLED || this == NOT_ALLOWED || this == UNREACHABLE
+
+    /** It may be installed but still switched off on the watch. */
+    val mayBeSwitchedOff: Boolean
+        get() = this == NOT_ALLOWED || this == UNREACHABLE
 }
 
 /** A reason reads "table:problem,table:problem". */

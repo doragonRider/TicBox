@@ -1126,11 +1126,13 @@
     <string name="bridge_update">Update</string>
     <string name="bridge_reinstall">Install again</string>
     <string name="bridge_installing">Sending to the watch and installing…</string>
-    <string name="bridge_installed">Installed. It should now be open on the watch.</string>
+    <string name="bridge_installed">Installed. Local Bridge should now be open on the watch: turn on “Allow phone to read” there to finish.</string>
     <string name="bridge_refused">The watch refused the install.</string>
     <string name="bridge_unknown_title">Install result unknown</string>
     <string name="bridge_step_allow_title">Allow it on the watch</string>
     <string name="bridge_step_allow_body">Open Local Bridge on the watch and turn on “Allow phone to read”.</string>
+    <string name="bridge_turn_on_title">Turn on Local Bridge on the watch</string>
+    <string name="bridge_turn_on_body">Local Bridge isn\'t answering. A new install, from this phone or a computer, stays off until it\'s turned on: on the watch, open Local Bridge and turn on “Allow phone to read”, then tap “Allow Bluetooth” if it shows.</string>
     <string name="bridge_open_on_watch">Open on watch</string>
     <string name="bridge_check_again">Check again</string>
     <string name="bridge_footnote">Local Bridge has no internet permission on the watch. It only talks to this phone, over Bluetooth.</string>

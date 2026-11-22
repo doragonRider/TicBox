@@ -1109,11 +1109,13 @@
     <string name="bridge_update">更新</string>
     <string name="bridge_reinstall">重新安装</string>
     <string name="bridge_installing">正在发送到手表并安装…</string>
-    <string name="bridge_installed">已安装，手表上应该已经打开了它。</string>
+    <string name="bridge_installed">已安装。手表上应该已经打开了本地桥接，请在其中开启“允许手机读取”以完成设置。</string>
     <string name="bridge_refused">手表拒绝了这次安装。</string>
     <string name="bridge_unknown_title">不确定是否安装成功</string>
     <string name="bridge_step_allow_title">在手表上允许</string>
     <string name="bridge_step_allow_body">在手表上打开本地桥接，打开“允许手机读取”。</string>
+    <string name="bridge_turn_on_title">在手表上开启本地桥接</string>
+    <string name="bridge_turn_on_body">本地桥接没有响应。无论从这台手机还是电脑安装，装好后它都处于关闭状态：请在手表上打开本地桥接，开启“允许手机读取”；如果出现“授予蓝牙权限”，也点一下。</string>
     <string name="bridge_open_on_watch">在手表上打开</string>
     <string name="bridge_check_again">重新检查</string>
     <string name="bridge_footnote">本地桥接在手表上没有联网权限，只通过蓝牙和这部手机通信。</string>

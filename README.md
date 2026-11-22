@@ -27,7 +27,7 @@ Install the phone APK with ADB from a computer. Opening the APK on the phone (fr
 
 3. If the notification access switch is greyed out, open the app's App info, tap ⋮ and choose "Allow restricted settings", then turn notification access on.
 
-The watch's Local Bridge doesn't need a separate download: it ships inside the phone app, which installs it on the watch over wireless debugging (see [watch components](docs/dev/watch.md)).
+The watch's Local Bridge doesn't need a separate download: it ships inside the phone app, which installs it on the watch over wireless debugging (see [watch components](docs/dev/watch.md)). However it's installed, it stays off until you open it on the watch once and turn on "Allow phone to read"; until then it doesn't answer the phone.
 
 ## Documentation
 

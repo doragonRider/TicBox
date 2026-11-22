@@ -477,6 +477,19 @@ fun LocalBridgeScreen(onBack: () -> Unit, navigate: (Any) -> Unit) {
                     Text(stringResource(R.string.toolbox_accept_device))
                 }
             }
+            // Step 3 says the same, but a fresh install, from here or from a computer, is easily
+            // taken for a working one, so it's said first.
+            Reveal(status.mayBeSwitchedOff && !install.isRunning, spacing = 20.dp) {
+                StatusBanner(
+                    stringResource(R.string.bridge_turn_on_body),
+                    tone = BannerTone.Warning,
+                    title = stringResource(R.string.bridge_turn_on_title),
+                    actionLabel = stringResource(R.string.bridge_check_again),
+                    onAction = {
+                        if (LocalBridgeViewModel.CHECK !in pending) viewModel.checkAgain()
+                    },
+                )
+            }
             Reveal(status == LocalBridgeStatus.READY, spacing = 20.dp) {
                 StatusBanner(stringResource(R.string.bridge_ready), tone = BannerTone.Success)
                 ListGroup {
