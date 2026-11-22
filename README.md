@@ -90,19 +90,13 @@ First check the watch's Wear OS version: it's the first item under Settings → 
 | Paired with another phone, on Wear OS 3.5 | Wear OS 3.5 can't change phones and keep its data. Update the watch to Wear OS 4 under Settings → System → System updates first, then transfer |
 | Paired with Mobvoi Health on this same phone | See [switching to TicBox on the same phone](#switching-to-ticbox-on-the-same-phone) |
 
-A reset erases everything on the watch, so keep it as the [last resort](#reset-the-last-resort). Settings → System → Disconnect & reset on the watch resets it, and so does unpairing it in Mobvoi Health; Mobvoi Health's Transfer doesn't.
+A reset erases everything on the watch, so keep it as the [last resort](#reset-the-last-resort). Settings → System → Disconnect & reset on the watch resets it.
 
 #### Transfer the watch to this phone
 
-This needs Wear OS 4. Keep the watch connected to the old phone, with enough battery.
+This needs Wear OS 4. Keep the watch connected to the old phone, with enough battery. Until the transfer has finished, don't unpair the watch on the old phone or forget it in the old phone's Bluetooth settings.
 
-1. In Mobvoi Health on the old phone, start the transfer from its device settings (System → Transfer), or use the transfer option under Settings → System on the watch. Both need a Google account on the watch; without one, see below.
-2. Confirm on the watch. It goes into transfer mode and waits for the new phone. Until the transfer has finished, don't unpair the watch on the old phone or forget it in the old phone's Bluetooth settings.
-3. Continue with [step 3: pair](#step-3-pair) on this phone and follow TicBox's prompts. Once the watch is back on its watch face, the transfer is done.
-
-After a transfer, the watch may stop accepting connections after one of them ends, for example after you update TicBox. If TicBox keeps trying to reconnect, restart the watch normally once; that clears it, with no reset and no unpairing needed. This is a known issue on the watch's side, and it's more likely when the old phone's pairing is removed before the transfer has finished.
-
-**Without a Google account on the watch**, neither option shows. TicBox's demo watch can open the same confirmation page from this phone: the demo's Advanced tools work on the real watch over wireless debugging.
+A transfer starts from a confirmation page on the watch. TicBox's demo watch can open it from this phone: the demo's Advanced tools work on the real watch over wireless debugging. Opening the page doesn't need a Google account on the watch.
 
 1. Connect the watch to Wi-Fi and turn on its wireless debugging, as in [step 5](#step-5-install-local-bridge-for-health-data), items 1–3.
 2. On TicBox's first page, tap "Try the demo watch", open Watch → Manage → Advanced → Wireless debugging, and pair and connect to the watch as in [step 5](#step-5-install-local-bridge-for-health-data), items 5–6.
@@ -112,9 +106,12 @@ After a transfer, the watch may stop accepting connections after one of them end
    am start -W -a android.settings.WATCH_TRANSFER
    ```
 
-4. Confirm on the watch, which goes into transfer mode. Back in TicBox, tap "Exit demo", then continue with [step 3: pair](#step-3-pair).
+4. Confirm on the watch. It goes into transfer mode and waits for the new phone.
+5. Back in TicBox, tap "Exit demo", then continue with [step 3: pair](#step-3-pair) and follow TicBox's prompts. Once the watch is back on its watch face, the transfer is done.
 
 A computer can do the same without a cable: connect to the watch's wireless debugging with `./adb pair` and `./adb connect`, then run `./adb shell am start -W -a android.settings.WATCH_TRANSFER`.
+
+After a transfer, the watch may stop accepting connections after one of them ends, for example after you update TicBox. If TicBox keeps trying to reconnect, restart the watch normally once; that clears it, with no reset and no unpairing needed. This is a known issue on the watch's side, and it's more likely when the old phone's pairing is removed before the transfer has finished.
 
 #### Switching to TicBox on the same phone
 
@@ -131,7 +128,7 @@ To keep the watch's data, you can go through a second phone running Android 14 o
 
 On the watch, choose Settings → System → Disconnect & reset. When the watch restarts, choose a language, then continue with [step 3: pair](#step-3-pair). This erases everything on the watch, including health records that haven't been synced anywhere. Before you reset, keep what you can somewhere else:
 
-- With Mobvoi Health, let it finish syncing. If you're signed in to a Mobvoi account, the data is in the Mobvoi cloud: later, sign in to the same account under Settings → Mobvoi account in TicBox to download the cloud health records to the phone. This is off by default, uses the internet, and hasn't been fully verified with real accounts yet.
+- If you've used a Mobvoi account, the cloud may hold health records: later, sign in to the same account under Settings → Mobvoi account in TicBox to download them to the phone. This is off by default, uses the internet, and hasn't been fully verified with real accounts yet.
 - With TicBox, export under Settings → Data migration and import it on the new phone.
 
 ### Step 3: Pair
