@@ -20,11 +20,15 @@ class LocalHealthFrames(
 ) {
     private var chunk = byteArrayOf()
     private var position = 0
+    /** Size of the last frame [read] returned, length prefix included. */
+    var lastFrameBytes = 0
+        private set
     suspend fun write(value: JsonObject) = transport.write(LocalHealthProtocol.frame(value))
     suspend fun read(): JsonObject {
         val size = ByteBuffer.wrap(readExactly(4)).int
         if (size !in 1..LocalHealthProtocol.MAX_FRAME_BYTES) throw IOException("Local health frame allocation budget exceeded")
         val frame = readExactly(size)
+        lastFrameBytes = 4 + size
         return try { withContext(parseContext) { LocalHealthProtocol.parse(frame) } }
         catch (problem: IllegalArgumentException) { throw IOException("Malformed local health frame") }
     }

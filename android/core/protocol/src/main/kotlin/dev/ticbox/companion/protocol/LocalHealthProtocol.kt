@@ -82,14 +82,16 @@ object LocalHealthProtocol {
         put("op", "ack"); put("receiver", receiver); put("table", table.wireName); put("batch", batch)
     }
 
-    fun page(value: JsonObject): LocalHealthPage {
+    /** [wireBytes] is the size of the frame that carried [value], for diagnostics. */
+    fun page(value: JsonObject, wireBytes: Long = 0): LocalHealthPage {
         val received = value["rows"] as? JsonArray
         val rows = received.orEmpty().mapNotNull { it as? JsonObject }.map(::LocalHealthRow)
         val incomplete = received == null || rows.size != received.size || rows.any { it.partial }
         return LocalHealthPage(rows, value.number("nextId") ?: rows.mapNotNull { it.id }.maxOrNull(),
             value.number("upperId"), value.flag("complete") ?: rows.isEmpty(),
             incomplete || value.flag("partial") == true, value.text("error"), value.text("providerVersion"),
-            value.text("nextKey"), value.text("upperKey"), value.text("batch"), value.number("scannedRows") ?: 0)
+            value.text("nextKey"), value.text("upperKey"), value.text("batch"), value.number("scannedRows") ?: 0,
+            value.number("watchMillis"), wireBytes)
     }
 }
 
@@ -106,7 +108,10 @@ class LocalHealthRow(val raw: JsonObject) {
 class LocalHealthPage(val rows: List<LocalHealthRow>, val nextId: Long?, val upperId: Long?,
     val complete: Boolean, val partial: Boolean = false, val error: String? = null, val providerVersion: String? = null,
     val nextKey: String? = null, val upperKey: String? = null,
-    val batchId: String? = null, val scannedRows: Long = 0) {
+    val batchId: String? = null, val scannedRows: Long = 0,
+    /** How long the watch worked on this reply; null from a bridge that doesn't say. */
+    val watchMillis: Long? = null,
+    val wireBytes: Long = 0) {
     override fun toString() = "LocalHealthPage(rows=${rows.size}, complete=$complete, contents=<redacted>)"
 }
 

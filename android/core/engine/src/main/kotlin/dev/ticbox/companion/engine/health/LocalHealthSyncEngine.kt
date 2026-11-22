@@ -155,13 +155,32 @@ class LocalHealthSyncEngine(scope: CoroutineScope, private val store: LocalHealt
         var currentTable: LocalHealthTable? = null
         val stopwatch = SyncStopwatch(now(), elapsedMillis)
         val runId = UUID.randomUUID().toString()
-        fun publish(phase: LocalHealthSyncPhase, reason: String? = null, finished: Boolean = false) = synchronized(this) {
+        fun publish(phase: LocalHealthSyncPhase, reason: String? = null, finished: LocalHealthSyncTiming? = null) = synchronized(this) {
             if (!closed && generation == selectedGeneration) mutableState.value = state.value.copy(
                 phase = phase, source = current.source, sessionId = current.sessionId,
                 pagesCommitted = pages, recordsCommitted = records, reason = reason,
                 lastSuccessAtMillis = if (phase == LocalHealthSyncPhase.COMPLETED || phase == LocalHealthSyncPhase.PARTIAL)
                     now() else state.value.lastSuccessAtMillis,
-                lastRun = if (finished) stopwatch.finish() else state.value.lastRun)
+                lastRun = finished ?: state.value.lastRun)
+        }
+        /** One line per table, each stage its own field, so `adb logcat` shows a whole run at once. */
+        fun logTiming(timing: LocalHealthSyncTiming, phase: LocalHealthSyncPhase) {
+            fun record(details: Map<String, String>) = runCatching { diagnostics.record(ProtocolDiagnostic("local_health", "run_timing",
+                DiagnosticSeverity.INFO, peer = current.source.peer, sessionId = current.sessionId, details = details)) }
+            record(mapOf("table" to "*", "mode" to mode.name, "phase" to phase.name, "total" to "${timing.totalMillis}ms"))
+            timing.stages.groupBy { it.table }.forEach { (table, stages) ->
+                record(buildMap {
+                    put("table", table ?: "*"); put("mode", mode.name)
+                    stages.forEach { stage ->
+                        put(stage.name, "${stage.millis}ms x${stage.count}" + if (stage.bytes > 0) " ${stage.bytes}B" else "")
+                    }
+                })
+            }
+        }
+        fun finish(phase: LocalHealthSyncPhase, reason: String?) {
+            val timing = stopwatch.finish()
+            publish(phase, reason, finished = timing)
+            logTiming(timing, phase)
         }
         fun log(event: String, problem: Exception? = null, page: LocalHealthPage? = null) {
             runCatching { diagnostics.record(ProtocolDiagnostic("local_health", event,
@@ -206,7 +225,14 @@ class LocalHealthSyncEngine(scope: CoroutineScope, private val store: LocalHealt
                         }
                         while (currentCoroutineContext().isActive) {
                             publish(LocalHealthSyncPhase.READING)
+                            val readStarted = elapsedMillis()
                             val page = stopwatch.measure(stage, "read") { withTimeout(30_000) { open.page(table, checkpoint) } }
+                            stopwatch.add(stage, "read", 0, count = 0, bytes = page.wireBytes)
+                            // The watch says how long it worked on the page; the rest went to Bluetooth and parsing here.
+                            page.watchMillis?.let { watch ->
+                                stopwatch.add(stage, "watch", watch)
+                                stopwatch.add(stage, "transfer", (elapsedMillis() - readStarted - watch).coerceAtLeast(0))
+                            }
                             if (page.error != null) {
                                 // Remote errors are identifiers, never copy remote exception text into diagnostics/UI.
                                 reason = when (page.error) {
@@ -272,14 +298,14 @@ class LocalHealthSyncEngine(scope: CoroutineScope, private val store: LocalHealt
             }
             disconnect()
             if (availableTables == 0 && problems.isEmpty()) problems += "no_advertised_sources"
-            publish(when {
+            finish(when {
                 problems.isEmpty() -> LocalHealthSyncPhase.COMPLETED
                 availableTables > 0 -> LocalHealthSyncPhase.PARTIAL
                 else -> LocalHealthSyncPhase.UNAVAILABLE
-            }, problems.takeIf { it.isNotEmpty() }?.joinToString(","), finished = true)
+            }, problems.takeIf { it.isNotEmpty() }?.joinToString(","))
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (problem: Exception) {
-            publish(LocalHealthSyncPhase.FAILED, "local_sync_${problem.javaClass.simpleName}", finished = true)
+            finish(LocalHealthSyncPhase.FAILED, "local_sync_${problem.javaClass.simpleName}")
             log("sync_failed", problem)
         } finally { disconnect() }
     }
@@ -290,10 +316,10 @@ private class SyncStopwatch(private val startedAtMillis: Long, private val elaps
     private val started = elapsedMillis()
     private val stages = linkedMapOf<Pair<String?, String>, LocalHealthSyncStage>()
 
-    @Synchronized fun add(table: String?, name: String, millis: Long, count: Int = 1) {
+    @Synchronized fun add(table: String?, name: String, millis: Long, count: Int = 1, bytes: Long = 0) {
         val previous = stages[table to name]
         stages[table to name] = LocalHealthSyncStage(table, name,
-            millis = (previous?.millis ?: 0) + millis, count = (previous?.count ?: 0) + count)
+            millis = (previous?.millis ?: 0) + millis, count = (previous?.count ?: 0) + count, bytes = (previous?.bytes ?: 0) + bytes)
     }
 
     /** Failed and cancelled attempts count too: they are part of why a sync was slow. */

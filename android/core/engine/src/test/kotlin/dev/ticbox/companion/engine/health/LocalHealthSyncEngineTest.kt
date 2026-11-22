@@ -197,7 +197,7 @@ class LocalHealthSyncEngineTest {
             object : LocalHealthConnection {
                 override suspend fun page(table: LocalHealthTable, checkpoint: LocalHealthCheckpoint): LocalHealthPage {
                     delay(50)
-                    return LocalHealthPage(listOf(row(1)), 1, 1, complete = true)
+                    return LocalHealthPage(listOf(row(1)), 1, 1, complete = true, watchMillis = 20, wireBytes = 1_000)
                 }
                 override val setupStages = listOf(LocalHealthSyncStage(null, "connect", 7, count = 2))
                 override fun close() = Unit
@@ -213,7 +213,10 @@ class LocalHealthSyncEngineTest {
         assertEquals(1, connections)
         val stages = synced.lastRun!!.stages.associateBy { it.table to it.name }
         assertEquals(LocalHealthSyncStage("data_point", "connect", 7, count = 2), stages["data_point" to "connect"])
-        assertEquals(LocalHealthSyncStage("data_point", "read", 50), stages["data_point" to "read"])
+        assertEquals(LocalHealthSyncStage("data_point", "read", 50, bytes = 1_000), stages["data_point" to "read"])
+        // The watch's own 20 ms leave 30 for Bluetooth and parsing.
+        assertEquals(LocalHealthSyncStage("data_point", "watch", 20), stages["data_point" to "watch"])
+        assertEquals(LocalHealthSyncStage("data_point", "transfer", 30), stages["data_point" to "transfer"])
         assertEquals(50, synced.lastRun!!.totalMillis)
 
         store.lastSuccess = now - 6 * 60_000
