@@ -96,4 +96,31 @@ class ActivityBucketsTest {
         )
         assertTrue(activityBuckets(emptyList(), start, end).isEmpty())
     }
+
+    @Test
+    fun hourlyTotalsPairHalfHoursFromTheDayStartAndCountAShortDaylightSavingDay() {
+        val zone = ZoneId.of("Europe/Berlin")
+        val day = LocalDate.of(2026, 3, 29)
+        val dayStart = day.atStartOfDay(zone).toInstant()
+        val dayEnd = day.plusDays(1).atStartOfDay(zone).toInstant()
+        assertEquals(23, Duration.between(dayStart, dayEnd).toHours())
+        fun half(index: Long, value: Double) =
+            HealthPoint(
+                dayStart.plus(Duration.ofMinutes(30 * index)),
+                value,
+                dayStart.plus(Duration.ofMinutes(30 * index + 30)),
+            )
+        val hours =
+            hourlyTotals(
+                listOf(half(0, 10.0), half(1, 5.0), half(5, 7.0), half(45, 4.0)),
+                dayStart,
+                dayEnd,
+            )
+        assertEquals(listOf(15.0, 7.0, 4.0), hours.map { it.value })
+        assertEquals(
+            listOf(0L, 2L, 22L),
+            hours.map { Duration.between(dayStart, it.time).toHours() },
+        )
+        assertEquals(dayEnd, hours.last().endExclusive)
+    }
 }

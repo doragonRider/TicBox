@@ -25,6 +25,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -106,9 +107,12 @@ fun TimeSeriesChart(
     modifier: Modifier = Modifier,
     formatter: MetricFormatter = metricFormatter(),
     weekly: Boolean = false,
+    goal: Double? = null,
 ) {
     val range =
-        remember(points, metric, weekly) { valueRange(metric, points.map { it.value }, weekly) }
+        remember(points, metric, weekly, goal) {
+            valueRange(metric, points.map { it.value } + listOfNotNull(goal), weekly)
+        }
     PlotChart(
         points = points,
         color = metricColor(metric),
@@ -123,13 +127,15 @@ fun TimeSeriesChart(
         description = description,
         modifier = modifier,
         weekly = weekly,
+        goal = goal,
     )
 }
 
 /**
  * Line (samples) or bar (totals) chart on a fixed time axis. Tapping or dragging selects the
  * nearest point; the caller shows the selected value next to the chart. A line breaks where two
- * samples are more than [gapMillis] apart, and a lone sample shows as a dot.
+ * samples are more than [gapMillis] apart, and a lone sample shows as a dot. With a [goal], a
+ * dashed line marks it and bars below it are lighter.
  */
 @Composable
 fun PlotChart(
@@ -147,6 +153,7 @@ fun PlotChart(
     modifier: Modifier = Modifier,
     weekly: Boolean = false,
     gapMillis: Long = Long.MAX_VALUE,
+    goal: Double? = null,
 ) {
     val grid = MaterialTheme.colorScheme.outlineVariant
     val labelStyle =
@@ -200,10 +207,21 @@ fun PlotChart(
 
         fun y(value: Double) = plotBottom - range.fraction(value) * plotHeight
 
+        // The goal's value takes the place of a grid value too close to it.
+        val goalY = goal?.let(::y)
+        val labelRoom = 14.dp.toPx()
         gridValues.forEachIndexed { index, value ->
             val lineY = y(value)
             drawLine(grid, Offset(plotLeft, lineY), Offset(size.width, lineY), 1.dp.toPx())
-            drawLabel(measurer, gridLabels[index], labelStyle, Offset(0f, lineY), centerY = true)
+            if (goalY == null || abs(goalY - lineY) >= labelRoom) {
+                drawLabel(
+                    measurer,
+                    gridLabels[index],
+                    labelStyle,
+                    Offset(0f, lineY),
+                    centerY = true,
+                )
+            }
         }
         labels.forEach { label ->
             drawLabel(
@@ -227,11 +245,21 @@ fun PlotChart(
                         weekly -> x(point.time) + slot / 2
                         else -> x(point.time)
                     }
+                val reached = goal == null || point.value >= goal
+                val alpha =
+                    when {
+                        selected == null || selected == index -> if (reached) 1f else 0.55f
+                        else -> if (reached) 0.45f else 0.25f
+                    }
                 drawRoundRect(
-                    color.copy(alpha = if (selected == null || selected == index) 1f else 0.45f),
+                    color.copy(alpha = alpha),
                     topLeft = Offset(center - barWidth / 2, top),
-                    size = Size(barWidth, (plotBottom - top).coerceAtLeast(1.dp.toPx())),
-                    cornerRadius = CornerRadius(3.dp.toPx()),
+                    size =
+                        Size(
+                            barWidth,
+                            (plotBottom - top).coerceAtLeast(barWidth.coerceAtMost(4.dp.toPx())),
+                        ),
+                    cornerRadius = CornerRadius(barWidth.coerceAtMost(12.dp.toPx()) / 2),
                 )
             }
         } else {
@@ -269,6 +297,24 @@ fun PlotChart(
                     style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
                 )
             }
+        }
+
+        if (goal != null && goalY != null) {
+            val dash = 4.dp.toPx()
+            drawLine(
+                color,
+                Offset(plotLeft, goalY),
+                Offset(size.width, goalY),
+                1.5.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(dash * 1.5f, dash)),
+            )
+            drawLabel(
+                measurer,
+                gridLabel(goal),
+                labelStyle.copy(color = color),
+                Offset(0f, goalY),
+                centerY = true,
+            )
         }
 
         selected?.let(points::getOrNull)?.let { point ->
@@ -350,6 +396,18 @@ fun MiniChart(
         }
     val range =
         remember(points, metric) { valueRange(metric, points.map { it.value }, weekly = false) }
+    // Totals show by the hour, which a card this small can still tell apart.
+    val hours =
+        remember(points, day.date) {
+            if (metric.dailySummary != DailySummary.TOTAL) emptyList()
+            else {
+                val zone = ZoneId.systemDefault()
+                val dayStart = day.date.atStartOfDay(zone).toInstant()
+                hourlyTotals(points, dayStart, day.date.plusDays(1).atStartOfDay(zone).toInstant())
+            }
+        }
+    val hourly =
+        remember(hours, metric) { valueRange(metric, hours.map { it.value }, weekly = false) }
     Canvas(modifier.fillMaxWidth().height(40.dp).clearAndSetSemantics {}) {
         val span = 86_400_000f
         fun x(time: Instant) =
@@ -357,13 +415,13 @@ fun MiniChart(
         fun y(value: Double) = size.height - range.fraction(value) * size.height
         if (metric.dailySummary == DailySummary.TOTAL) {
             val width = (size.width / 24f * 0.6f).coerceAtLeast(1.dp.toPx())
-            points.forEach { point ->
-                val top = y(point.value)
+            hours.forEach { point ->
+                val top = hourly.let { size.height - it.fraction(point.value) * size.height }
                 drawRoundRect(
                     color,
-                    Offset(x(point.time) - width / 2, top),
-                    Size(width, (size.height - top).coerceAtLeast(1f)),
-                    CornerRadius(2.dp.toPx()),
+                    Offset(x(point.plotTime) - width / 2, top),
+                    Size(width, (size.height - top).coerceAtLeast(width)),
+                    CornerRadius(width / 2),
                 )
             }
         } else if (points.isNotEmpty()) {
