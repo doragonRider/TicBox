@@ -15,9 +15,13 @@ internal class IncrementalHealthReader(
     /** Tells whether the private fitness files changed; null when that can't be determined. */
     private val fitnessStamp: (CancellationSignal) -> String? = { null },
     private val journal: HealthJournalReader? = null,
+    /** Closed with the reader: the workout helper kept for this read window. */
+    private val helper: AutoCloseable? = null,
 ) : AutoCloseable {
-    constructor(context: Context) : this(HealthIncrementalStore(context), sourceReader(context), enabledHealthTables(context),
-        { cancellation -> if (BridgeSettings.rootFitnessEnabled(context)) RootFitnessPageReader(context).stamp(cancellation) else null }, RootHealthJournalReader(context))
+    constructor(context: Context) : this(context, FitnessHelperSession(context))
+    private constructor(context: Context, fitness: FitnessHelperSession) : this(HealthIncrementalStore(context), sourceReader(context, fitness),
+        enabledHealthTables(context), { cancellation -> if (BridgeSettings.rootFitnessEnabled(context)) RootFitnessPageReader(context).stamp(cancellation) else null },
+        RootHealthJournalReader(context, fitness = fitness), fitness)
 
     private var stamped: Pair<String, String?>? = null
     /** Where the last reply or read-ahead spent its time, for the log: reading the source, hashing rows, the ledger. */
@@ -166,7 +170,7 @@ internal class IncrementalHealthReader(
         }
     }
 
-    override fun close() = store.close()
+    override fun close() { try { helper?.close() } finally { store.close() } }
     fun invalidateJournal(source: String) {
         journalWindows.remove(source)
         store.invalidateJournal(source)
@@ -178,10 +182,10 @@ internal class IncrementalHealthReader(
     }
 }
 
-private fun sourceReader(context: Context): (JsonObject, CancellationSignal) -> JsonObject {
+private fun sourceReader(context: Context, fitnessHelper: FitnessHelperSession): (JsonObject, CancellationSignal) -> JsonObject {
     val provider = HealthProviderReader(context.contentResolver, healthProviderVersion(context, HealthProviderReader.URI),
         healthProviderVersion(context, SportProviderReader.URI), framed = false)
-    val fitness = RootFitnessPageReader(context)
+    val fitness = RootFitnessPageReader(context, fitnessHelper)
     return { request, cancellation ->
         if (LocalHealthTable.entries.firstOrNull { it.wireName == request.text("table") }?.privateFitness == true) {
             if (BridgeSettings.rootFitnessEnabled(context)) fitness.page(request, cancellation) else queryError("root_not_enabled")
