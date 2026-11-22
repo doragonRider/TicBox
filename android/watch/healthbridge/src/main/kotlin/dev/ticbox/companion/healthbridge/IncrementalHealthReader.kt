@@ -252,11 +252,12 @@ internal class IncrementalHealthReader(
         /** Well inside the phone's 30-second page timeout. */
         const val READ_BUDGET_NANOS = 3_000_000_000L
         /**
-         * Pages read ahead past the batches made: one for the next batch to be made from, and one being read meanwhile.
-         * With only one, a request arrived while that page was still being read and waited for it, and reading resumed
-         * only after its reply was written, so reading and packing took turns.
+         * Pages read ahead past the batches made. With one (1.0.9), a request arrived while that page was still being read
+         * and waited for it. With two (1.0.10), reading caught up with packing and then waited for each batch to be made;
+         * the batch waited for the ACK before it, and the ACK for the transaction of the page being read, so the three still
+         * took turns. A few more let reading go on while the answering thread waits.
          */
-        const val AHEAD_PAGES = 2
+        const val AHEAD_PAGES = 4
     }
 }
 

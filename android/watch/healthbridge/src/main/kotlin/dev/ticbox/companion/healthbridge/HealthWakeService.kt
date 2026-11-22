@@ -45,7 +45,8 @@ class HealthWakeService : WearableListenerService() {
             if (!adapter.isEnabled) return
             val server = adapter.listenUsingRfcommWithServiceRecord("TicBox Local Health", UUID.fromString(LocalHealthProtocol.RFCOMM_UUID))
             window.attach(server)
-            Log.i(TAG, "Local Bluetooth read window opened")
+            // Says which bridge wrote the lines that follow; a log read later can't tell otherwise.
+            Log.i(TAG, "Local Bluetooth read window opened; versionCode=${packageManager.getPackageInfo(packageName, 0).longVersionCode}")
             while (!cancellation.isCanceled) {
                 val socket = server.accept(); window.attach(socket)
                 socket.use {
@@ -86,14 +87,18 @@ class HealthWakeService : WearableListenerService() {
                                 ("queuedMillis" to JsonPrimitive((started - arrived).coerceAtLeast(0))))
                             if (request.text("op") == "journal" && request.text("action") in setOf("enable", "disable") &&
                                 (page.text("error") == null || request.text("action") == "disable")) reader.invalidateJournal(request.text("source")!!)
+                            val writing = SystemClock.elapsedRealtime()
                             LocalHealthProtocol.write(socket.outputStream, page, zlib = request.text("compression") == LocalHealthProtocol.ZLIB)
+                            val acking = SystemClock.elapsedRealtime()
+                            // Waits for a page read ahead to commit, as SQLite takes one writer at a time.
                             reader.afterReply()
+                            val acked = SystemClock.elapsedRealtime()
                             window.touch(60_000)
                             if (request.text("op") == "changes") {
                                 pages++; rows += (page["rows"] as? JsonArray)?.size ?: 0
                                 Log.i(TAG, "Local changes sent; pages=$pages rows=$rows scanned=${page.number("scannedRows") ?: 0} " +
                                     "partial=${page.flag("partial") == true} error=${page.text("error") ?: "none"} millis=${page.number("watchMillis")} " +
-                                    "queued=${page.number("queuedMillis")} ${reader.lastStages}")
+                                    "queued=${page.number("queuedMillis")} write=${acking - writing}ms ack=${acked - acking}ms ${reader.lastStages}")
                                 // While this reply travels and the phone saves it, pack the next one from the rows read ahead.
                                 if (going && reader.packAhead(request)) ahead.want(request)
                             }
@@ -147,8 +152,8 @@ class HealthWakeService : WearableListenerService() {
 
     /**
      * Reads the source ahead on its own thread while the answering thread packs and sends, one page at a time, until
-     * two pages' worth of rows wait past the batches made (`AHEAD_PAGES` in the reader). [want] points it at a table
-     * as each request is answered, or stops it.
+     * `AHEAD_PAGES` pages' worth of rows wait past the batches made (see the reader). [want] points it at a table as each
+     * request is answered, or stops it.
      */
     private class ReadAhead(private val reader: IncrementalHealthReader, private val cancellation: CancellationSignal,
         private val read: (JsonObject) -> Unit) : AutoCloseable {

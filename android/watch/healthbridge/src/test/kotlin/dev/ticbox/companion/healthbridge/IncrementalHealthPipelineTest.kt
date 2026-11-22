@@ -230,15 +230,19 @@ class IncrementalHealthPipelineTest {
 
     @Test fun whileAReplyTravelsTheNextBatchesAreMadeAndAnotherPageIsRead() {
         streamlined = true
-        repeat(1000) { provider.insertFixture(it + 1L, "70", 1) }
+        // Some values a row's text could be cut at, if a stored batch were split without reading its strings.
+        fun value(id: Int) = if (id % 7 == 0) "]},{\"rows\":[\\\"$id" else "70"
+        repeat(1000) { provider.insertFixture(it + 1L, value(it + 1), 1) }
         val receiver = source.localUserId; val table = LocalHealthTable.POINT; val run = UUID.randomUUID().toString()
         val first = exchange(LocalHealthProtocol.changes(table, receiver, run, full = true))
-        // Three batches wait for their ACKs, and two more pages are read past them.
-        assertEquals(2 * pageRows, ledger.pendingBeyond(receiver, table, 4 * pageRows))
+        // Three batches wait for their ACKs, and four more pages are read past them.
+        assertEquals(4 * pageRows, ledger.pendingBeyond(receiver, table, 8 * pageRows))
         val reads = sourceReads
         val next = reader.handle(LocalHealthProtocol.changes(table, receiver, run, full = true, after = first.text("batch")), CancellationSignal())
         assertEquals(reads, sourceReads) // Made already; nothing was read for it.
-        assertEquals((pageRows + 1..2 * pageRows).toList(), LocalHealthProtocol.page(next).rows.map { it.id!!.toInt() })
+        val rows = LocalHealthProtocol.page(next).rows
+        assertEquals((pageRows + 1..2 * pageRows).toList(), rows.map { it.id!!.toInt() })
+        assertEquals((pageRows + 1..2 * pageRows).map(::value), rows.map { it.columns.getValue("values").jsonPrimitive.content })
     }
 
     @Test fun aPageThatFailsToSaveAfterTheNextWasAskedForIsSentAgainInOrder() = runBlocking {
