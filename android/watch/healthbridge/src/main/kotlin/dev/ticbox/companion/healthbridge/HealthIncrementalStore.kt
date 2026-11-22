@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import android.util.Log
 import dev.ticbox.companion.protocol.*
 import java.io.File
 import java.util.UUID
@@ -130,7 +131,7 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
                     ?.let { deferred ?: (now() - it) }
                 val journalLost = journalWindow == null && metadata(journalKey(receiver, table)) != null
                 val full = resend || (journalLost && metadata(fallbackKey(receiver, table)) == null)
-                if (journalWindow != null) {
+                val planned = if (journalWindow != null) {
                     val cursor = metadata(journalKey(receiver, table))?.let { json ->
                         runCatching { HealthJournalPosition.parse(LocalHealthProtocol.parse(json.toByteArray())) }.getOrNull()
                     }
@@ -149,6 +150,9 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
                     HealthCapture(run, full, if (unchanged) emptyList() else plan(receiver, table, full, previous.third, since, resend),
                         stamp = stamp, resend = resend, journalFallback = journalLost, window = since)
                 }
+                Log.i("TicBoxHealthBridge", "Capture planned; table=${table.wireName} full=${planned.full} " +
+                    "resend=${planned.resend} journal=${planned.journal != null} scopes=${describe(planned.scopes)}")
+                planned
             }
         }
         save(receiver, table, capture); capture
@@ -280,9 +284,16 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
         return due
     }
 
+    /** Scope kinds only, for logs: no IDs or times. */
+    private fun describe(scopes: List<HealthScanScope>) = scopes.joinToString(",") { scope -> when {
+        scope.probe -> "probe"; scope.parent != null -> "workout"; scope.remaining != null -> "deep"
+        scope.since != null -> "recent"; scope.audit -> "all"; else -> "new"
+    } }.ifEmpty { "none" }
+
     /** An older sleep session that reopens/merges brings its original point range back into focus. */
     private fun mutableHealthSince(receiver: String, window: Long): Long {
         var since = now() - window
+        var open = 0; var changed = 0
         db.rawQuery("SELECT payload,last_changed FROM observations WHERE receiver=? AND kind=? AND present=1",
             arrayOf(receiver, LocalHealthTable.SESSION.wireName)).use { cursor ->
             while (cursor.moveToNext()) {
@@ -290,9 +301,13 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
                 val columns = LocalHealthRow(LocalHealthProtocol.parse(cursor.getString(0).toByteArray())).columns
                 val start = columns.number("time_from") ?: continue
                 val end = columns.number("time_to") ?: 0
-                if (start > 0 && (end <= start || cursor.getLong(1) >= now() - DAY)) since = minOf(since, start)
+                if (start > 0 && (end <= start || cursor.getLong(1) >= now() - DAY) && start < now() - window) {
+                    since = minOf(since, start); if (end <= start) open++ else changed++
+                }
             }
         }
+        // Counts only: how many unfinished or recently changed sessions reach back past the usual range.
+        if (open + changed > 0) Log.i("TicBoxHealthBridge", "Recent range widened; openSessions=$open changedSessions=$changed")
         return since
     }
 

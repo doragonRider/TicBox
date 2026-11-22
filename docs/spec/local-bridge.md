@@ -320,4 +320,6 @@ adb shell am start -W -n dev.ticbox.companion/dev.ticbox.companion.healthbridge.
 
 手表在每个回复里带 `watchMillis` 时，手机把 read 拆成 `watch`（手表处理）和 `transfer`（其余时间：请求和回复的蓝牙传输、手表序列化和压缩、手机解压和解析），并累计每页收到的字节数。每轮结束后，手机为每张表写一条 `run_timing` 诊断（各阶段的毫秒数、次数和字节数，压缩时为压缩后的大小，不含健康数据），另有一条带总耗时的汇总。
 
-变更日志的每次操作（读状态、开启、关闭）结束后，手机写一条 `journal_result` 诊断：来源、操作、结果（`ok`、稳定的错误码、手机等满 90 秒的 `phone_timeout` 或异常类型）和耗时。手表的 root 辅助进程遇到非预期异常时，在回复里附上失败的步骤（context、verify、stat、uid、open、validate 或操作名）和异常类型，Local Bridge 把它们连同超时和退出码写入 `TicBoxHealthBridge` 日志；异常消息可能含有 SQL 或数据，不记录。
+变更日志的每次操作（读状态、开启、关闭）结束后，手机写一条 `journal_result` 诊断：来源、操作、结果（`ok`、稳定的错误码、手机等满 90 秒的 `phone_timeout` 或异常类型）和耗时。手表的 root 辅助进程遇到非预期异常时，在回复里附上失败的步骤（context、verify、stat、sqlite、uid、open、validate 或操作名）、异常类型和抛出位置（最多 4 个“类.方法”，跳过 Binder 转发的帧），Local Bridge 把它们连同超时和退出码写入 `TicBoxHealthBridge` 日志；异常消息可能含有 SQL 或数据，不记录。
+
+手表每开始一次新的采集，记录一行 `Capture planned`：表、是否全量、是否重发、是否走变更日志，以及计划的范围种类（new、recent、deep、workout、all、probe），不含 ID 或时间。近期范围被未结束或最近一天有变化的会话向前扩展时，记录这样的会话数（`Recent range widened`）。每次预读结束记录一行 `Read-ahead`：读取的源行数、待传行数、采集是否结束和耗时。

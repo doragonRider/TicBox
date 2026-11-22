@@ -152,7 +152,8 @@ adb -s <phone> logcat -d -s "TicBoxProtocol:I" | grep run_timing        # Window
 - Provider 查询可能冷启动官方进程并触发它的初始化和联网任务；需要确保离线时，先关闭手表的 Wi-Fi，用 USB ADB 测试。
 - 系统强行停止、禁用应用、撤销蓝牙权限，或 GMS 不派送唤醒事件时，手机显示不可用并保留已入库的记录。
 - 变更日志页显示“数据源不在手表上”（`journal_database_missing`），或开了 root 运动采集却始终没有训练：root helper 没有在全局挂载空间运行，看不到官方应用的数据目录（见[本地桥接协议 §5](../spec/local-bridge.md#5-root-运动采集)）。1.0.0 及更早的 Local Bridge 都是这样，更新到 1.0.1 后重新开启日志。在手表上对比 `su -c 'ls <dataDir>/databases'` 和 `su -c 'nsenter -t $(pidof dev.ticbox.companion) -m ls <dataDir>/databases'` 可以确认。
-- 变更日志页显示“没能从手表读到日志的状态”，或开启/关闭后显示“没能确认结果，已重新读取状态”：手机等满 90 秒没有回复，或手表的 root 辅助进程超时、遇到了非预期的异常。复现后读取两边的日志：手机 `adb logcat -d -s TicBoxProtocol:I | grep journal_result`（`outcome` 为 `phone_timeout` 时是手机等待超时），手表 `adb logcat -d -s TicBoxHealthBridge:*`，其中 `Journal helper failed` 的 `step` 和 `exception` 说明在哪一步、因什么异常失败，`Journal helper timed out` 表示辅助进程超时。
+- 变更日志页显示“没能从手表读到日志的状态”，或开启/关闭后显示“没能确认结果，已重新读取状态”：手机等满 90 秒没有回复，或手表的 root 辅助进程超时、遇到了非预期的异常。复现后读取两边的日志：手机 `adb logcat -d -s TicBoxProtocol:I | grep journal_result`（`outcome` 为 `phone_timeout` 时是手机等待超时），手表 `adb logcat -d -s TicBoxHealthBridge:*`，其中 `Journal helper failed` 的 `step`、`exception` 和 `at` 说明在哪一步、因什么异常、在哪段代码失败，`Journal helper timed out` 表示辅助进程超时。1.0.3 及更早在真机上都会以 `step=open exception=SecurityException` 失败：辅助进程降到官方应用的 UID 后，SQLite 第一次打开数据库时要经系统 context 读取一项全局设置，这个 Binder 调用因包名与 UID 不符被拒绝；1.0.4 改为在降权前先打开一个内存数据库，完成这次读取。
+- 增量同步比预期慢：手表日志里每次采集的 `Capture planned` 列出读取的范围，`Recent range widened` 说明有多少会话把近期范围向前扩展，`Local changes sent` 的 `scanned` 和 `Read-ahead` 给出实际读了多少行。
 
 ## 7. 待验证
 
