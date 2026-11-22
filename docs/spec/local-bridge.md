@@ -229,7 +229,7 @@ RECORD 的 HASH 不是分页键；POINT.RECORD_ID 指向 RECORD._id。原始 `co
 
 ## 6. 变更日志（可选，需要 root）
 
-轮询需要反复重读很少变化的行。启用变更日志后，日常同步按日志中的键回读，没有变化时跳过普通的行扫描。它通过 `services.localHealth.setJournalEnabled()` 显式启用，配对、重连和普通同步都不会安装它。实现见 [AtomicHealthJournal.kt](../../android/watch/healthbridge/src/main/kotlin/dev/ticbox/companion/healthbridge/AtomicHealthJournal.kt)、[HealthJournalProfiles.kt](../../android/watch/healthbridge/src/main/kotlin/dev/ticbox/companion/healthbridge/HealthJournalProfiles.kt) 和 [RootHealthJournalReader.kt](../../android/watch/healthbridge/src/main/kotlin/dev/ticbox/companion/healthbridge/RootHealthJournalReader.kt)。
+轮询需要反复重读很少变化的行。启用变更日志后，日常同步按日志中的键回读，没有变化时跳过普通的行扫描。它通过 `services.localHealth.setJournalEnabled()` 显式启用，配对、重连和普通同步都不会安装它。实现见 [AtomicHealthJournal.kt](../../android/watch/healthbridge/src/main/kotlin/dev/ticbox/companion/healthbridge/AtomicHealthJournal.kt)、[HealthJournalProfiles.kt](../../android/watch/healthbridge/src/main/kotlin/dev/ticbox/companion/healthbridge/HealthJournalProfiles.kt) 、[RootHealthJournalReader.kt](../../android/watch/healthbridge/src/main/kotlin/dev/ticbox/companion/healthbridge/RootHealthJournalReader.kt)、[HealthJournalRead.kt](../../android/watch/healthbridge/src/main/kotlin/dev/ticbox/companion/healthbridge/HealthJournalRead.kt) 和 [HealthModuleJournal.kt](../../android/watch/healthbridge/src/main/kotlin/dev/ticbox/companion/healthbridge/HealthModuleJournal.kt)。
 
 ### 6.1 为什么用同库触发器
 
@@ -285,6 +285,22 @@ root 或日志不可用时，保留旧的日志游标，先完成一次独立的
 
 待传队列持久后即可接管源序号，不必等手机在线。Local Bridge 的事务失败不推进；ACK 丢失时重放批次，旧 ACK 不清除新的 revision；sourceAbsent 仍保留手机上的历史。
 
+### 6.6 读取
+
+每轮同步每个来源只读一次：同一次读取带回日志窗口，以及本接收方每张表在游标之后的一页事件和对应的行（每页最多 128 个事件，行放不下时减半；整个回复最多 1 MiB，放不下的表之后单独读页）。窗口不再包含的游标不带页，那张表照常重建基线。schema 校验只做一次，包含在文件代际的指纹计算里。
+
+**健康库经进程内模块读取。** 装了[进程内模块](monitoring-settings.md#52-进程内模块)时，读取在官方健康应用的进程里完成，不启动 root 辅助进程。应用之间按 Android 的 SELinux 策略只能用 Binder 通信，不能直接连到另一个应用的 Unix socket，所以这条路走 Binder：
+
+1. 模块每次启动生成 128 位随机令牌，写进官方应用私有目录的 `no_backup/ticbox-health-token`，只有属主可读。Local Bridge 用 root 读出令牌，每个进程读一次。
+2. Local Bridge 向 `com.mobvoi.wear.health.at` 发有序广播 `dev.ticbox.companion.healthmodule.JOURNAL`，附上令牌。令牌相符时，模块在结果的 extras 里交回 Binder（结果码 1）；不符时结果码为 2。没有模块时，广播立刻以 0 结束，不用等待。
+3. 每次查询是一次 Binder 调用：事务码为 `FIRST_CALL_TRANSACTION`，请求和回复都是 UTF-8 JSON 的字节数组，请求都带令牌。操作有两个：`journal_describe` 返回包名、版本号、版本名、APK 摘要，以及数据库文件的 device 和 inode；`journal_query` 执行一条 SQL，参数只能是字符串。
+4. 模块只接受单条 SELECT、WITH，以及校验用到的 PRAGMA（user_version、table_xinfo、foreign_key_list、index_list、index_xinfo），PRAGMA 不能带赋值。连接以 `OPEN_READONLY | NO_LOCALIZED_COLLATORS` 打开，文件被替换后重新打开，空闲 30 秒后关闭；每条查询 5 秒超时。
+5. 单元格带存储类型：`i` 整数、`f` 浮点、`s` 文本、`b` Base64 的 BLOB，或 null。Local Bridge 据此还原出与直接读文件相同的游标。一个进程的 Binder 缓冲只有约 1 MB，所以回复最多 256 KiB；按键取行时每次最多 128 个键，回复过大就分成两半再查。
+
+所有检查都在 Local Bridge 里完成，用的是辅助进程读文件时的同一套代码：版本白名单、schema、日志命名空间和元数据，以及文件代际（来源、版本名、device、inode、schema 指纹）。所以两条路径算出的代际相同，游标在两条路径间通用，换路径不会重建基线。读取前后各取一次 device 和 inode，不同就报 `journal_source_replaced`。模块没有加载、令牌读不到、版本不在白名单或读取出错时，改用 root 辅助进程。开启和关闭日志总是由辅助进程完成。
+
+**运动库仍由 root 辅助进程读取**，模块不在运动应用里。开着运动日志时，每轮先用 su 和 stat 取运动库及其 WAL 的修改时间和大小，与不开日志时的检查相同。和上次读窗口之前取的值一样，就沿用上次的窗口，不启动辅助进程；游标已在窗口头的表，这一轮就不用读。stat 在读窗口之前取，所以读窗口期间发生的写入，下一轮会表现为变化。开启或关闭日志会清除保存的窗口。
+
 ## 7. 手动 JSON 导出
 
 手表 Local Bridge 的设置页（以及 debug 包的检查页）提供“导出健康 JSON”，也可以通过 ADB 打开：
@@ -322,5 +338,7 @@ adb shell am start -W -n dev.ticbox.companion/dev.ticbox.companion.healthbridge.
 手表在每个回复里带 `watchMillis` 时，手机把 read 拆成 `watch`（手表处理）和 `transfer`（其余时间：请求和回复的蓝牙传输、手表序列化和压缩、手机解压和解析），并累计每页收到的字节数。每轮结束后，手机为每张表写一条 `run_timing` 诊断（各阶段的毫秒数、次数和字节数，压缩时为压缩后的大小，不含健康数据），另有一条带总耗时的汇总。
 
 变更日志的每次操作（读状态、开启、关闭）结束后，手机写一条 `journal_result` 诊断：来源、操作、结果（`ok`、稳定的错误码、手机等满 90 秒的 `phone_timeout` 或异常类型）和耗时。手表的 root 辅助进程遇到非预期异常时，在回复里附上失败的步骤（sqlite、context、verify、stat、uid、open、validate 或操作名）、异常类型和抛出位置（最多 4 个“类.方法”，跳过 Binder 转发的帧），Local Bridge 把它们连同超时和退出码写入 `TicBoxHealthBridge` 日志；异常消息可能含有 SQL 或数据，不记录。
+
+手表每读一次变更日志，记录走了哪条路：`Journal read through the module` 带查询次数和毫秒数，`Journal helper finished` 带操作和毫秒数，`Journal window unchanged` 表示运动库没变、沿用了上次的窗口。模块那条路失败时记录 `Journal read through the module failed` 和稳定的原因码，`Health module journal not available` 表示模块没有交回 Binder（没装模块，或令牌不符）。
 
 手表每开始一次新的采集，记录一行 `Capture planned`：表、是否全量、是否重发、是否走变更日志，以及计划的范围种类（new、recent、deep、workout、all、probe），不含 ID 或时间。近期范围被未结束或最近一天有变化的会话向前扩展时，记录这样的会话数（`Recent range widened`）。每次预读结束记录一行 `Read-ahead`：读取的源行数、待传行数、采集是否结束和耗时。`Local changes sent`（每个 changes 回复一行）和 `Read-ahead` 还把耗时拆成读源数据（`source`）、算行的指纹（`hash`）、写本地账本（`ledger`）和组装批次（`pack`，只有回复有）各用的毫秒数；`Local changes sent` 的 `queued` 是请求等预读的时间。

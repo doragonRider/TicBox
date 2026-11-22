@@ -275,7 +275,7 @@ class HealthJournalProfilesTest {
         }
     }
 
-    private companion object {
+    internal companion object {
         val HEALTH_HASHES = listOf("993724866f858147fc2b385340b6c6a2", "d54ea02cfe7bc87bfe1f4aad8d32d23a")
         val FITNESS_HASHES = listOf("516350121b90186f5b7326fe366cb4f0", "f7fe416659310e31e28e1c8b6837c16a")
         const val HEALTH_POINT = "CREATE TABLE data_point (_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,\"values\" TEXT NOT NULL DEFAULT '',device_id TEXT NOT NULL DEFAULT '',wwid TEXT,type INTEGER NOT NULL DEFAULT -1,time_to INTEGER NOT NULL,time_from INTEGER NOT NULL,synced INTEGER NOT NULL DEFAULT 0,deleted INTEGER NOT NULL DEFAULT 0)"

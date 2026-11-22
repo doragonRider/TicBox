@@ -35,11 +35,28 @@ internal class IncrementalHealthReader(
     private var journalRun: String? = null
     private val journalWindows = mutableMapOf<String, HealthJournalWindow?>()
 
-    private fun window(table: LocalHealthTable, run: String, cancellation: CancellationSignal): HealthJournalWindow? {
+    private fun window(table: LocalHealthTable, receiver: String, run: String, cancellation: CancellationSignal): HealthJournalWindow? {
         val source = journalSource(table) ?: return null
         if (journalRun != run) { journalWindows.clear(); journalRun = run }
-        if (!journalWindows.containsKey(source)) journalWindows[source] = journal?.window(table, cancellation)
+        if (!journalWindows.containsKey(source)) journalWindows[source] = readWindow(table, source, receiver, run, cancellation)
         return journalWindows[source]
+    }
+
+    /**
+     * Workout files that look as they did when the window was last read hold the same log, so the window is reused and
+     * no helper starts. The look is taken before the read, so a write during it shows up as a change next time.
+     * Otherwise one read brings the window and each table's page after this receiver's cursor.
+     */
+    private fun readWindow(table: LocalHealthTable, source: String, receiver: String, run: String, cancellation: CancellationSignal): HealthJournalWindow? {
+        val journal = journal ?: return null
+        if (!journal.enabled(source)) return null
+        val stamp = if (source == "fitness") stamp(table, run, cancellation) else null
+        if (stamp != null) store.journalGate(source, stamp)?.let { kept ->
+            Log.i("TicBoxHealthBridge", "Journal window unchanged; source=$source")
+            return kept
+        }
+        val positions = tables.filter { journalSource(it) == source }.mapNotNull { each -> store.journalCursor(receiver, each)?.let { each to it } }.toMap()
+        return journal.window(table, positions, cancellation).also { if (stamp != null) store.setJournalGate(source, stamp, it) }
     }
 
     /** Both fitness tables live in one file, so one look at it serves the whole run. */
@@ -83,7 +100,7 @@ internal class IncrementalHealthReader(
     }
 
     private fun begin(request: JsonObject, table: LocalHealthTable, receiver: String, run: String, cancellation: CancellationSignal) =
-        store.begin(receiver, table, run, request.flag("full") == true, window(table, run, cancellation),
+        store.begin(receiver, table, run, request.flag("full") == true, window(table, receiver, run, cancellation),
             request.number("window")?.takeIf { it > 0 }) { stamp(table, run, cancellation) }
 
     /** Reads the source until [enough] or the time budget runs out. A failed source page ends it with that error. */

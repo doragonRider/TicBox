@@ -37,20 +37,22 @@ internal object AtomicHealthJournal {
 
     fun install(db: SQLiteDatabase, source: String): JsonObject = transaction(db) {
         val targets = targets(source)
-        val existing = catalog(db)
+        val existing = catalog(db.sql)
         if (existing.isNotEmpty()) {
-            validateNamespace(db, source, existing)
-            return@transaction metadata(db, source).json()
+            validateNamespace(db.sql, source, existing)
+            return@transaction metadata(db.sql, source).json()
         }
-        val expected = schema(db, source, targets)
+        val expected = schema(db.sql, source, targets)
         expected.values.forEach { db.execSQL(it.sql) }
         db.execSQL("INSERT INTO $META(singleton,version,source,epoch,head,floor) VALUES(1,?,?,?,0,0)",
             arrayOf<Any>(VERSION, source, UUID.randomUUID().toString()))
-        validateNamespace(db, source)
-        metadata(db, source).json()
+        validateNamespace(db.sql, source)
+        metadata(db.sql, source).json()
     }
 
-    fun status(db: SQLiteDatabase, source: String): JsonObject {
+    fun status(db: SQLiteDatabase, source: String) = status(db.sql, source)
+
+    fun status(db: JournalSql, source: String): JsonObject {
         targets(source)
         val existing = catalog(db)
         if (existing.isEmpty()) return absent()
@@ -61,7 +63,7 @@ internal object AtomicHealthJournal {
     /** Missing attached triggers (for example after an OEM table was dropped) do not prevent removal. */
     fun remove(db: SQLiteDatabase, source: String): JsonObject = transaction(db) {
         val targets = targets(source)
-        val existing = catalog(db)
+        val existing = catalog(db.sql)
         if (existing.isEmpty()) return@transaction JsonObject(absent() + ("removed" to JsonPrimitive(false)))
         val variants = listOf(schema(source, targets, emptySet()), schema(source, targets, targets.map { it.sql }.toSet()))
         existing.forEach { actual ->
@@ -70,7 +72,7 @@ internal object AtomicHealthJournal {
         existing.filter { it.type == "trigger" }.forEach { db.execSQL("DROP TRIGGER ${it.name}") }
         existing.filter { it.type == "index" }.forEach { db.execSQL("DROP INDEX ${it.name}") }
         existing.filter { it.type == "table" }.forEach { db.execSQL("DROP TABLE ${it.name}") }
-        if (catalog(db).isNotEmpty()) fail("journal_namespace_unknown")
+        if (catalog(db.sql).isNotEmpty()) fail("journal_namespace_unknown")
         JsonObject(absent() + ("removed" to JsonPrimitive(true)))
     }
 
@@ -78,7 +80,10 @@ internal object AtomicHealthJournal {
      * Metadata, retention bounds and the event page come from one SELECT/read snapshot. The supplied
      * upper is fixed for the entire run; unrelated table events may be skipped by advancing to it.
      */
-    fun read(db: SQLiteDatabase, source: String, table: LocalHealthTable, epoch: String,
+    fun read(db: SQLiteDatabase, source: String, table: LocalHealthTable, epoch: String, after: Long, upper: Long, limit: Int = 32) =
+        read(db.sql, source, table, epoch, after, upper, limit)
+
+    fun read(db: JournalSql, source: String, table: LocalHealthTable, epoch: String,
         after: Long, upper: Long, limit: Int = 32): JsonObject {
         val target = targets(source).firstOrNull { it.kind == table.wireName }
             ?: fail("journal_invalid_source")
@@ -130,7 +135,7 @@ internal object AtomicHealthJournal {
         else -> fail("journal_invalid_source")
     }
 
-    private fun schema(db: SQLiteDatabase, source: String, targets: List<Target> = targets(source)) =
+    private fun schema(db: JournalSql, source: String, targets: List<Target> = targets(source)) =
         schema(source, targets, targets.filter { secondaryUnique(db, it.sql) }.map { it.sql }.toSet())
 
     private fun schema(source: String, targets: List<Target>, wideTables: Set<String>): Map<String, ObjectDdl> {
@@ -206,7 +211,7 @@ internal object AtomicHealthJournal {
         "THEN RAISE(ROLLBACK,'$FAILURE') END;"
 
     /** A non-primary UNIQUE index can make REPLACE delete a different key without a DELETE trigger. */
-    private fun secondaryUnique(db: SQLiteDatabase, table: String): Boolean =
+    private fun secondaryUnique(db: JournalSql, table: String): Boolean =
         db.rawQuery("PRAGMA index_list('$table')", null).use { cursor ->
             val unique = cursor.getColumnIndexOrThrow("unique"); val origin = cursor.getColumnIndexOrThrow("origin")
             var found = false
@@ -214,13 +219,13 @@ internal object AtomicHealthJournal {
             found
         }
 
-    private fun catalog(db: SQLiteDatabase): List<ObjectDdl> = db.rawQuery(
+    private fun catalog(db: JournalSql): List<ObjectDdl> = db.rawQuery(
         "SELECT type,name,tbl_name,sql FROM sqlite_master WHERE substr(lower(name),1,?)=? OR lower(tbl_name) IN (?,?) ORDER BY name",
         arrayOf(PREFIX.length.toString(), PREFIX, META, EVENTS)).use { cursor ->
         buildList { while (cursor.moveToNext()) add(ObjectDdl(cursor.getString(0), cursor.getString(1), cursor.getString(2), cursor.getString(3) ?: "")) }
     }
 
-    private fun validateNamespace(db: SQLiteDatabase, source: String, existing: List<ObjectDdl> = catalog(db)) {
+    private fun validateNamespace(db: JournalSql, source: String, existing: List<ObjectDdl> = catalog(db)) {
         val expected = schema(db, source)
         // A recognizable but incomplete namespace needs explicit removal/reinstallation, never repair
         // in place: a missing trigger may already have allowed unjournaled committed writes.
@@ -232,7 +237,7 @@ internal object AtomicHealthJournal {
         "(SELECT COUNT(*) FROM $META),(SELECT COUNT(*) FROM $EVENTS),(SELECT MIN(seq) FROM $EVENTS)," +
         "(SELECT MAX(seq) FROM $EVENTS),typeof(head)||':'||typeof(floor) FROM $META WHERE singleton=1"
 
-    private fun metadata(db: SQLiteDatabase, source: String): Metadata = db.rawQuery(metadataSelect(), null).use { cursor ->
+    private fun metadata(db: JournalSql, source: String): Metadata = db.rawQuery(metadataSelect(), null).use { cursor ->
         if (!cursor.moveToFirst()) fail("journal_metadata_invalid")
         checkedMetadata(cursor, source)
     }
@@ -248,6 +253,7 @@ internal object AtomicHealthJournal {
         return Metadata(epoch, head, floor)
     }
 
+    private val SQLiteDatabase.sql get() = FileJournalSql(this)
     private fun Cursor.textOrNull(index: Int) = if (isNull(index)) null else getString(index)
     private fun absent() = buildJsonObject { put("version", VERSION); put("installed", false) }
     private fun fail(code: String): Nothing = throw HealthJournalException(code)

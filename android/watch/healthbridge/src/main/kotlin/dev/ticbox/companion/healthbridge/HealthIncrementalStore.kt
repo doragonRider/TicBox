@@ -93,6 +93,26 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
     }
     private fun stampKey(receiver: String, table: LocalHealthTable) = "source_stamp:$receiver:${table.wireName}"
     private fun journalKey(receiver: String, table: LocalHealthTable) = "journal_cursor:$receiver:${table.wireName}"
+    private fun gateKey(source: String) = "journal_gate:$source"
+
+    fun journalCursor(receiver: String, table: LocalHealthTable): HealthJournalPosition? = metadata(journalKey(receiver, table))?.let { json ->
+        runCatching { HealthJournalPosition.parse(LocalHealthProtocol.parse(json.toByteArray())) }.getOrNull()
+    }
+
+    /** The window last read for this source, while its files still carry the stamp taken before that read. */
+    fun journalGate(source: String, stamp: String): HealthJournalWindow? = metadata(gateKey(source))?.let { json ->
+        runCatching {
+            val gate = LocalHealthProtocol.parse(json.toByteArray())
+            if (gate.text("stamp") == stamp) HealthJournalWindow.parse(gate.getValue("window").jsonObject) else null
+        }.getOrNull()
+    }
+
+    fun setJournalGate(source: String, stamp: String, window: HealthJournalWindow?) {
+        transaction { database ->
+            if (window == null) database.delete("metadata", "name=?", arrayOf(gateKey(source)))
+            else setMetadata(gateKey(source), buildJsonObject { put("stamp", stamp); put("window", window.json()) }.toString())
+        }
+    }
     private fun auditKey(receiver: String, table: LocalHealthTable) = "journal_audit:$receiver:${table.wireName}"
     private fun fallbackKey(receiver: String, table: LocalHealthTable) = "journal_fallback:$receiver:${table.wireName}"
     private fun clearFallback(receiver: String, table: LocalHealthTable) {
@@ -163,6 +183,7 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
 
     /** Explicit configuration changes invalidate only acquisition plans, never retained phone deliveries. */
     fun invalidateJournal(source: String) = transaction { database ->
+        database.delete("metadata", "name=?", arrayOf(gateKey(source)))
         LocalHealthTable.entries.filter { journalSource(it) == source }.forEach { table ->
             val suffix = ":${table.wireName}"
             database.rawQuery("SELECT name FROM metadata", null).use { cursor ->
