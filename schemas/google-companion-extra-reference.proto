@@ -1,0 +1,153 @@
+// Static wire projection of the selected Google companion business messages.
+// Descriptive names; not the original .proto. See docs/spec/companion.md.
+// No transport, AppKey, authorization, UI, or platform service is implemented here.
+// bytes fields explicitly marked opaque contain nested protobuf messages; preserve
+// their bytes rather than treating them as arbitrary strings or JSON.
+syntax = "proto2";
+package ticbox.reference.google_companion_extra;
+
+message Empty {}
+
+// /deeplink/rpc/open_deeplink.
+// WCS 1.15.81 only declares field 1. Unknown fields are version-sensitive.
+message OpenDeepLinkPhone {
+  optional int32 kind_raw_enum = 1; // 2 reaches the Assistant activation branch.
+  optional bytes activation_info_opaque_proto = 2;
+  optional bytes account_info_opaque_proto = 3;
+}
+message OpenDeepLinkWcs { optional int32 kind_raw_enum = 1; }
+// Structural projections only: semantic names not exposed by these generated classes.
+message ActivationInfoStructure {
+  optional string field_1 = 1;
+  repeated string field_2 = 2;
+  optional string field_3 = 3;
+  optional string field_4 = 4;
+  optional string field_5 = 5;
+  optional string field_6 = 6;
+  optional string field_7 = 7;
+  optional bool field_8 = 8;
+  optional int32 field_9_raw_enum = 9;
+  optional int32 field_10_raw_enum = 10;
+}
+message AccountInfoStructure { optional string field_1 = 1; }
+
+enum LockScreenType { LOCK_UNKNOWN = 0; LOCK_NONE = 1; LOCK_PIN = 2; LOCK_GESTURE = 3; }
+message ChangeLockScreenRequest { optional LockScreenType lock_screen_type = 1; }
+message ChangeLockScreenResponse {
+  enum Result {
+    UNKNOWN = 0;
+    ERROR_CONFIGURATION_NOT_SUPPORTED_FOR_TYPE = 1;
+    SUCCESS_CONFIGURATION_SCREEN_DISPLAYED = 2;
+    SUCCESS_VERIFICATION_SCREEN_DISPLAYED = 3;
+  }
+  optional Result result = 1;
+}
+message NotifyConfigurationStarted {
+  enum Status { UNKNOWN = 0; SUCCESS_CONFIGURATION_SCREEN_DISPLAYED = 1; }
+  optional Status status = 1;
+}
+message NotifyUnlockFinished {
+  enum Status { UNKNOWN = 0; WRONG_CREDENTIAL = 1; CANCELLED = 2; UNLOCKED = 3; }
+  optional Status status = 1;
+}
+message NotifyConfigurationFinished {
+  enum Result { UNKNOWN = 0; SCREEN_LOCK_CONFIGURED = 1; CANCELLED = 2; SCREEN_LOCK_REMOVED = 3; }
+  optional Result result = 1;
+}
+message SupportedLockScreenTypes {
+  repeated LockScreenType supported_lock_screen_types = 1 [packed = true];
+}
+message GetLockScreenConfigurationSupportResponse {
+  repeated LockScreenType lock_screen_type = 1 [packed = false];
+}
+message LockStatePayload { optional LockScreenType lock_type_set = 1; }
+message PermissionSyncRequest { optional string package_name = 1; }
+
+// /wf_editing_session/channel: int32 BE serialized byte count followed by one
+// EditingSessionMessage. Repeated frames, not protobuf varint-delimited framing.
+message StringValue { optional string value = 1; }
+message Int32Value { optional int32 value = 1; }
+message Int64Value { optional int64 value = 1; }
+message BoolValue { optional bool value = 1; }
+message EditingSessionMessage {
+  oneof message {
+    EditingRequest request = 1;
+    EditingResponse response = 2;
+    EditingMetadata metadata = 3;
+  }
+}
+message EditingRequest {
+  oneof request {
+    StartEditingSessionRequest start_session = 1;
+    EndEditingSessionRequest end_session = 2;
+    AbortEditingSessionRequest abort_session = 3;
+    WatchFaceScreenshotRequest watch_face_screenshot = 4;
+    ComplicationScreenshotRequest complication_screenshot = 5;
+  }
+}
+message EditingResponse {
+  oneof response {
+    SessionStartResponse session_start = 1;
+    SessionEnded session_end = 2;
+    ScreenshotResponse screenshot = 3;
+  }
+}
+message EditingMetadata {
+  optional bytes style_schema_opaque_proto = 1;
+  optional bytes complication_states_opaque_proto = 2;
+}
+message StartEditingSessionRequest {
+  optional Int32Value favorite_id = 1;
+  optional BoolValue abort_current_session = 2;
+  optional Int32Value surface_width = 3;  // Handler requires message presence.
+  optional Int32Value surface_height = 4; // Handler requires message presence.
+}
+message EndEditingSessionRequest {
+  optional StringValue session_token = 1;
+  optional WatchFaceFavoriteInfo favorite_info = 2;
+}
+message AbortEditingSessionRequest { optional StringValue session_token = 1; }
+message WatchFaceFavoriteInfo {
+  optional Int32Value id = 1;
+  optional StringValue component_name = 2;
+  optional bytes style_opaque_proto = 3;
+  repeated bytes complication_infos_opaque_proto = 4;
+  optional bytes preview = 5;
+}
+message RenderParameters {
+  optional int32 draw_mode = 1;
+  repeated LayerParameter layer_parameters = 2;
+  optional int32 selected_complication_id = 3;
+  optional int32 outline_tint = 4;
+  repeated int32 watch_face_layers_raw_enum = 5 [packed = true];
+  optional bytes highlight_layer_opaque_proto = 6;
+}
+message LayerParameter { optional int32 layer = 1; optional int32 layer_mode = 2; }
+message WatchFaceScreenshotRequest {
+  optional Int32Value request_id = 1;
+  optional StringValue session_token = 2;
+  optional RenderParameters render_parameters = 3;
+  optional Int32Value compression_quality = 4;
+  reserved 5;
+  optional bytes style_opaque_proto = 6;
+  repeated bytes complication_infos_opaque_proto = 7;
+  optional int32 compression_type_raw_enum = 8;
+}
+message ComplicationScreenshotRequest {
+  optional Int32Value request_id = 1;
+  optional StringValue session_token = 2;
+  optional bytes complication_info_opaque_proto = 3;
+  optional RenderParameters render_parameters = 4;
+  optional Int32Value compression_quality = 5;
+  optional Int64Value calendar_time_millis = 6;
+  optional bytes style_opaque_proto = 7;
+  optional int32 compression_type_raw_enum = 8;
+}
+// Status values are listed in docs/spec/companion.md (watchface editing session).
+message SessionStartResponse { optional StringValue session_token = 1; optional int32 status_code_raw_enum = 2; }
+message SessionEnded { optional StringValue session_token = 1; optional int32 status_code_raw_enum = 2; }
+message ScreenshotResponse {
+  optional Int32Value request_id = 1;
+  optional int32 status_code_raw_enum = 2;
+  optional bytes screenshot = 3;
+}

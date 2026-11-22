@@ -1,0 +1,11 @@
+<resources>
+    <string name="sample_title">本地健康讀取檢查</string>
+    <string name="sample_explanation">SESSION 和 SPORT 檢查沿用背景同步讀取器，最多取一筆記錄，僅在本機儲存狀態、欄位名稱、類型及 Provider 權限，不輸出健康值或識別碼。空資料表與權限遭拒會分別回報；SPORT 可能需要廠商簽章權限。原始資料列取樣讀取最新最多 5 筆 POINT 記錄；其檔案含健康值及時間，wwid 和 device_id 會移除。這些操作都不會上傳。操作前請關閉手錶 Wi-Fi、藍牙等網路，僅保留 USB 連線。</string>
+    <string name="sample_offline">已手動關閉手錶網路</string>
+    <string name="sample_start">讀取最多 5 筆原始記錄</string>
+    <string name="session_probe_start">檢查 SESSION 讀取（僅中繼資料）</string>
+    <string name="sport_probe_start">檢查 SPORT 來源與權限（僅中繼資料）</string>
+    <string name="sample_running">正在讀取，請稍候</string>
+    <string name="sample_done">讀取完成：%1$d 筆，狀態 %2$s。私有檔案：files/%3$s</string>
+    <string name="sample_failed">取樣未完成：%1$s。診斷不含健康值。</string>
+</resources>

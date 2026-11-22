@@ -1,0 +1,40 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <!-- The user's notification filter must list system and non-launcher apps as well as launchers.
+         A finite queries intent cannot enumerate those sources. Used only for this local picker. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
+    <queries>
+        <intent><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent>
+    </queries>
+    <application
+        android:name=".CompanionApplication"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.TicBox"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:localeConfig="@xml/locales_config"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:supportsRtl="false"
+        android:enableOnBackInvokedCallback="true">
+        <!-- Compose re-reads resources when the configuration changes, so the Activity handles
+             these changes in place. Recreating it would flash the window, e.g. when the app
+             switches its theme or language. Pages keep clear of the keyboard themselves, which
+             only works if the window doesn't also pan out of its way. -->
+        <service
+            android:name=".ShellService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+        <activity
+            android:name=".MainActivity"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="uiMode|locale|layoutDirection|orientation|screenSize|screenLayout|
+                smallestScreenSize|density|fontScale|fontWeightAdjustment|keyboard|keyboardHidden|
+                navigation"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

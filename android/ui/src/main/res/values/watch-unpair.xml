@@ -1,0 +1,29 @@
+<resources>
+    <string name="phone_transfer_title">Change paired phone</string>
+    <string name="phone_transfer_intro">The transfer happens on the watch and the new phone. This phone only starts it and, at the very end, clears its own record.</string>
+    <string name="phone_transfer_warning">Until the watch has completely finished pairing with the new phone, don’t unpair from this phone or forget the watch in its Bluetooth settings. Doing so early can make the transfer fail or leave this phone’s Bluetooth record behind.</string>
+    <string name="phone_transfer_disconnected">The watch isn’t connected. Steps 1 and 2 need it connected to this phone.</string>
+    <string name="phone_transfer_step_check">Check the watch first</string>
+    <string name="phone_transfer_step_check_body">Reads the watch’s service version and compares it with the version this app was verified on. Nothing on the watch changes.</string>
+    <string name="unpair_check_support">Check watch support</string>
+    <string name="unpair_support_observed">This watch runs the verified version</string>
+    <string name="unpair_unsupported">This watch doesn’t run the verified version</string>
+    <string name="phone_transfer_unsupported">Wear OS 3.5 can’t move to a new phone and keep its data.</string>
+    <string name="unpair_check_interrupted">The watch connection changed during the check. Check again once it’s stable.</string>
+    <string name="unpair_check_timed_out">The watch didn’t report its service version in time. Try again later.</string>
+    <string name="unpair_check_version_unavailable">Couldn’t read the watch’s service version. Try again later.</string>
+    <string name="phone_transfer_step_transfer">Finish on the watch and new phone</string>
+    <string name="phone_transfer_step_transfer_body">Once it’s open, finish everything on the watch and the new phone, including confirming the pairing code. Then check that the watch is back on its watch face, the new phone stays connected and health sync has resumed.</string>
+    <string name="watch_transfer_action">Open transfer on watch</string>
+    <string name="watch_transfer_opened">Transfer opened on the watch. Finish all of it on the watch and the new phone.</string>
+    <string name="phone_transfer_step_clear">Clean up this phone afterwards</string>
+    <string name="phone_transfer_step_clear_body">Once the watch has ended its association, this phone stops reconnecting, but its Bluetooth record may remain. Clear it here; nothing is sent to the watch.</string>
+    <string name="phone_transfer_clear_action">Clear this phone’s pairing</string>
+    <string name="phone_transfer_clear_linked">The watch is still connected to this phone, so the transfer may not be finished. You can clear this once that connection ends.</string>
+    <string name="phone_transfer_association_ended">The watch has ended its association with this phone. You can clear its pairing now.</string>
+    <string name="phone_transfer_clear_confirm_offline">The watch isn’t connected to this phone, so nothing is sent to it. Continuing stops reconnection and removes this phone’s Bluetooth pairing and association. Health records on this phone stay.\n\nMake sure the watch has completely finished pairing with the new phone, or the transfer may fail.</string>
+    <string name="phone_transfer_clear_confirm_ended">The watch has ended its association with this phone. Continuing stops reconnection and removes this phone’s Bluetooth pairing and association. Nothing is sent to the watch, and health records on this phone stay.</string>
+    <string name="phone_transfer_cleared">This phone’s pairing was cleared.</string>
+    <string name="phone_transfer_clear_refused">This phone’s pairing wasn’t cleared. The watch may have reconnected; try again later.</string>
+    <string name="unpair_local_cleanup_failed">Local cleanup did not finish. Open system Bluetooth settings, forget this watch, then check the watch before pairing again.</string>
+</resources>

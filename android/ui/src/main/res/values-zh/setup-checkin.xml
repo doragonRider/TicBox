@@ -1,0 +1,9 @@
+<resources>
+    <string name="setup_checkin_option_title">尝试 Google 设备检查（可选）</string>
+    <string name="setup_checkin_option_body">默认跳过。检查可能使用手表网络进行 Google 设备注册；可以随时跳过检查，继续本地设置。</string>
+    <string name="setup_checkin_action_title">Google 设备检查</string>
+    <string name="setup_checkin_step">Google 设备检查</string>
+    <string name="setup_checkin_wait_body">正在检查手表的 Google 设备注册状态。可以立即跳过，无需等待响应。</string>
+    <string name="setup_checkin_failed_body">尚未确认 Google 设备检查完成。可以重试，或跳过检查继续本地设置。</string>
+    <string name="setup_checkin_skip">跳过此检查</string>
+</resources>

@@ -1,0 +1,124 @@
+name: Android build and package
+
+on:
+  workflow_call:
+    inputs:
+      delivery:
+        default: release
+        type: string
+    secrets:
+      TICBOX_SIGNING_STORE_BASE64:
+        required: false
+      TICBOX_SIGNING_STORE_PASSWORD:
+        required: false
+      TICBOX_SIGNING_KEY_ALIAS:
+        required: false
+      TICBOX_SIGNING_KEY_PASSWORD:
+        required: false
+      TICBOX_SIGNING_CERT_SHA256:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+          package-manager-cache: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '27'
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Set up Android SDK and install current packages
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+        with:
+          packages: 'platform-tools platforms;android-37.2 build-tools;37.0.0 ndk;27.2.12479018'
+      - name: Check Node codecs and documents
+        run: npm run check
+      - name: Prepare injected signing key
+        if: inputs.delivery != 'ci-debug'
+        env:
+          TICBOX_SIGNING_STORE_BASE64: ${{ secrets.TICBOX_SIGNING_STORE_BASE64 }}
+          TICBOX_SIGNING_STORE_PASSWORD: ${{ secrets.TICBOX_SIGNING_STORE_PASSWORD }}
+          TICBOX_SIGNING_KEY_ALIAS: ${{ secrets.TICBOX_SIGNING_KEY_ALIAS }}
+          TICBOX_SIGNING_KEY_PASSWORD: ${{ secrets.TICBOX_SIGNING_KEY_PASSWORD }}
+          TICBOX_SIGNING_CERT_SHA256: ${{ secrets.TICBOX_SIGNING_CERT_SHA256 }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          const names = ['TICBOX_SIGNING_STORE_BASE64', 'TICBOX_SIGNING_STORE_PASSWORD', 'TICBOX_SIGNING_KEY_ALIAS', 'TICBOX_SIGNING_KEY_PASSWORD', 'TICBOX_SIGNING_CERT_SHA256'];
+          const missing = names.filter(name => !process.env[name]);
+          if (missing.length) throw Error('Configure repository Actions secrets: ' + missing.join(', '));
+          const directory = path.join(process.env.RUNNER_TEMP, 'ticbox-signing');
+          fs.mkdirSync(directory, { mode: 0o700 });
+          const file = path.join(directory, 'companion.keystore');
+          fs.writeFileSync(file, Buffer.from(process.env.TICBOX_SIGNING_STORE_BASE64, 'base64'), { mode: 0o600, flag: 'wx' });
+          fs.appendFileSync(process.env.GITHUB_ENV, 'TICBOX_SIGNING_STORE_FILE=' + file + '\n');
+          NODE
+      - name: Build, test and verify both APKs
+        env:
+          DELIVERY_CHANNEL: ${{ inputs.delivery }}
+          TICBOX_SIGNING_STORE_PASSWORD: ${{ secrets.TICBOX_SIGNING_STORE_PASSWORD }}
+          TICBOX_SIGNING_KEY_ALIAS: ${{ secrets.TICBOX_SIGNING_KEY_ALIAS }}
+          TICBOX_SIGNING_KEY_PASSWORD: ${{ secrets.TICBOX_SIGNING_KEY_PASSWORD }}
+          TICBOX_SIGNING_CERT_SHA256: ${{ secrets.TICBOX_SIGNING_CERT_SHA256 }}
+        run: |
+          if [ "$DELIVERY_CHANNEL" = "ci-debug" ]; then
+            npm run android:check -- --debug
+          else
+            npm run android:check
+          fi
+      - name: Package matching phone and watch APKs
+        id: package
+        env:
+          DELIVERY_CHANNEL: ${{ inputs.delivery }}
+          TICBOX_SIGNING_CERT_SHA256: ${{ secrets.TICBOX_SIGNING_CERT_SHA256 }}
+        run: npm run android:package -- "$DELIVERY_CHANNEL"
+      - name: Upload phone APK
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          path: ${{ steps.package.outputs.directory }}/ticbox-phone-*.apk
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload watch healthbridge APK
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          path: ${{ steps.package.outputs.directory }}/ticbox-healthbridge-*.apk
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain complete release assets for publishing
+        if: inputs.delivery != 'ci-debug'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-assets-${{ github.sha }}
+          path: ${{ steps.package.outputs.directory }}/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload verification reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: verification-${{ inputs.delivery }}-${{ github.sha }}
+          path: |
+            build/distributions/**/README.txt
+            build/distributions/**/SHA256SUMS.txt
+            build/distributions/**/manifest.json
+            build/verification/android-*.json
+            android/**/build/test-results/**/*.xml
+            android/**/build/reports/lint-results-*.xml
+          retention-days: 14
+      - name: Remove injected key
+        if: always() && inputs.delivery != 'ci-debug'
+        run: rm -rf -- "$RUNNER_TEMP/ticbox-signing"

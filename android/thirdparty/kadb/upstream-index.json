@@ -1,0 +1,359 @@
+{
+  "repository": "https://github.com/flyfishxu/Kadb",
+  "commit": "3d1c13e8df261cc4a2bb57b03aa8c392cb8386c3",
+  "tag": "2.1.5",
+  "files": [
+    {
+      "source": "kadb/src/androidMain/kotlin/com/flyfishxu/kadb/Kadb.android.kt",
+      "sha256": "6bed60793d2ede7c6f0f5348bd87caeec89d9b5f38d7f011b616620c6416edff",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/Kadb.android.kt",
+      "androidBindingAdapted": true
+    },
+    {
+      "source": "kadb/src/androidMain/kotlin/com/flyfishxu/kadb/cert/platform/DefaultDeviceName.android.kt",
+      "sha256": "6c4f62803d92574ec0b8a5299b42d528da7419b37c648d64c1232fae2409f61f",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/cert/platform/DefaultDeviceName.android.kt",
+      "androidBindingAdapted": true
+    },
+    {
+      "source": "kadb/src/androidMain/kotlin/com/flyfishxu/kadb/core/HostFeaturePolicy.android.kt",
+      "sha256": "db2fb8cad61b147856d4676b00422817fe0ad2b19331889e5202d792288388d5",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/core/HostFeaturePolicy.android.kt",
+      "androidBindingAdapted": true
+    },
+    {
+      "source": "kadb/src/androidMain/kotlin/com/flyfishxu/kadb/pair/PairingAuthCtx.android.kt",
+      "sha256": "21413f715d4b0398ab06247c690bab98733d714d662f83b97128e9a564c552b7",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/pair/PairingAuthCtx.android.kt",
+      "androidBindingAdapted": true
+    },
+    {
+      "source": "kadb/src/androidMain/kotlin/com/flyfishxu/kadb/pair/PairingConnectionCtx.android.kt",
+      "sha256": "990bfaff8579f6f7cc17ad9d7e7f63d115a4db7e5eec4fc4e3093f6912d49690",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/pair/PairingConnectionCtx.android.kt",
+      "androidBindingAdapted": true
+    },
+    {
+      "source": "kadb/src/androidMain/kotlin/com/flyfishxu/kadb/transport/PlainBlockingChannel.kt",
+      "sha256": "2c2608e6d12ea7804b44dd08ac4f27629be527a1417e4aa182d6ae773725d37c",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/transport/PlainBlockingChannel.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/androidMain/kotlin/com/flyfishxu/kadb/transport/TcpKeepAlive.android.kt",
+      "sha256": "5f80a17b02920501db98e69b64a3d37e95ba171f13fa79beca28cb5a99d8763c",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/transport/TcpKeepAlive.android.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/androidMain/kotlin/com/flyfishxu/kadb/transport/TransportFactory.android.kt",
+      "sha256": "62f48e1f64529919ece0969c61befcda580890085e6fa5d5503a32757411dd45",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/transport/TransportFactory.android.kt",
+      "androidBindingAdapted": true
+    },
+    {
+      "source": "kadb/src/androidMain/kotlin/com/flyfishxu/kadb/usb/KadbUsb.kt",
+      "sha256": "a36ee09b46d960dc578b7069989fe6ee3661ab58fe9aedf8ec8afe6d7a668c34",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/usb/KadbUsb.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/Kadb.kt",
+      "sha256": "de55a595a628f40b1d1ec3acdcbd3355bf9ba5f4951649ac2199ab92ff120f5d",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/Kadb.kt",
+      "androidBindingAdapted": true
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/KadbOptions.kt",
+      "sha256": "2173dc13953fe3827f6c9c6b51538caf3a1b712f9c19d1a2a0d6e33d4edd07b7",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/KadbOptions.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/TcpKeepAlive.kt",
+      "sha256": "32c04368ef6aed3924139fdb4d8da1577ca4510d55680dc5168c951d4bc233e3",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/TcpKeepAlive.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/cert/AdbKeyPair.kt",
+      "sha256": "f1f86c2fcb63677d1d9991ee0eadca9a41469da3752d6fb034474d9bc833be19",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/cert/AdbKeyPair.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/cert/AndroidPubkey.kt",
+      "sha256": "506a6ecaf04d2b41f1821094effd7a546e34299ff8640c62d08013d9c387b696",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/cert/AndroidPubkey.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/cert/CertUtils.kt",
+      "sha256": "97cfeb7746e7a35877869ba21d9adc8e8bfaf4dc6cb0b457e8c42456ab4bc6a3",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/cert/CertUtils.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/cert/HostKeySet.kt",
+      "sha256": "5870e6f36c8fe78df332ea8c2bd9ba8e925b375799348c93c6641a345a9a30c0",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/cert/HostKeySet.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/cert/InMemoryPrivateKeyStore.kt",
+      "sha256": "59d4a83b9a04e632b008c73c8098b0c8a4c1e06f3c142b8a39c2b92a10604585",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/cert/InMemoryPrivateKeyStore.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/cert/KadbCert.kt",
+      "sha256": "6cff9517894826ba677e4a7e398648a280910d5478704ec06ecef2434a168df6",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/cert/KadbCert.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/cert/KadbCertException.kt",
+      "sha256": "038875758aa8bf2a5c7e7e356a0138fc41247be277ceef9967f5c316c8d83c6b",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/cert/KadbCertException.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/cert/KadbCertPolicy.kt",
+      "sha256": "e2593771e7f9eb315a8f1ec86384be9dfb824c39a53da1df83b6629d1f9db65b",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/cert/KadbCertPolicy.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/cert/KadbIdentitySnapshot.kt",
+      "sha256": "bfc2df61aad5075093675f377e14486f9b3045fa47a1d4155641e66b69042539",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/cert/KadbIdentitySnapshot.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/cert/KadbPrivateKeyStore.kt",
+      "sha256": "42542c9675ab2b0967db9147c64d65bee6681d098120a89b388f446d7e4214b6",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/cert/KadbPrivateKeyStore.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/cert/OkioFilePrivateKeyStore.kt",
+      "sha256": "345d2900bfa1de078bcba88c554c8f339625a4e6642e951ca94714ea351950d6",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/cert/OkioFilePrivateKeyStore.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/cert/platform/DefaultDeviceName.kt",
+      "sha256": "c22c0a96a8099b306b25c4de19d9b57d8fd2cb34b4b72f4c424b01957a95273e",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/cert/platform/DefaultDeviceName.kt",
+      "androidBindingAdapted": true
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/core/AdbConnection.kt",
+      "sha256": "1aecae53ae6fe57a51dff8e7055a5c764e8286511a6969762fb3c6ddc646d02f",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/core/AdbConnection.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/core/AdbMessage.kt",
+      "sha256": "6b205e846debe2553f31685e5a2f4301077d9611aee574f95ae7de29be9ea2bc",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/core/AdbMessage.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/core/AdbProtocol.kt",
+      "sha256": "8684ceefebacf8fe6d19551ebb0eae4a43eb6b9904b6fcd2ee5e959611354cb6",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/core/AdbProtocol.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/core/AdbReader.kt",
+      "sha256": "f01027728489b60d2357a481a0fc970cc8e1f1498cfe14a9a3ce72ee9575f537",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/core/AdbReader.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/core/AdbWriter.kt",
+      "sha256": "7647a0e7a8540c232faa7b8a3f5c62d3fea3a25095942325f88e17864e9a3d48",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/core/AdbWriter.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/core/HostFeaturePolicy.kt",
+      "sha256": "81cdc19024519f5d0f300e909e39d282141772d764ffb531536fe83714e37c33",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/core/HostFeaturePolicy.kt",
+      "androidBindingAdapted": true
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/debug/Logging.kt",
+      "sha256": "3f6e1a8228b06d02f4efd7fcb66b0d04ecb41f2bad1bcca0f8c79ec5935e81ad",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/debug/Logging.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/exception/AdbAuthException.kt",
+      "sha256": "3a3b2b0dde1207e26708e888733840434e0f33f1cad7d6f1de140c479d02a5ad",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/exception/AdbAuthException.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/exception/AdbPairAuthException.kt",
+      "sha256": "2e0d7cae240c6ffd99e262c920091b631898e5709fb8019b56c11c205f9ac75e",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/exception/AdbPairAuthException.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/exception/AdbStreamClosed.kt",
+      "sha256": "885b6c79c9940d5508f8617c71de6cdb883c8b06969e46dc5060ba08cf351089",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/exception/AdbStreamClosed.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/forwarding/TcpForwarder.kt",
+      "sha256": "f56b780fc7737429fcf4bc5f5d746b75c886863e4c1a3ff54656cb0a26e5dbea",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/forwarding/TcpForwarder.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/pair/PairingAuthCtx.kt",
+      "sha256": "9a4b34d8a1acd236ceb2c14dcc1a88a5ed5aabfe12adbaed322e7960977b64a1",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/pair/PairingAuthCtx.kt",
+      "androidBindingAdapted": true
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/pair/PairingConnectionCtx.kt",
+      "sha256": "03961d478baf74094c409e5feaa8b8c0bf3dccbe8364e76019f3cd9ab2811661",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/pair/PairingConnectionCtx.kt",
+      "androidBindingAdapted": true
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/pair/SslUtils.kt",
+      "sha256": "78908e96af3b9178e08e0d339ca70b902d0f46dbf33fbb1160c6f7ab596c10e7",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/pair/SslUtils.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/queue/AdbMessageQueue.kt",
+      "sha256": "beb7c1679af80585ed1eff0da75367f1e24a300ec8a85432768188d729a28cca",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/queue/AdbMessageQueue.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/shell/AdbPtyShellSession.kt",
+      "sha256": "e5de237bda6f453d5891fd212467121cf446202f5192bfdcf297d4180e3c3c50",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/shell/AdbPtyShellSession.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/shell/AdbShellPacket.kt",
+      "sha256": "7730860b623a04a50001b02069898e9b3656e88fb72260d20468d81c1f5c6219",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/shell/AdbShellPacket.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/shell/AdbShellPacketV2.kt",
+      "sha256": "acb2427a6f4dfafb7d1de8f47a814980284d3c82bbb32ca101cf0a5ee1743da5",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/shell/AdbShellPacketV2.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/shell/AdbShellResponse.kt",
+      "sha256": "3d007d6171d5295ab19a71c82f7fcd8635964a6524df40c999a134e93dc1c4a9",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/shell/AdbShellResponse.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/shell/AdbShellStream.kt",
+      "sha256": "827bcdac25d3fa74ba11ea5f059491c9fd3a7ba9d12ea1aa7fc7475f94639acf",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/shell/AdbShellStream.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/stream/AdbStream.kt",
+      "sha256": "e77f61b5dbb71fe17aede0c7c6cd027bdb33a7a8ffdbe239a481d4fa35ddfc32",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/stream/AdbStream.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/stream/AdbSyncModels.kt",
+      "sha256": "1c4172d448c773c7c82f4e664d5c0a943eea11a779123fd51c8f8809ab36bc8d",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/stream/AdbSyncModels.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/stream/AdbSyncStream.kt",
+      "sha256": "7659527a96572073b14a88e94d70451ebdcf49842fc342f7cff366a4b16f55ec",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/stream/AdbSyncStream.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/tls/TlsErrorMapper.kt",
+      "sha256": "34c122379c2cdab2b270c01d3a298ad8d0b4d7611ad231c405f900d2a8b37e24",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/tls/TlsErrorMapper.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/transport/OkioAdapters.kt",
+      "sha256": "3aa09bb11a5150948c3bb15152be36930ac728642267d0e22ce71bbb40e6e2d2",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/transport/OkioAdapters.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/transport/TlsNioChannel.kt",
+      "sha256": "34b4540682f3519660bf17dbe0dde4fcf48f17d10a867a5e196d0ae5014fe2a6",
+      "disposition": "platform-binding-or-replaced-TLS"
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/transport/TransportChannel.kt",
+      "sha256": "2526cafeb07436170cb64d0dfe61d9d7fa60042c6ad4902a4739c4cec05c2d65",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/transport/TransportChannel.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/transport/TransportFactory.kt",
+      "sha256": "5ee6f9dd1e02240e1b7b1e44b7773cfb65f8a82ef118ce0f254daf52ed8cf82d",
+      "disposition": "platform-binding-or-replaced-TLS"
+    },
+    {
+      "source": "kadb/src/commonMain/kotlin/com/flyfishxu/kadb/transport/UsbPacketChannel.kt",
+      "sha256": "bda17e5ff51a9acf7534b4a179a97c1305cf6d2d21423b9294d0d811c3173d9c",
+      "path": "src/main/kotlin/com/flyfishxu/kadb/transport/UsbPacketChannel.kt",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonTest/kotlin/com/flyfishxu/kadb/KadbConnectionLifecycleTest.kt",
+      "path": "src/test/kotlin/com/flyfishxu/kadb/KadbConnectionLifecycleTest.kt",
+      "sha256": "82dbead378fad33d61976b121a62dfd9996f828c13ea3e4d11b41bf024946536",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonTest/kotlin/com/flyfishxu/kadb/KadbTransportFailureTest.kt",
+      "path": "src/test/kotlin/com/flyfishxu/kadb/KadbTransportFailureTest.kt",
+      "sha256": "f3979893fc20ba4a7b19c478996085fe9229125f3678ee159cd7cc22bbb05726",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonTest/kotlin/com/flyfishxu/kadb/transport/UsbHandshakeTest.kt",
+      "path": "src/test/kotlin/com/flyfishxu/kadb/transport/UsbHandshakeTest.kt",
+      "sha256": "287f2b51a6be3936bf14def3831bdc63a5f9b3d0592044e129e93e6bee400ddb",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonTest/kotlin/com/flyfishxu/kadb/transport/UsbPacketChannelTest.kt",
+      "path": "src/test/kotlin/com/flyfishxu/kadb/transport/UsbPacketChannelTest.kt",
+      "sha256": "4cdf31d9b44e6151abf3fee4a48a1c2cd155061c511782e6591d7b5772d6f5be",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonTest/kotlin/com/flyfishxu/kadb/queue/AdbMessageQueueTest.kt",
+      "path": "src/test/kotlin/com/flyfishxu/kadb/queue/AdbMessageQueueTest.kt",
+      "sha256": "9935c06d8884571da717118f00d3fefd2cac3dff1bbf951af80a491986ff19d2",
+      "androidBindingAdapted": false
+    },
+    {
+      "source": "kadb/src/commonTest/kotlin/com/flyfishxu/kadb/stream/AdbStreamTransferTest.kt",
+      "path": "src/test/kotlin/com/flyfishxu/kadb/stream/AdbStreamTransferTest.kt",
+      "sha256": "4f68afa551d5a52f7a6c99f8b1527a0c5b1e2d2861e93152d107093961f761e7",
+      "androidBindingAdapted": false
+    }
+  ]
+}

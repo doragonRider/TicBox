@@ -1,0 +1,65 @@
+# Pinned stable releases; upgrade them in their own commits.
+[versions]
+agp = "9.5.1"
+kotlin = "2.4.21"
+coroutines = "1.11.0"
+junit = "6.1.3"
+compose-bom = "2026.09.00"
+activity-compose = "1.13.0"
+wear-compose = "1.7.1"
+lifecycle = "2.11.0"
+serialization-json = "1.12.0"
+play-services-wearable = "20.0.1"
+androidx-annotation = "1.11.0"
+
+navigation = "2.10.2"
+navigationevent = "1.2.0"
+spotless = "8.11.0"
+ktfmt = "0.64"
+robolectric = "4.17"
+junit4 = "4.13.2"
+
+[libraries]
+coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-engine = { module = "org.junit.jupiter:junit-jupiter-engine" }
+junit-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
+navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigation" }
+navigationevent-compose = { module = "androidx.navigationevent:navigationevent-compose", version.ref = "navigationevent" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+junit4 = { module = "junit:junit", version.ref = "junit4" }
+junit-vintage = { module = "org.junit.vintage:junit-vintage-engine" }
+compose-ui-test = { module = "androidx.compose.ui:ui-test-junit4" }
+compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
+compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+compose-tooling = { module = "androidx.compose.ui:ui-tooling" }
+activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity-compose" }
+wear-compose-foundation = { module = "androidx.wear.compose:compose-foundation", version.ref = "wear-compose" }
+wear-compose-material3 = { module = "androidx.wear.compose:compose-material3", version.ref = "wear-compose" }
+lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
+lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization-json" }
+play-services-wearable = { module = "com.google.android.gms:play-services-wearable", version.ref = "play-services-wearable" }
+androidx-annotation = { module = "androidx.annotation:annotation", version.ref = "androidx-annotation" }
+# Preserve Kadb 2.1.5's runtime dependencies in the local Android TLS transport fork.
+kadb-okio = { module = "com.squareup.okio:okio", version = "3.18.2" }
+kadb-bcprov = { module = "org.bouncycastle:bcprov-jdk18on", version = "1.86" }
+kadb-bcpkix = { module = "org.bouncycastle:bcpkix-jdk18on", version = "1.86" }
+kadb-spake2 = { module = "com.github.Flyfish233:spake2-java", version = "1.1.1" }
+termlib = { module = "org.connectbot:termlib", version = "0.3.14" }
+kadb-documentfile = { module = "androidx.documentfile:documentfile", version = "1.1.0" }
+kadb-hiddenapi = { module = "org.lsposed.hiddenapibypass:hiddenapibypass", version = "6.1" }
+# Host-only TLS fixture for the Kadb transport tests.
+kadb-conscrypt-fixture = { module = "org.conscrypt:conscrypt-openjdk-uber", version = "2.6.2" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }

@@ -1,0 +1,9 @@
+<resources>
+    <string name="find_watch_title">Find watch</string>
+    <string name="find_watch_preparing">Starting ringtone and vibration…</string>
+    <string name="find_watch_ringing">Your phone is looking for this watch. The ringtone is playing.</string>
+    <string name="find_watch_vibrating">Your phone is looking for this watch. It\'s vibrating, but the ringtone may be unavailable.</string>
+    <string name="find_watch_failed">Ringtone and vibration couldn\'t start. You can close this page.</string>
+    <string name="find_watch_invalid_request">This find request is incomplete. Try again on your phone.</string>
+    <string name="find_watch_stop">Stop</string>
+</resources>

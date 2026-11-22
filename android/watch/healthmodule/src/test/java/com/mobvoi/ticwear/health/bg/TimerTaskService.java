@@ -1,0 +1,1 @@
+package com.mobvoi.ticwear.health.bg;import android.content.Context;import dev.ticbox.companion.healthmodule.TestOem;public final class TimerTaskService{public static void a(Context c){TestOem.calls.add("timer_refresh");}}

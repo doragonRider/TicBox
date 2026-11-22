@@ -1,0 +1,9 @@
+scrcpy server 4.1 + TicBox request-keyframe-v1 and prefer-cbr-v1 extensions
+Copyright (C) 2018 Genymobile; local extension by TicBox contributors
+Upstream source: https://github.com/Genymobile/scrcpy/tree/2926c06c5dc3064ae6d8db706f1a98a37cfcf3f0
+Source, patch and reproducible offline build: android/thirdparty/scrcpy-server/ and tools/build-scrcpy-server.mjs
+Extension: negotiated empty control opcode 127 requests MediaCodec PARAMETER_KEY_REQUEST_SYNC_FRAME without restarting capture.
+Rate control: optional video_prefer_cbr checks the actual selected encoder capability before requesting constant bitrate; no wire framing change.
+Diagnostics: optional video_diagnostics emits bounded capability/format and source-output metadata through the owned console descriptor; disabled with frame statistics off.
+SHA-256: f5ae23cb377fc366950e549b01789c5370b45a1982359af12190807f170bf5fb
+Licensed under Apache License 2.0; see SCRCPY-LICENSE. This is a locally built derivative, not the unchanged upstream Release binary.

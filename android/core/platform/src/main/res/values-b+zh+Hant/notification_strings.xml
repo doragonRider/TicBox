@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="watch_notification_listener">TicBox 通知同步</string>
+    <string name="service_channel_name">手錶連線</string>
+    <string name="service_waiting_bluetooth">正在等待藍牙</string>
+    <string name="service_permission_required">需要藍牙權限</string>
+    <string name="service_pairing_attention">手錶配對需要處理</string>
+    <string name="service_preparing">正在準備手錶連線</string>
+    <string name="service_connecting">正在連線手錶</string>
+    <string name="service_connected">手錶已連線</string>
+    <string name="service_reconnecting">正在重新連線手錶</string>
+    <string name="service_attention">手錶連線需要處理</string>
+    <string name="service_find_phone_ringing">尋找手機正在響鈴</string>
+    <string name="service_action_stop_ringing">停止響鈴</string>
+</resources>

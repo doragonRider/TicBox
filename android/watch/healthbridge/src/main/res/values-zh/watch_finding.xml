@@ -1,0 +1,9 @@
+<resources>
+    <string name="find_watch_title">查找手表</string>
+    <string name="find_watch_preparing">正在启动铃声与振动…</string>
+    <string name="find_watch_ringing">手机正在查找此手表。铃声已开始播放。</string>
+    <string name="find_watch_vibrating">手机正在查找此手表。已开启振动，铃声可能不可用。</string>
+    <string name="find_watch_failed">铃声和振动未能启动，可关闭此界面。</string>
+    <string name="find_watch_invalid_request">查找手表请求不完整，请在手机上重试。</string>
+    <string name="find_watch_stop">停止</string>
+</resources>

@@ -1,0 +1,26 @@
+{
+  "identity": {
+    "schema": "ticbox-scrcpy-server/v1",
+    "upstreamCommit": "2926c06c5dc3064ae6d8db706f1a98a37cfcf3f0",
+    "extension": "request-keyframe-v1",
+    "videoRateControl": "prefer-cbr-dynamic-bitrate-v2",
+    "encoderDiagnostics": "format-output-input-vendor-v4",
+    "glInput": "paced-flush-copies-v3",
+    "controlOpcode": 127,
+    "bitRateOpcode": 126,
+    "scrcpyVersion": "4.1",
+    "sourceArchiveSha256": "0747390e98e18c008caf710a81d0e9a2e364f90aefcb9c01369f53eb5a39641f",
+    "patchSha256": "1edd1307a5e0183c9222cd98139c45668ef701b88bffc2aca1920a01dcdd4232",
+    "tools": {
+      "languageRelease": 8,
+      "minApi": 21,
+      "androidPlatform": "android-37.2",
+      "buildTools": "37.0.0",
+      "androidJarSha256": "2507cf762abe2171a8cb3c289837fc71f2e66e598f396f1cc10bb7dc10020329",
+      "frameworkAidlSha256": "83f59c5a5e307f2e00954712157fd6bc4ec6ecbf38596467253d8c3d3d385588",
+      "d8JarSha256": "a26ee56252adcff6752c379ae255a0ad538ebec60189e078ec6855487107637d"
+    }
+  },
+  "bytes": 248659,
+  "sha256": "f5ae23cb377fc366950e549b01789c5370b45a1982359af12190807f170bf5fb"
+}

@@ -1,0 +1,29 @@
+<resources>
+    <string name="phone_transfer_title">更换绑定的手机</string>
+    <string name="phone_transfer_intro">迁移在手表和新手机上完成，这部手机只负责开始和最后清理自己的记录。</string>
+    <string name="phone_transfer_warning">在手表彻底完成与新手机的配对之前，不要解除与这部手机的配对，也不要在系统蓝牙设置里忘记手表，否则可能导致迁移失败，或这部手机的蓝牙记录无法清除。</string>
+    <string name="phone_transfer_disconnected">手表未连接。前两步需要手表连接这部手机。</string>
+    <string name="phone_transfer_step_check">先检查手表</string>
+    <string name="phone_transfer_step_check_body">读取手表的服务版本，与本应用验证过的版本对比，不会改动手表。</string>
+    <string name="unpair_check_support">检查手表支持情况</string>
+    <string name="unpair_support_observed">手表是已验证的版本</string>
+    <string name="unpair_unsupported">手表不是已验证的版本</string>
+    <string name="phone_transfer_unsupported">Wear OS 3.5 不支持保留数据迁移手机。</string>
+    <string name="unpair_check_interrupted">检查期间手表连接发生变化，请等连接稳定后重新检查。</string>
+    <string name="unpair_check_timed_out">未及时收到表端服务版本，请稍后重试。</string>
+    <string name="unpair_check_version_unavailable">未能读取表端服务版本，请稍后重试。</string>
+    <string name="phone_transfer_step_transfer">在手表和新手机上完成迁移</string>
+    <string name="phone_transfer_step_transfer_body">打开迁移流程后，在手表和新手机上完成全部操作，包括确认配对码。完成后确认手表回到表盘、新手机连接稳定、健康同步恢复。</string>
+    <string name="watch_transfer_action">在手表上打开迁移流程</string>
+    <string name="watch_transfer_opened">已在手表上打开迁移流程，请在手表和新手机上完成整个迁移。</string>
+    <string name="phone_transfer_step_clear">迁移完成后清理这部手机</string>
+    <string name="phone_transfer_step_clear_body">手表结束与这部手机的关联后，这部手机会停止重连，但蓝牙记录可能还在。可以在这里清除，不会向手表发送任何内容。</string>
+    <string name="phone_transfer_clear_action">清除这部手机的配对记录</string>
+    <string name="phone_transfer_clear_linked">手表还连接着这部手机，迁移可能还没有完成。连接结束后才能清除。</string>
+    <string name="phone_transfer_association_ended">手表已结束与这部手机的关联，现在可以清除配对记录。</string>
+    <string name="phone_transfer_clear_confirm_offline">手表现在没有连接这部手机，不会向手表发送任何内容。继续会停止重连，并清除这部手机的蓝牙配对和关联记录，这部手机上的健康记录会保留。\n\n请确认手表已彻底完成与新手机的配对，否则可能导致迁移失败。</string>
+    <string name="phone_transfer_clear_confirm_ended">手表已结束与这部手机的关联。继续会停止重连，并清除这部手机的蓝牙配对和关联记录。不会向手表发送任何内容，这部手机上的健康记录会保留。</string>
+    <string name="phone_transfer_cleared">已清除这部手机的配对记录。</string>
+    <string name="phone_transfer_clear_refused">没有清除这部手机的配对记录。手表可能又连接上了，请稍后再试。</string>
+    <string name="unpair_local_cleanup_failed">本机清理尚未完成。请在系统蓝牙设置中忘记这块手表，并在重新配对前确认手表状态。</string>
+</resources>

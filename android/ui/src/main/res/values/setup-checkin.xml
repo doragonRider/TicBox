@@ -1,0 +1,9 @@
+<resources>
+    <string name="setup_checkin_option_title">Try Google device check-in (optional)</string>
+    <string name="setup_checkin_option_body">Skipped by default. Checking may use the watch\'s internet connection for Google device registration. You can skip the check at any time and continue local setup.</string>
+    <string name="setup_checkin_action_title">Google device check-in</string>
+    <string name="setup_checkin_step">Google device check-in</string>
+    <string name="setup_checkin_wait_body">Checking the watch\'s Google device registration status. You can skip this check now without waiting for a response.</string>
+    <string name="setup_checkin_failed_body">Google device check-in has not been confirmed. Retry, or skip this check and continue local setup.</string>
+    <string name="setup_checkin_skip">Skip this check</string>
+</resources>

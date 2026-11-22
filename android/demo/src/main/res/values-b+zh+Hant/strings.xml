@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="demo_watch_name">示範手錶</string>
+    <string name="demo_watch_model">TicWatch Pro 5 Enduro（示範）</string>
+    <string name="demo_face_essential">日常</string>
+    <string name="demo_face_sport">運動</string>
+    <string name="demo_face_daylight">晴空</string>
+    <string name="demo_face_field">原野</string>
+    <string name="demo_media_app">示範播放器</string>
+    <string name="demo_media_title">晨間散步</string>
+    <string name="demo_media_artist">範例演出者</string>
+    <string name="demo_app_weather">天氣</string>
+    <string name="demo_app_timer">計時器</string>
+    <string name="demo_app_compass">指南針</string>
+    <string name="demo_face_photo">相片</string>
+    <string name="demo_account_nickname">示範使用者</string>
+    <string name="demo_audio_earpiece">聽筒</string>
+    <string name="demo_audio_speaker">揚聲器</string>
+    <string name="demo_sos_contact">陳思遠</string>
+</resources>

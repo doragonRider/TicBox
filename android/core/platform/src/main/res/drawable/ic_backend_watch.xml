@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The launcher icon's watch, redrawn for the status bar: round face, straps, crown and hands at
+     ten past ten. Straps end inside the ring so they don't show through the open face. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M8.7,3.24Q8.7,2.3 9.64,2.3H13.36Q14.3,2.3 14.3,3.24L14.94,6.2H8.06Z M8.06,17.8H14.94L14.3,20.76Q14.3,21.7 13.36,21.7H9.64Q8.7,21.7 8.7,20.76Z M18.6,10.4H19.4Q20.2,10.4 20.2,11.2V12.8Q20.2,13.6 19.4,13.6H18.6Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M11.5,4.5a7.5,7.5 0,1 1,0 15a7.5,7.5 0,0 1,0 -15 M11.5,6.4a5.6,5.6 0,1 0,0 11.2a5.6,5.6 0,0 0,0 -11.2" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.9"
+        android:strokeLineCap="round"
+        android:pathData="M11.5,12.3L8.5,10.4" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M11.5,12.3L14.6,9.45" />
+</vector>

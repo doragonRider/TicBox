@@ -1,0 +1,22 @@
+# Third-party packages and local analysis output stay out of the repository.
+*.apk
+*.apkm
+*.apks
+*.xapk
+artifacts/
+results/
+node_modules/
+
+# Android local configuration, build output and signing material.
+.gradle/
+.kotlin/
+**/build/
+**/local.properties
+*.jks
+*.keystore
+
+# Per-worktree machine configuration and agent notes.
+/.agent-local/
+
+# Each machine's own build command (see docs/dev/building.md).
+/build.sh

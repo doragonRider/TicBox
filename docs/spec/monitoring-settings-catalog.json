@@ -1,0 +1,524 @@
+{
+  "schema": "ticbox-monitoring-settings-v1",
+  "scope": "Official settings for TicHealth 5.5.0-3292.2931 and 5.6.0-3234.2686, from static analysis. Defaults marked device_dependent_default come from the watch model and firmware features.",
+  "provider": {
+    "authority": "com.mobvoi.health.provider.settings",
+    "permission": "com.mobvoi.ticwear.permission.HEALTH",
+    "permission_protection": "signatureOrSystem",
+    "uri": "content://com.mobvoi.health.provider.settings/{table}/{name}",
+    "methods": [
+      "get",
+      "put",
+      "remove"
+    ],
+    "arg": null,
+    "extras": {
+      "table": "String",
+      "name": "String",
+      "value": "String (put only)"
+    },
+    "get_result": {
+      "value": "String|null"
+    },
+    "put_result": {
+      "value": "old String|null"
+    },
+    "storage": "SharedPreferences settings_<table>, String values",
+    "notify_change": "caller, after status=true and old value differs; provider does not notify"
+  },
+  "provider_settings": [
+    {
+      "id": "BACKGROUND_HEART_RATE",
+      "table": "app_ctrl",
+      "name": "background_hrm",
+      "type": "boolean-string",
+      "default": null,
+      "device_dependent_default": true
+    },
+    {
+      "id": "BACKGROUND_HEART_RATE_MODE",
+      "table": "app_ctrl",
+      "name": "background_hrm_mode",
+      "type": "integer-string",
+      "default": 0,
+      "choices": [
+        0,
+        1
+      ],
+      "choice_meanings": [
+        "common",
+        "real_time"
+      ],
+      "mcu_period_seconds": [
+        600,
+        1
+      ]
+    },
+    {
+      "id": "BLOOD_OXYGEN",
+      "table": "app_ctrl",
+      "name": "auto_detect_blood_oxygen",
+      "type": "boolean-string",
+      "default": null,
+      "device_dependent_default": true,
+      "mcu_daytime_enabled_period_seconds": 3600
+    },
+    {
+      "id": "PRESSURE",
+      "table": "app_ctrl",
+      "name": "auto_detect_pressure",
+      "type": "boolean-string",
+      "default": false,
+      "mcu_enabled_period_seconds": 1800
+    },
+    {
+      "id": "BODY_MIND",
+      "table": "app_ctrl",
+      "name": "auto_detect_body_mind_state",
+      "type": "boolean-string",
+      "default": false,
+      "consumer_coverage": "incomplete"
+    },
+    {
+      "id": "HEART_HEALTH",
+      "table": "app_ctrl",
+      "name": "auto_detect_heart_health",
+      "type": "boolean-string",
+      "default": false
+    },
+    {
+      "id": "SLEEP",
+      "table": "app_ctrl",
+      "name": "auto_detect_sleep",
+      "type": "boolean-string",
+      "default": true,
+      "feature_gate": "flags_feature/auto_motion",
+      "post_write": [
+        "recompute_auto_motion"
+      ]
+    },
+    {
+      "id": "AUTO_EXERCISE",
+      "table": "app_ctrl",
+      "name": "auto_detect_fitness",
+      "type": "boolean-string",
+      "default": null,
+      "device_dependent_default": true,
+      "feature_gate": "flags_feature/auto_motion",
+      "post_write": [
+        "recompute_auto_motion"
+      ]
+    },
+    {
+      "id": "RESPIRATION",
+      "table": "app_ctrl",
+      "name": "detect_respiration_rate",
+      "type": "boolean-string",
+      "default": true,
+      "mcu_enabled_period_seconds": 1200
+    },
+    {
+      "id": "TEMPERATURE",
+      "table": "app_ctrl",
+      "name": "detect_temperature",
+      "type": "boolean-string",
+      "default": true,
+      "mcu_enabled_period_seconds": 600
+    },
+    {
+      "id": "REST_HEART_RATE_ALERT",
+      "table": "app_ctrl",
+      "name": "rest_hrm_warning",
+      "type": "boolean-string",
+      "default": false,
+      "oem_enable_prerequisites": {
+        "background_hrm": "true",
+        "background_hrm_mode": "1"
+      },
+      "post_write": [
+        "recompute_auto_motion"
+      ]
+    },
+    {
+      "id": "REST_HEART_RATE_LOWER",
+      "table": "app_ctrl",
+      "name": "rest_hrm_warning_lower",
+      "type": "integer-string",
+      "default": 60,
+      "ui55_range": {
+        "minimum": 40,
+        "maximum": 60,
+        "step": 5
+      },
+      "unit": "bpm",
+      "ui56": "removed",
+      "consumer": "mcu379"
+    },
+    {
+      "id": "REST_HEART_RATE_UPPER",
+      "table": "app_ctrl",
+      "name": "rest_hrm_warning_upper",
+      "type": "integer-string",
+      "default": 100,
+      "ui55_range": {
+        "minimum": 100,
+        "maximum": 150,
+        "step": 10
+      },
+      "unit": "bpm",
+      "ui56": "removed",
+      "consumer": "mcu379"
+    },
+    {
+      "id": "EXERCISE_HEART_RATE_ALERT",
+      "table": "app_ctrl",
+      "name": "fitness_hrm_warning",
+      "type": "boolean-string",
+      "default": false
+    },
+    {
+      "id": "SLEEP_BLOOD_OXYGEN_INTERVAL",
+      "table": "app_ctrl",
+      "name": "sleep_detect_blood_oxygen_frequency",
+      "type": "integer-string",
+      "default": 3600,
+      "choices": [
+        3600,
+        1800,
+        60
+      ],
+      "unit": "seconds",
+      "resource56": "array/sleep_blood_oxygen_frequency"
+    },
+    {
+      "id": "TEMPERATURE_UNIT",
+      "table": "app_ctrl",
+      "name": "detect_sleep_temperature_unit",
+      "type": "string",
+      "default_by_version": {
+        "tichealth56": "0",
+        "tichealth55": "depends-on-companion-temperature"
+      },
+      "choices": [
+        "0",
+        "1"
+      ],
+      "choice_meanings": [
+        "celsius",
+        "fahrenheit"
+      ]
+    },
+    {
+      "id": "STEP_COUNTING",
+      "table": "app_ctrl",
+      "name": "step_pedometer",
+      "type": "boolean-string",
+      "default": true,
+      "other_oem_setter_effects": [
+        "reset-step-motion-state",
+        "notify-step-provider"
+      ],
+      "oem_reset": {
+        "store": "healthy",
+        "values": {
+          "last_step": 0,
+          "last_step_time": 0,
+          "last_motion_type": "MotionType.Unknown.typeCode",
+          "last_motion_time": 0,
+          "last_freq_distance": 0
+        }
+      }
+    }
+  ],
+  "derived_settings": [
+    {
+      "table": "app_ctrl",
+      "name": "auto_motion",
+      "type": "boolean-string",
+      "user_writable": false,
+      "expression": "effective(auto_detect_fitness) || effective(auto_detect_sleep) || rest_hrm_warning"
+    }
+  ],
+  "private_settings": [
+    {
+      "name": "alert_sit_long",
+      "store": "healthy",
+      "type": "boolean",
+      "default": true,
+      "oem_effect": "TimerTaskService start when enabled",
+      "external_xml_write_is_realtime": false,
+      "fixed_policy": {
+        "scheduled_minute_of_hour": 48,
+        "deadline_minutes": 4,
+        "step_threshold_across_two_half_hour_bins": 100,
+        "mutable_frequency": false,
+        "additional_gates": [
+          "step monitoring enabled",
+          "data_step consent",
+          "not in health reminder quiet period",
+          "not charging/off-wrist/moving",
+          "activity goal not yet reached",
+          "not disabled today"
+        ]
+      },
+      "id": "SEDENTARY_REMINDER"
+    },
+    {
+      "name": "alert_step_enable_when_80",
+      "store": "healthy",
+      "type": "boolean",
+      "default": true,
+      "external_xml_write_is_realtime": false,
+      "fixed_policy": {
+        "minimum": "floor(step goal * 0.8)",
+        "maximum_exclusive": "step goal",
+        "once_per_day": true,
+        "mutable_percentage": false
+      },
+      "id": "STEP_GOAL_APPROACH_REMINDER"
+    },
+    {
+      "name": "alert_health_time_done",
+      "store": "healthy",
+      "type": "boolean",
+      "default": true,
+      "external_xml_write_is_realtime": false,
+      "id": "DAILY_GOALS_REMINDER"
+    },
+    {
+      "name": "health_not_disturb_start_new",
+      "store": "healthy",
+      "type": "string",
+      "default": "22:00",
+      "format": "HH:mm",
+      "external_xml_write_is_realtime": false,
+      "id": "HEALTH_QUIET_START"
+    },
+    {
+      "name": "health_not_disturb_end_new",
+      "store": "healthy",
+      "type": "string",
+      "default": "08:00",
+      "format": "HH:mm",
+      "external_xml_write_is_realtime": false,
+      "id": "HEALTH_QUIET_END"
+    },
+    {
+      "name": "sleep_notification",
+      "store": "sleep_settings",
+      "type": "boolean",
+      "default": false,
+      "oem_effect": "reschedule-bedtime-notification-alarm",
+      "external_xml_write_is_realtime": false,
+      "id": "SLEEP_BEDTIME_REMINDER"
+    },
+    {
+      "name": "sleep_complete_notification",
+      "store": "sleep_settings",
+      "type": "boolean",
+      "default": false,
+      "external_xml_write_is_realtime": false,
+      "id": "SLEEP_COMPLETE_REMINDER"
+    },
+    {
+      "name": "sleep_alarm",
+      "type": "boolean",
+      "default": false,
+      "oem_effects": [
+        "AlarmUtils.c: cancel/rebuild exact wake alarm",
+        "LocalBroadcastManager sleep-alarm-to-MCU",
+        "reschedule bedtime notification"
+      ],
+      "store": "sleep_settings",
+      "external_xml_write_is_realtime": false,
+      "id": "SLEEP_WAKE_ALARM"
+    },
+    {
+      "name": "smart_awake",
+      "type": "string",
+      "default": "0",
+      "choices": [
+        "0",
+        "15",
+        "30",
+        "45",
+        "60"
+      ],
+      "unit": "minutes",
+      "oem_effects": [
+        "AlarmUtils.c",
+        "SleepService awake/rem detection within configured window"
+      ],
+      "store": "sleep_settings",
+      "external_xml_write_is_realtime": false,
+      "id": "SLEEP_SMART_AWAKE_MINUTES"
+    },
+    {
+      "name": "vibration_mode",
+      "type": "string",
+      "default_by_version": {
+        "tichealth56": "once",
+        "tichealth55": "always"
+      },
+      "choices": [
+        "never",
+        "once",
+        "always"
+      ],
+      "store": "sleep_settings",
+      "external_xml_write_is_realtime": false,
+      "id": "SLEEP_ALARM_VIBRATION"
+    },
+    {
+      "name": "sound_switch",
+      "type": "boolean",
+      "default": true,
+      "store": "sleep_settings",
+      "external_xml_write_is_realtime": false,
+      "id": "SLEEP_ALARM_SOUND"
+    },
+    {
+      "name": "sleep_time",
+      "type": "string",
+      "default": "23:00",
+      "format": "HH:mm",
+      "oem_effects": [
+        "validate against getup_time and enabled exclusion period",
+        "DB expected sleep point",
+        "week_of_year metadata",
+        "sleep_target derived minutes",
+        "AlarmUtils.c"
+      ],
+      "store": "sleep_settings",
+      "external_xml_write_is_realtime": false,
+      "id": "SLEEP_EXPECTED_BEDTIME"
+    },
+    {
+      "name": "getup_time",
+      "type": "string",
+      "default": "08:00",
+      "format": "HH:mm",
+      "oem_effects": [
+        "validate against sleep_time and enabled exclusion period",
+        "DB expected wake point",
+        "week_of_year metadata",
+        "sleep_target derived minutes",
+        "AlarmUtils.c"
+      ],
+      "store": "sleep_settings",
+      "external_xml_write_is_realtime": false,
+      "id": "SLEEP_EXPECTED_WAKE_TIME"
+    },
+    {
+      "name": "exclusion_time_open_status",
+      "type": "boolean",
+      "default": false,
+      "validation": "must not overlap expected sleep period",
+      "store": "sleep_settings",
+      "external_xml_write_is_realtime": false,
+      "id": "SLEEP_EXCLUSION_ENABLED"
+    },
+    {
+      "name": "exclusion_start_time",
+      "type": "string",
+      "default": "10:00",
+      "format": "HH:mm",
+      "oem_effects": [
+        "validate against expected sleep period when enabled",
+        "exclusion_time_target derived minutes"
+      ],
+      "store": "sleep_settings",
+      "external_xml_write_is_realtime": false,
+      "id": "SLEEP_EXCLUSION_START"
+    },
+    {
+      "name": "exclusion_end_time",
+      "type": "string",
+      "default": "17:00",
+      "format": "HH:mm",
+      "oem_effects": [
+        "validate against expected sleep period when enabled",
+        "exclusion_time_target derived minutes"
+      ],
+      "store": "sleep_settings",
+      "external_xml_write_is_realtime": false,
+      "id": "SLEEP_EXCLUSION_END"
+    }
+  ],
+  "database_settings": [
+    {
+      "id": "EXERCISE_HEART_RATE_UPPER",
+      "name": "heart_rate_warning_fitness_upper_limit",
+      "type": "integer",
+      "data_type": 16,
+      "unit": "bpm",
+      "ui_range": {
+        "minimum": 100,
+        "maximum": 220
+      },
+      "default": null,
+      "device_dependent_default": true,
+      "oem_default_formula": "220-age(profile birthday); invalid age uses 25",
+      "uri": "content://com.mobvoi.health.db.provider/data_point",
+      "permission": "com.mobvoi.ticwear.permission.HEALTH",
+      "write_method": "ContentResolver.insert",
+      "write_mode": "new timestamped data point; do not overwrite existing record",
+      "content_values": {
+        "type": 16,
+        "time_from": "now millis",
+        "time_to": "same now millis",
+        "values": "float string of bpm value",
+        "wwid": "current OEM account or observed legitimate empty account",
+        "device_id": "current SharedWearInfo wear_device_id; reject illegal_device_id",
+        "synced": 0,
+        "deleted": 0
+      },
+      "identity_sources": {
+        "wear_device_id": "content://com.mobvoi.wear.provider.info/wear/wear_device_id",
+        "wwid_priority": [
+          "content://com.mobvoi.wear.provider.accountInfo/account/wwid",
+          "content://com.mobvoi.wear.provider.info/phone/wwid"
+        ],
+        "required_authority_owners": {
+          "com.mobvoi.health.db.provider": "com.mobvoi.wear.health.at",
+          "com.mobvoi.wear.provider.info": "com.mobvoi.wear.appsservice",
+          "com.mobvoi.wear.provider.accountInfo": "com.mobvoi.wear.account.aw"
+        },
+        "empty_account": "explicit empty string is legitimate; absent/null/error is unavailable"
+      },
+      "read_selection": "type=16 and time_to>=0 and time_to<now; restrict current nonempty wwid as stock readers do",
+      "read_order": "time_to DESC LIMIT 1",
+      "oem_effects": [
+        "Provider notifies data_point URI",
+        "Provider runs its per-type follow-up processing"
+      ],
+      "apply_boundary": "TicFitness copies toggle and threshold at prepareSports; active exercise session realtime reload is not observed",
+      "implementation": {
+        "class": "AgentFitnessHeartRateLimit",
+        "source": "android/watch/toolboxagent/src/main/kotlin/dev/ticbox/companion/toolboxagent/AgentFitnessHeartRateLimit.kt",
+        "tested": "9 Robolectric tests; no real-watch observation",
+        "readback_order": "time_to DESC, _id DESC LIMIT 1",
+        "same_millisecond_readback": "exclusive upper bound now+1"
+      }
+    }
+  ],
+  "limitations": [
+    "Static analysis does not observe sensor execution or MCU acceptance.",
+    "No healthy/Sleep preference XML mutation or OEM process restart is authorized as an implementation shortcut.",
+    "Unrecognized provider values remain observations, not inferred supported choices.",
+    "BODY_SENSORS, ACTIVITY_RECOGNITION and OEM GDPR grants are independent of stored monitoring toggles.",
+    "NoiseDetect application and its monitoring configuration are not present.",
+    "The optional in-process module covers the 16 private settings only for the two supported TicHealth builds. Writing the preference XML from outside the process (for example with root app_process) is not supported."
+  ],
+  "in_process_module": {
+    "protocol_version": 1,
+    "module_version_code": 1,
+    "socket": "abstract:ticbox-health-v1",
+    "allowed_client_uid": 0,
+    "frame": "4-byte big-endian length, 1..65536 UTF-8 bytes, flat settings request only",
+    "host_process": "com.mobvoi.wear.health.at main process",
+    "source_guard": "HealthApplication instance plus package, versionCode, versionName and full base APK SHA-256 (allowlist in HealthProfile.java)",
+    "execution": "main Handler serial queue; original asynchronous SleepWorker DB writes are followed by an ordered readback barrier; no OEM main-thread blocking",
+    "same_value_request": "explicit requests reapply safe side effects; SleepCycle probes Type33/34 before appending a needed repair; no automatic replay"
+  }
+}

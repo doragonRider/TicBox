@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- ADB's self-signed TLS certificates are not Web PKI certificates. Pairing is
+         authenticated by SPAKE2 plus TLS exporter binding, then adbd authenticates
+         our persisted host key. These two upstream managers are confined to Kadb;
+         they are never installed as the application's HTTPS default trust manager. -->
+    <issue id="TrustAllX509TrustManager">
+        <ignore path="**/kadb/jars/classes.jar" />
+        <ignore path="**/bcpkix-jdk18on/1.86/**/bcpkix-jdk18on-1.86.jar" />
+    </issue>
+    <!-- Keep the TLS comparison independent of unrelated upstream dependency updates. -->
+    <issue id="NewerVersionAvailable">
+        <ignore regexp="org\.lsposed\.hiddenapibypass:hiddenapibypass" />
+        <ignore regexp="org\.conscrypt:conscrypt-openjdk-uber" />
+    </issue>
+</lint>

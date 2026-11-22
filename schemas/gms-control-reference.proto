@@ -1,0 +1,109 @@
+syntax = "proto2";
+package ticbox.reference.gms_control;
+
+// Reference reconstruction, not Google's original .proto. Based on phone and watch
+// GMS 24.28.35; field names are descriptive.
+// This projection declares only the control-related WearMessage fields. Other
+// fields remain unknown fields here; merge with the transport/data reference
+// before using it as a complete schema. The outer fields are NOT a oneof.
+// The phone declares tags 11, 17 and 20; the watch also declares tag 19.
+message WearControlFields {
+  optional Heartbeat heartbeat = 11;
+  optional CryptoMessage crypto = 17;
+  // Watch-only iOS L2CAP pre-CONNECT authentication; absent on the phone.
+  optional IosAuthMessage ios_auth = 19;
+  optional ControlMessage control = 20;
+}
+
+// Genuinely zero declared fields. Conditional receipt confirmation,
+// not a sequence-number ACK or a periodic application-level keepalive request.
+message Heartbeat {}
+
+// A2A negotiation is gated by config.type == 3, whereas the Mobvoi
+// Pro 5 family Android path uses type 5. Names below are descriptive.
+message CryptoMessage {
+  // UKEY2 init/response/final and encrypted CONFIRM bytes.
+  optional bytes handshake_payload = 1;
+  // 32-byte session-resumption authentication value.
+  optional bytes resume_authenticator = 2;
+  // Only observed setter is true on the initial negotiation message. Full
+  // original field meaning and a peer-side reader of this boolean are unknown.
+  optional bool initial_negotiation_marker = 3;
+  // Closed validator accepts 0..2. Symbolic names here are descriptive:
+  // the sender uses wire 1 if a saved session exists, otherwise wire 2.
+  optional CryptoSessionMode session_mode = 4;
+}
+enum CryptoSessionMode {
+  CRYPTO_MODE_UNSPECIFIED = 0;
+  CRYPTO_MODE_SAVED_SESSION_AVAILABLE = 1;
+  CRYPTO_MODE_FRESH_SESSION = 2;
+}
+
+// The type numbers below are WIRE values (the generated helper enum is offset by one).
+message ControlMessage {
+  optional ControlType type = 1 [default = CONTROL_UNKNOWN];
+  optional AccountMatchingMessage account_matching = 2;
+}
+enum ControlType {
+  CONTROL_UNKNOWN = 0;
+  TERMINATE_ASSOCIATION = 1;
+  SUSPEND_SYNC = 2;
+  RESUME_SYNC = 3;
+  MIGRATION_FAILED = 4;
+  ACCOUNT_MATCHING = 5;
+  MIGRATION_CANCELLED = 6;
+}
+
+// The generated metadata uses an open enum representation with no
+// validator. int32 preserves unrecognized numeric operations in a proto2 schema.
+// Its known values are listed in AccountMatchingOperation for documentation.
+message AccountMatchingMessage {
+  optional int32 operation = 1 [default = 0];
+  repeated AccountMatchingRecord accounts = 2;
+  optional string error_message = 3;
+}
+enum AccountMatchingOperation {
+  ACCOUNT_OPERATION_UNSPECIFIED = 0;
+  GET_ACCOUNTS = 1;
+  ACCOUNTS_RESPONSE = 2;
+  REMOVE_ACCOUNTS = 3;
+  REMOVE_ACCOUNTS_CONFIRM = 4;
+  CANCEL = 5;
+  REMOTE_ERROR = 6;
+}
+// Field 2 is Account.name and field 1 to the
+// account ID fetched via the Google account API. These are not name/type pairs.
+message AccountMatchingRecord {
+  optional string account_id = 1;
+  optional string account_name = 2;
+}
+
+// This inner message DOES have a true protobuf oneof (case numbers 1..3).
+message IosAuthMessage {
+  oneof payload {
+    IosChallenge challenge = 1;
+    IosChallengeResponse response = 2;
+    IosAuthResult result = 3;
+  }
+}
+// The watch sends 256 bytes from SecureRandom before CONNECT.
+message IosChallenge {
+  optional bytes challenge = 1;
+}
+// Field names are inferred from how the watch uses them.
+message IosChallengeResponse {
+  optional string application_id = 1;
+  optional string key_identifier = 2;
+  optional bytes attestation = 3;
+  optional bytes assertion = 4;
+}
+// The validator accepts 0..3. Status labels are inferred from the actual send paths.
+message IosAuthResult {
+  optional IosAuthStatus status = 1;
+}
+enum IosAuthStatus {
+  IOS_AUTH_UNSPECIFIED = 0;
+  IOS_AUTH_FAILURE = 1;
+  IOS_AUTH_SUCCESS = 2;
+  IOS_AUTH_UNKNOWN_KEY = 3;
+}

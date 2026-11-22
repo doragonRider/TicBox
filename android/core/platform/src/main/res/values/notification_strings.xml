@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="watch_notification_listener">TicBox notification sync</string>
+    <string name="service_channel_name">Watch connection</string>
+    <string name="service_title" translatable="false">TicBox</string>
+    <string name="service_waiting_bluetooth">Waiting for Bluetooth</string>
+    <string name="service_permission_required">Bluetooth permission required</string>
+    <string name="service_pairing_attention">Watch pairing needs attention</string>
+    <string name="service_preparing">Preparing watch connection</string>
+    <string name="service_connecting">Connecting to watch</string>
+    <string name="service_connected">Watch connected</string>
+    <string name="service_reconnecting">Reconnecting to watch</string>
+    <string name="service_attention">Watch connection needs attention</string>
+    <string name="service_find_phone_ringing">Find phone is ringing</string>
+    <string name="service_action_stop_ringing">Stop ringing</string>
+</resources>

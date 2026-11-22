@@ -1,0 +1,1 @@
+package ja;import dev.ticbox.companion.healthmodule.TestOem;public final class d{public static boolean t(String a,String b,String c,String d){return TestOem.compatible(a,b,c,d);}public static int g(String a,String b){return TestOem.duration(a,b);}public static long h(String t){return TestOem.minutes(t)*60000L;}}

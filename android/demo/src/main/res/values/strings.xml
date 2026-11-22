@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="demo_watch_name">Demo watch</string>
+    <string name="demo_watch_model">TicWatch Pro 5 Enduro (demo)</string>
+    <string name="demo_face_essential">Essential</string>
+    <string name="demo_face_sport">Sport</string>
+    <string name="demo_face_daylight">Daylight</string>
+    <string name="demo_face_field">Field</string>
+    <string name="demo_media_app">Demo Player</string>
+    <string name="demo_media_title">Morning Walk</string>
+    <string name="demo_media_artist">Sample Artist</string>
+    <string name="demo_app_weather">Weather</string>
+    <string name="demo_app_timer">Timer</string>
+    <string name="demo_app_compass">Compass</string>
+    <string name="demo_face_photo">Photo</string>
+    <string name="demo_account_nickname">Demo user</string>
+    <string name="demo_audio_earpiece">Earpiece</string>
+    <string name="demo_audio_speaker">Speaker</string>
+    <string name="demo_sos_contact">Sam Rivera</string>
+</resources>

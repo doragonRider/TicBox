@@ -1,0 +1,4 @@
+<resources>
+    <string name="pairing_existing_bond_notice">重新配对会清理手机上这块手表已有的蓝牙配对记录。如果打开了系统蓝牙设置，请忘记所选手表后返回。手机已保存的健康记录会保留。</string>
+    <string name="pairing_phase_clearing_old_bond">正在清理旧蓝牙配对记录；如打开系统设置，请忘记这块手表后返回。</string>
+</resources>

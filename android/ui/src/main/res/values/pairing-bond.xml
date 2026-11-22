@@ -1,0 +1,4 @@
+<resources>
+    <string name="pairing_existing_bond_notice">Pairing again clears this watch’s old Bluetooth pairing on your phone. If Bluetooth settings opens, forget the selected watch there and return. Your phone’s saved health records are kept.</string>
+    <string name="pairing_phase_clearing_old_bond">Removing the old Bluetooth pairing. If system settings opens, forget this watch and return.</string>
+</resources>

@@ -1,0 +1,1322 @@
+--- a/server/src/main/java/com/genymobile/scrcpy/Options.java
++++ b/server/src/main/java/com/genymobile/scrcpy/Options.java
+@@ -34,6 +34,9 @@
+     private AudioSource audioSource = AudioSource.OUTPUT;
+     private boolean audioDup;
+     private int videoBitRate = 8000000;
++    private boolean videoPreferCbr;
++    private boolean videoDiagnostics;
++    private int videoTailRepeatUs;
+     private int audioBitRate = 128000;
+     private float maxFps;
+     private float angle;
+@@ -131,6 +134,18 @@
+         return audioDup;
+     }
+ 
++    public boolean getVideoDiagnostics() {
++        return videoDiagnostics;
++    }
++
++    public boolean getVideoPreferCbr() {
++        return videoPreferCbr;
++    }
++
++    public int getVideoTailRepeatUs() {
++        return videoTailRepeatUs;
++    }
++
+     public int getVideoBitRate() {
+         return videoBitRate;
+     }
+@@ -399,6 +414,19 @@
+                     }
+                     options.minSizeAlignment = align;
+                     break;
++                case "video_diagnostics":
++                    options.videoDiagnostics = Boolean.parseBoolean(value);
++                    break;
++                case "video_prefer_cbr":
++                    options.videoPreferCbr = Boolean.parseBoolean(value);
++                    break;
++                case "video_tail_repeat_us":
++                    int tailRepeat = Integer.parseInt(value);
++                    if (tailRepeat < 0 || tailRepeat > 1_000_000) {
++                        throw new IllegalArgumentException("video_tail_repeat_us (" + tailRepeat + ") must be between 0 and 1000000");
++                    }
++                    options.videoTailRepeatUs = tailRepeat;
++                    break;
+                 case "video_bit_rate":
+                     options.videoBitRate = Integer.parseInt(value);
+                     break;
+--- a/server/src/main/java/com/genymobile/scrcpy/control/ControlMessage.java
++++ b/server/src/main/java/com/genymobile/scrcpy/control/ControlMessage.java
+@@ -30,6 +30,10 @@
+     public static final int TYPE_CAMERA_ZOOM_OUT = 20;
+     public static final int TYPE_RESIZE_DISPLAY = 21;
+     public static final int TYPE_SCAN_FILE = 22;
++    // TicWatch extension v1: only sent after its explicit Agent capability is negotiated.
++    public static final int TYPE_REQUEST_KEYFRAME = 127;
++    // TicWatch extension v2: the owning Agent adapts the running encoder's target bit rate.
++    public static final int TYPE_SET_VIDEO_BIT_RATE = 126;
+ 
+     public static final long SEQUENCE_INVALID = 0;
+ 
+@@ -60,6 +64,7 @@
+     private int productId;
+     private int width;
+     private int height;
++    private int bitRate;
+ 
+     private ControlMessage() {
+     }
+@@ -188,6 +193,13 @@
+         return msg;
+     }
+ 
++    public static ControlMessage createSetVideoBitRate(int bitRate) {
++        ControlMessage msg = new ControlMessage();
++        msg.type = TYPE_SET_VIDEO_BIT_RATE;
++        msg.bitRate = bitRate;
++        return msg;
++    }
++
+     public static ControlMessage createScanFile(String path) {
+         ControlMessage msg = new ControlMessage();
+         msg.type = TYPE_SCAN_FILE;
+@@ -286,4 +298,8 @@
+     public int getHeight() {
+         return height;
+     }
++
++    public int getBitRate() {
++        return bitRate;
++    }
+ }
+--- a/server/src/main/java/com/genymobile/scrcpy/control/ControlMessageReader.java
++++ b/server/src/main/java/com/genymobile/scrcpy/control/ControlMessageReader.java
+@@ -47,6 +47,7 @@
+             case ControlMessage.TYPE_ROTATE_DEVICE:
+             case ControlMessage.TYPE_OPEN_HARD_KEYBOARD_SETTINGS:
+             case ControlMessage.TYPE_RESET_VIDEO:
++            case ControlMessage.TYPE_REQUEST_KEYFRAME:
+             case ControlMessage.TYPE_CAMERA_ZOOM_IN:
+             case ControlMessage.TYPE_CAMERA_ZOOM_OUT:
+                 return ControlMessage.createEmpty(type);
+@@ -64,6 +65,8 @@
+                 return parseResizeDisplay();
+             case ControlMessage.TYPE_SCAN_FILE:
+                 return parseScanFile();
++            case ControlMessage.TYPE_SET_VIDEO_BIT_RATE:
++                return parseSetVideoBitRate();
+             default:
+                 throw new ControlProtocolException("Unknown event type: " + type);
+         }
+@@ -144,6 +147,14 @@
+         return ControlMessage.createSetClipboard(sequence, text, paste);
+     }
+ 
++    private ControlMessage parseSetVideoBitRate() throws IOException {
++        int bitRate = dis.readInt();
++        if (bitRate <= 0) {
++            throw new ControlProtocolException("Invalid video bit rate: " + bitRate);
++        }
++        return ControlMessage.createSetVideoBitRate(bitRate);
++    }
++
+     private ControlMessage parseSetDisplayPower() throws IOException {
+         boolean on = dis.readBoolean();
+         return ControlMessage.createSetDisplayPower(on);
+--- a/server/src/main/java/com/genymobile/scrcpy/control/Controller.java
++++ b/server/src/main/java/com/genymobile/scrcpy/control/Controller.java
+@@ -337,6 +337,20 @@
+             case ControlMessage.TYPE_RESET_VIDEO:
+                 resetVideo();
+                 return true;
++            case ControlMessage.TYPE_REQUEST_KEYFRAME: {
++                CaptureControl activeControl = surfaceCapture == null ? null : surfaceCapture.getCaptureControl();
++                if (activeControl != null) {
++                    activeControl.requestKeyFrame();
++                }
++                return true;
++            }
++            case ControlMessage.TYPE_SET_VIDEO_BIT_RATE: {
++                CaptureControl activeControl = surfaceCapture == null ? null : surfaceCapture.getCaptureControl();
++                if (activeControl != null) {
++                    activeControl.setVideoBitRate(msg.getBitRate());
++                }
++                return true;
++            }
+             default:
+                 // fall through
+         }
+--- a/server/src/main/java/com/genymobile/scrcpy/opengl/OpenGLRunner.java
++++ b/server/src/main/java/com/genymobile/scrcpy/opengl/OpenGLRunner.java
+@@ -2,6 +2,7 @@
+ 
+ import com.genymobile.scrcpy.model.Size;
+ import com.genymobile.scrcpy.util.Threads;
++import com.genymobile.scrcpy.video.EncoderInputLog;
+ 
+ import android.graphics.SurfaceTexture;
+ import android.opengl.EGL14;
+@@ -13,6 +14,7 @@
+ import android.opengl.GLES11Ext;
+ import android.opengl.GLES20;
+ import android.os.Handler;
++import android.os.SystemClock;
+ import android.os.HandlerThread;
+ import android.view.Surface;
+ 
+@@ -37,9 +39,39 @@
+ 
+     private boolean stopped;
+ 
++    // Only the OpenGL handler thread reads or writes these, but for the input log.
++    private final TailRepeat tail;
++    private final PresentationGate gate;
++    private volatile EncoderInputLog inputLog;
++    private final Runnable repeatTail = this::repeatTail;
++    private final Runnable presentWaiting = this::presentWaiting;
++    // Run by the encoder thread once it has worked through its backlog
++    private final Runnable drained = () -> handler.post(presentWaiting);
++    private Size outputSize;
++    private float[] lastMatrix;
++    private long lastPresentationNanos;
++    // The texture holds a picture that hasn't gone into the encoder yet
++    private boolean waiting;
++    private long waitingTimestamp;
++
++    /**
++     * Paces what goes into the encoder itself: at most maxFps inputs a second, copies included (0 for
++     * no limit), no new picture while the encoder is backed up, and copies of the last picture once
++     * nothing moves while the encoder still holds one (tailRepeatUs apart, 0 for none). The
++     * framework's own frame rate limit must be off.
++     */
++    public OpenGLRunner(OpenGLFilter filter, float[] overrideTransformMatrix, long tailRepeatUs, float maxFps) {
++        this.filter = filter;
++        this.overrideTransformMatrix = overrideTransformMatrix;
++        this.tail = tailRepeatUs > 0 ? new TailRepeat(tailRepeatUs) : null;
++        this.gate = new PresentationGate(maxFps);
++    }
++
+     public OpenGLRunner(OpenGLFilter filter, float[] overrideTransformMatrix) {
+         this.filter = filter;
+         this.overrideTransformMatrix = overrideTransformMatrix;
++        this.tail = null;
++        this.gate = null;
+     }
+ 
+     public OpenGLRunner(OpenGLFilter filter) {
+@@ -90,6 +122,7 @@
+     }
+ 
+     private void run(Size inputSize, Size outputSize, Surface outputSurface) throws OpenGLException {
++        this.outputSize = outputSize;
+         eglDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY);
+         if (eglDisplay == EGL14.EGL_NO_DISPLAY) {
+             throw new OpenGLException("Unable to get EGL14 display");
+@@ -191,17 +224,133 @@
+             surfaceTexture.getTransformMatrix(matrix);
+         }
+ 
++        if (gate != null) {
++            // The texture keeps only the newest picture: one that waits is replaced, never queued
++            lastMatrix = matrix;
++            waiting = true;
++            waitingTimestamp = surfaceTexture.getTimestamp();
++            handler.removeCallbacks(repeatTail);
++            presentWaiting();
++            return;
++        }
++
+         filter.draw(textureId, matrix);
+ 
+-        EGLExt.eglPresentationTimeANDROID(eglDisplay, eglSurface, surfaceTexture.getTimestamp());
++        present(surfaceTexture.getTimestamp(), false, true);
++    }
++
++    /** Sends the waiting picture into the encoder once its turn has come and the encoder isn't backed up. */
++    private void presentWaiting() {
++        if (stopped || !waiting) {
++            return;
++        }
++        handler.removeCallbacks(presentWaiting);
++        long now = System.nanoTime();
++        EncoderInputLog log = inputLog;
++        boolean backedUp = log != null && log.backedUp(now);
++        long delay = gate.delay(now, backedUp);
++        if (delay > 0) {
++            if (backedUp) {
++                log.whenDrained(drained);
++            }
++            handler.postDelayed(presentWaiting, (delay + 999_999) / 1_000_000);
++            return;
++        }
++        waiting = false;
++        draw(lastMatrix);
++        // Timestamps must keep increasing even if a copy of the last picture went out just before.
++        present(Math.max(waitingTimestamp, lastPresentationNanos + 1_000), false, true);
++        gate.presented(now);
++        if (tail != null) {
++            schedule(tail.start());
++        }
++    }
++
++    private void draw(float[] matrix) {
++        GLES20.glViewport(0, 0, outputSize.getWidth(), outputSize.getHeight());
++        filter.draw(textureId, matrix);
++    }
++
++    /** awaited: the stream waits for this one to come out, as for a picture or a refresh. */
++    private void present(long presentationNanos, boolean copy, boolean awaited) {
++        lastPresentationNanos = presentationNanos;
++        EGLExt.eglPresentationTimeANDROID(eglDisplay, eglSurface, presentationNanos);
++        EncoderInputLog log = inputLog;
++        if (log != null) {
++            // Before the swap: the encoder may take the picture and give it back before this returns
++            log.submitted(presentationNanos, copy, awaited, System.nanoTime());
++        }
+         EGL14.eglSwapBuffers(eglDisplay, eglSurface);
+     }
+ 
++    /** Set before start(). */
++    public void setInputLog(EncoderInputLog inputLog) {
++        this.inputLog = inputLog;
++    }
++
++    private void schedule(long delayNanos) {
++        if (delayNanos >= 0) {
++            // Rounded up: a copy must never come before its time
++            handler.postAtTime(repeatTail, SystemClock.uptimeMillis() + (delayNanos + 999_999) / 1_000_000);
++        }
++    }
++
++    /** Draws the texture's current picture again; the SurfaceTexture keeps it until the next frame. */
++    private void repeatTail() {
++        if (stopped || waiting) {
++            return;
++        }
++        EncoderInputLog log = inputLog;
++        long now = System.nanoTime();
++        if (log != null && log.backedUp(now)) {
++            // A copy would only wait behind the pictures the encoder holds. Put it off without using
++            // one up: once the backlog is over, a copy may still be needed to get the last one out.
++            schedule(tail.interval());
++            return;
++        }
++        if (!tail.due(log == null || log.holdsAwaited())) {
++            return;
++        }
++        copyLast(false, now);
++        schedule(tail.next());
++    }
++
++    private void copyLast(boolean awaited, long now) {
++        draw(lastMatrix);
++        present(Math.max(System.nanoTime(), lastPresentationNanos + 1_000_000), true, awaited);
++        // A copy takes a picture's place in the rate, so a picture right after it waits its turn
++        gate.presented(now);
++    }
++
++    /**
++     * A sync frame was requested. An encoder makes it from its next input, so a still screen gets a
++     * copy of the last picture, and copies after it for the encoders that hold their newest input.
++     */
++    public void refresh() {
++        handler.post(() -> {
++            if (stopped || gate == null || lastMatrix == null) {
++                return;
++            }
++            if (waiting) {
++                presentWaiting();
++                return;
++            }
++            handler.removeCallbacks(repeatTail);
++            // The sync frame is made from this copy, and the copies after it get it out
++            copyLast(true, System.nanoTime());
++            if (tail != null) {
++                schedule(tail.start());
++            }
++        });
++    }
++
+     public void stopAndRelease() {
+         final Semaphore sem = new Semaphore(0);
+ 
+         handler.post(() -> {
+             stopped = true;
++            handler.removeCallbacks(repeatTail);
++            handler.removeCallbacks(presentWaiting);
+             surfaceTexture.setOnFrameAvailableListener(null, handler);
+ 
+             filter.release();
+--- a/server/src/main/java/com/genymobile/scrcpy/opengl/TailRepeat.java
++++ b/server/src/main/java/com/genymobile/scrcpy/opengl/TailRepeat.java
+@@ -0,0 +1,53 @@
++package com.genymobile.scrcpy.opengl;
++
++/**
++ * Copies of the last picture once the screen stops changing, for encoders that hold their newest
++ * inputs until more arrive (MediaTek's keep about four): without them the final picture of an
++ * animation waits for the next change on screen. The first copy comes a frame and a half after the
++ * picture, so that one only a little late isn't preceded by a copy, and the copies stop once the
++ * encoder holds nothing the stream waits for. An encoder that gives every picture back at once
++ * gets none.
++ */
++public final class TailRepeat {
++
++    /** At most this many copies after one picture, even if the encoder never gives it back. */
++    public static final int COUNT = 12;
++
++    private final long intervalNanos;
++    private int remaining;
++
++    public TailRepeat(long intervalUs) {
++        this.intervalNanos = intervalUs * 1000;
++    }
++
++    /** A new picture restarts the copies. Returns the delay before the first, or -1 for none. */
++    public long start() {
++        remaining = intervalNanos > 0 ? COUNT : 0;
++        return remaining > 0 ? intervalNanos * 3 / 2 : -1;
++    }
++
++    /**
++     * Whether a copy should be drawn now: only while the encoder still holds something the stream
++     * waits for, and copies are left. The delay before the next comes from next().
++     */
++    public boolean due(boolean encoderHolds) {
++        if (!encoderHolds) {
++            remaining = 0;
++        }
++        if (remaining <= 0) {
++            return false;
++        }
++        remaining--;
++        return true;
++    }
++
++    /** The delay before the next copy, or -1 for none. */
++    public long next() {
++        return remaining > 0 ? intervalNanos : -1;
++    }
++
++    /** The delay before trying again when a copy was put off. */
++    public long interval() {
++        return intervalNanos;
++    }
++}
+--- a/server/src/main/java/com/genymobile/scrcpy/util/Ln.java
++++ b/server/src/main/java/com/genymobile/scrcpy/util/Ln.java
+@@ -29,6 +29,13 @@
+         // not instantiable
+     }
+ 
++    /** Only bounded, opt-in encoder metadata reaches the owning Agent; no Android log copy. */
++    public static void writeEncoderMetadata(String json) {
++        synchronized (CONSOLE_ERR) {
++            CONSOLE_ERR.println("TICWATCH_ENCODER_V1 " + json);
++        }
++    }
++
+     public static void disableSystemStreams() {
+         PrintStream nullStream = new PrintStream(new NullOutputStream());
+         System.setOut(nullStream);
+--- a/server/src/main/java/com/genymobile/scrcpy/video/CaptureControl.java
++++ b/server/src/main/java/com/genymobile/scrcpy/video/CaptureControl.java
+@@ -1,6 +1,7 @@
+ package com.genymobile.scrcpy.video;
+ 
+ import android.media.MediaCodec;
++import android.os.Bundle;
+ 
+ public class CaptureControl {
+ 
+@@ -14,6 +15,12 @@
+     // Current instance of MediaCodec to "interrupt" on reset
+     private MediaCodec runningMediaCodec;
+ 
++    // Latest target from the owning Agent; 0 keeps the configured rate.
++    private int videoBitRate;
++
++    // Gives the encoder an input after a sync frame request, so a still screen gets one too.
++    private Runnable keyFrameInput;
++
+     public synchronized boolean isResetRequested() {
+         return reset != 0;
+     }
+@@ -36,7 +43,62 @@
+         }
+     }
+ 
++    /**
++     * Request a sync frame from the currently running encoder without changing capture or sockets.
++     * The same monitor guards register/unregister: cleanup clears the instance before stopping it.
++     * Initialization/reset races are harmless no-ops; the caller retains its bounded retry policy.
++     */
++    public synchronized boolean requestKeyFrame() {
++        if (runningMediaCodec == null || reset != 0) {
++            return false;
++        }
++        Bundle parameters = new Bundle();
++        parameters.putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0);
++        try {
++            runningMediaCodec.setParameters(parameters);
++            if (keyFrameInput != null) {
++                // An encoder makes the sync frame from its next input, which a still screen never sends
++                keyFrameInput.run();
++            }
++            return true;
++        } catch (IllegalStateException | IllegalArgumentException e) {
++            // An encoder can reject dynamic parameters. Never turn this into a capture restart.
++            return false;
++        }
++    }
++
++    /**
++     * Change the running encoder's target bit rate without restarting capture. A reset reconfigures
++     * the encoder from its original format, so the latest target is applied again when it starts.
++     */
++    public synchronized boolean setVideoBitRate(int bitRate) {
++        if (bitRate <= 0) {
++            return false;
++        }
++        videoBitRate = bitRate;
++        return runningMediaCodec != null && reset == 0 && applyVideoBitRate(runningMediaCodec);
++    }
++
++    private boolean applyVideoBitRate(MediaCodec codec) {
++        Bundle parameters = new Bundle();
++        parameters.putInt(MediaCodec.PARAMETER_KEY_VIDEO_BITRATE, videoBitRate);
++        try {
++            codec.setParameters(parameters);
++            return true;
++        } catch (IllegalStateException | IllegalArgumentException e) {
++            // A codec that refuses dynamic rates keeps its configured one.
++            return false;
++        }
++    }
++
++    public synchronized void setKeyFrameInput(Runnable keyFrameInput) {
++        this.keyFrameInput = keyFrameInput;
++    }
++
+     public synchronized void setRunningMediaCodec(MediaCodec runningMediaCodec) {
+         this.runningMediaCodec = runningMediaCodec;
++        if (runningMediaCodec != null && videoBitRate > 0) {
++            applyVideoBitRate(runningMediaCodec);
++        }
+     }
+ }
+--- a/server/src/main/java/com/genymobile/scrcpy/video/ScreenCapture.java
++++ b/server/src/main/java/com/genymobile/scrcpy/video/ScreenCapture.java
+@@ -11,6 +11,7 @@
+ import com.genymobile.scrcpy.model.Orientation;
+ import com.genymobile.scrcpy.model.Size;
+ import com.genymobile.scrcpy.opengl.AffineOpenGLFilter;
++import com.genymobile.scrcpy.opengl.OpenGLException;
+ import com.genymobile.scrcpy.opengl.OpenGLFilter;
+ import com.genymobile.scrcpy.opengl.OpenGLRunner;
+ import com.genymobile.scrcpy.util.AffineMatrix;
+@@ -36,6 +37,10 @@
+     private Orientation.Lock captureOrientationLock;
+     private Orientation captureOrientation;
+     private final float angle;
++    private final int tailRepeatUs;
++    private final float maxFps;
++    // OpenGL couldn't start, so the encoder's own frame rate limit applies from the next start
++    private boolean glUnavailable;
+ 
+     private VideoConstraints videoConstraints;
+ 
+@@ -48,7 +53,8 @@
+     private VirtualDisplay virtualDisplay;
+ 
+     private AffineMatrix transform;
+-    private OpenGLRunner glRunner;
++    // Read by the control thread to answer sync frame requests
++    private volatile OpenGLRunner glRunner;
+ 
+     public ScreenCapture(VirtualDisplayListener vdListener, Options options) {
+         this.vdListener = vdListener;
+@@ -60,6 +66,8 @@
+         assert captureOrientationLock != null;
+         assert captureOrientation != null;
+         this.angle = options.getAngle();
++        this.tailRepeatUs = options.getVideoTailRepeatUs();
++        this.maxFps = options.getMaxFps();
+     }
+ 
+     @Override
+@@ -122,11 +130,26 @@
+             inputSize = displayInfo.getSize();
+             assert glRunner == null;
+             OpenGLFilter glFilter = new AffineOpenGLFilter(transform);
+-            glRunner = new OpenGLRunner(glFilter);
++            glRunner = pacesFrames() ? new OpenGLRunner(glFilter, null, tailRepeatUs, maxFps) : new OpenGLRunner(glFilter);
++            glRunner.setInputLog(getInputLog());
+             surface = glRunner.start(inputSize, videoSize, surface);
+         } else {
+             // If there is no filter, the display must be rendered at target video size directly
+             inputSize = videoSize;
++            if (pacesFrames()) {
++                // A 1:1 copy through OpenGL, which decides when each picture goes into the encoder
++                OpenGLRunner runner = new OpenGLRunner(new AffineOpenGLFilter(AffineMatrix.IDENTITY), null, tailRepeatUs, maxFps);
++                runner.setInputLog(getInputLog());
++                try {
++                    surface = runner.start(inputSize, videoSize, surface);
++                    glRunner = runner;
++                } catch (OpenGLException e) {
++                    // Start over without it: this encoder was configured without the framework's frame rate limit
++                    Ln.w("Paced input unavailable: " + e.getMessage());
++                    glUnavailable = true;
++                    getCaptureControl().reset(CaptureControl.RESET_REASON_CLIENT_RESET);
++                }
++            }
+         }
+ 
+         try {
+@@ -174,6 +197,19 @@
+         }
+     }
+ 
++    @Override
++    public boolean pacesFrames() {
++        return tailRepeatUs > 0 && !glUnavailable;
++    }
++
++    @Override
++    public void refresh() {
++        OpenGLRunner runner = glRunner;
++        if (runner != null) {
++            runner.refresh();
++        }
++    }
++
+     @Override
+     public void stop() {
+         if (glRunner != null) {
+--- a/server/src/main/java/com/genymobile/scrcpy/video/SurfaceCapture.java
++++ b/server/src/main/java/com/genymobile/scrcpy/video/SurfaceCapture.java
+@@ -12,13 +12,15 @@
+  */
+ public abstract class SurfaceCapture {
+ 
+-    private CaptureControl captureControl;
++    // Published by the encoder initialization thread and read by the control receiver.
++    private volatile CaptureControl captureControl;
+ 
+     /**
+      * Called once before the first capture starts.
+      */
+     public final void init(CaptureControl captureControl, VideoConstraints videoConstraints) throws ConfigurationException, IOException {
+         this.captureControl = captureControl;
++        captureControl.setKeyFrameInput(this::refresh);
+         init(videoConstraints);
+     }
+ 
+@@ -26,6 +28,30 @@
+         return captureControl;
+     }
+ 
++    // Replaced for each capture before it starts.
++    private volatile EncoderInputLog inputLog;
++
++    public void setInputLog(EncoderInputLog inputLog) {
++        this.inputLog = inputLog;
++    }
++
++    public EncoderInputLog getInputLog() {
++        return inputLog;
++    }
++
++    /**
++     * Whether this capture keeps the encoder to the frame rate itself, before {@link #start(Surface)}.
++     * If so, the framework's limit must be off: it drops pictures where this one makes them wait.
++     */
++    public boolean pacesFrames() {
++        return false;
++    }
++
++    /** A sync frame was requested: give the encoder an input to make it from, even if nothing moves. */
++    public void refresh() {
++        // Nothing by default: the next picture carries the sync frame
++    }
++
+     /**
+      * Called once before the first capture starts.
+      *
+--- a/server/src/main/java/com/genymobile/scrcpy/video/SurfaceEncoder.java
++++ b/server/src/main/java/com/genymobile/scrcpy/video/SurfaceEncoder.java
+@@ -41,6 +41,8 @@
+     private final String encoderName;
+     private final List<CodecOption> codecOptions;
+     private final int videoBitRate;
++    private final boolean videoPreferCbr;
++    private final boolean videoDiagnostics;
+     private final int maxSize;
+     private final float maxFps;
+     private final boolean downsizeOnError;
+@@ -61,6 +63,8 @@
+         this.capture = capture;
+         this.streamer = streamer;
+         this.videoBitRate = options.getVideoBitRate();
++        this.videoPreferCbr = options.getVideoPreferCbr();
++        this.videoDiagnostics = options.getVideoDiagnostics();
+         this.maxSize = options.getMaxSize();
+         this.maxFps = options.getMaxFps();
+         this.codecOptions = options.getVideoCodecOptions();
+@@ -73,7 +77,8 @@
+     private void streamCapture() throws IOException, ConfigurationException {
+         Codec codec = streamer.getCodec();
+         MediaCodec mediaCodec = createMediaCodec(codec, encoderName);
+-        MediaFormat format = createFormat(codec.getMimeType(), videoBitRate, maxFps, codecOptions);
++        MediaFormat format = createFormat(codec.getMimeType(), videoBitRate, codecOptions);
++        VideoRateControl.preferConstantBitrate(format, mediaCodec, codec.getMimeType(), videoPreferCbr);
+ 
+         MediaCodecInfo.VideoCapabilities caps;
+         int alignment;
+@@ -119,6 +124,14 @@
+ 
+                 format.setInteger(MediaFormat.KEY_WIDTH, size.getWidth());
+                 format.setInteger(MediaFormat.KEY_HEIGHT, size.getHeight());
++                if (maxFps > 0 && !capture.pacesFrames()) {
++                    // The key existed privately before Android 10:
++                    // <https://android.googlesource.com/platform/frameworks/base/+/625f0aad9f7a259b6881006ad8710adce57d1384%5E%21/>
++                    // <https://github.com/Genymobile/scrcpy/issues/488#issuecomment-567321437>
++                    // Not for a capture that paces itself. Removing a key needs Android 10, so once set it stays,
++                    // which suits a capture that has given up on OpenGL.
++                    format.setFloat(KEY_MAX_FPS_TO_ENCODER, maxFps);
++                }
+ 
+                 Surface surface = null;
+                 boolean mediaCodecStarted = false;
+@@ -127,6 +140,7 @@
+                     mediaCodec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+                     surface = mediaCodec.createInputSurface();
+ 
++                    capture.setInputLog(new EncoderInputLog());
+                     capture.start(surface);
+                     captureStarted = true;
+ 
+@@ -146,7 +160,7 @@
+                             streamer.writeSessionMeta(size.getWidth(), size.getHeight(), isClientResize);
+ 
+                             // If a reset is requested during encode(), it will interrupt the encoding by an EOS
+-                            encode(mediaCodec, streamer);
++                            encode(mediaCodec, streamer, format, codec.getMimeType(), capture.getInputLog());
+                         }
+ 
+                         // The capture might have been closed internally (for example if the camera is disconnected)
+@@ -249,12 +263,27 @@
+         return 0;
+     }
+ 
+-    private void encode(MediaCodec codec, Streamer streamer) throws IOException {
++    private void encode(MediaCodec codec, Streamer streamer, MediaFormat requestedFormat, String mime, EncoderInputLog inputLog)
++            throws IOException {
+         MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
++        VideoEncoderOutputDiagnostics outputDiagnostics = videoDiagnostics
++                ? new VideoEncoderOutputDiagnostics(Build.VERSION.SDK_INT, videoPreferCbr, videoBitRate, Ln::writeEncoderMetadata, inputLog) : null;
++        int diagnosticReports = 0;
++        if (videoDiagnostics) {
++            VideoEncoderDiagnostics.emit(codec, requestedFormat, mime, videoPreferCbr, "configured", Build.VERSION.SDK_INT);
++            diagnosticReports++;
++            VideoEncoderDiagnostics.emitVendorParameters(codec, videoPreferCbr, Build.VERSION.SDK_INT);
++        }
+ 
+         boolean eos;
+         do {
++            long dequeueStarted = videoDiagnostics ? System.nanoTime() : 0;
+             int outputBufferId = codec.dequeueOutputBuffer(bufferInfo, -1);
++            long dequeued = videoDiagnostics ? System.nanoTime() : 0;
++            if (videoDiagnostics && outputBufferId == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED && diagnosticReports < 3) {
++                VideoEncoderDiagnostics.emit(codec, requestedFormat, mime, videoPreferCbr, "output_format", Build.VERSION.SDK_INT);
++                diagnosticReports++;
++            }
+             try {
+                 eos = (bufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0;
+                 // On EOS, there might be data or not, depending on bufferInfo.size
+@@ -267,7 +296,17 @@
+                     }
+ 
+                     ByteBuffer codecBuffer = codec.getOutputBuffer(outputBufferId);
++                    long writeStarted = videoDiagnostics ? System.nanoTime() : 0;
+                     streamer.writePacket(codecBuffer, bufferInfo);
++                    if (!isConfig) {
++                        // Taken once written out, so a write that blocks keeps the encoder backed up
++                        long written = System.nanoTime();
++                        EncoderInputLog.Match input = inputLog.output(bufferInfo.presentationTimeUs, written);
++                        if (outputDiagnostics != null) {
++                            outputDiagnostics.record(bufferInfo.size, (bufferInfo.flags & MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0,
++                                    bufferInfo.presentationTimeUs, dequeueStarted, dequeued, writeStarted, written, input);
++                        }
++                    }
+                 }
+             } finally {
+                 if (outputBufferId >= 0) {
+@@ -307,7 +346,7 @@
+         }
+     }
+ 
+-    private static MediaFormat createFormat(String videoMimeType, int bitRate, float maxFps, List<CodecOption> codecOptions) {
++    private static MediaFormat createFormat(String videoMimeType, int bitRate, List<CodecOption> codecOptions) {
+         MediaFormat format = new MediaFormat();
+         format.setString(MediaFormat.KEY_MIME, videoMimeType);
+         format.setInteger(MediaFormat.KEY_BIT_RATE, bitRate);
+@@ -328,13 +367,6 @@
+             // output 1 frame as soon as 1 frame is queued
+             format.setInteger(MediaFormat.KEY_LATENCY, 1);
+         }
+-        if (maxFps > 0) {
+-            // The key existed privately before Android 10:
+-            // <https://android.googlesource.com/platform/frameworks/base/+/625f0aad9f7a259b6881006ad8710adce57d1384%5E%21/>
+-            // <https://github.com/Genymobile/scrcpy/issues/488#issuecomment-567321437>
+-            format.setFloat(KEY_MAX_FPS_TO_ENCODER, maxFps);
+-        }
+-
+         if (codecOptions != null) {
+             for (CodecOption option : codecOptions) {
+                 String key = option.getKey();
+--- a/server/src/main/java/com/genymobile/scrcpy/video/VideoRateControl.java
++++ b/server/src/main/java/com/genymobile/scrcpy/video/VideoRateControl.java
+@@ -0,0 +1,29 @@
++package com.genymobile.scrcpy.video;
++
++import android.media.MediaCodec;
++import android.media.MediaCodecInfo;
++import android.media.MediaFormat;
++
++/** Optional rate control for a paced live stream, applied to the actual selected encoder. */
++public final class VideoRateControl {
++    private VideoRateControl() {
++    }
++
++    public static boolean preferConstantBitrate(MediaFormat format, MediaCodec codec, String mime, boolean enabled) {
++        // Preserve normal scrcpy sessions and any explicitly supplied codec option.
++        if (!enabled || format.containsKey(MediaFormat.KEY_BITRATE_MODE)) {
++            return false;
++        }
++        try {
++            MediaCodecInfo.EncoderCapabilities caps = codec.getCodecInfo().getCapabilitiesForType(mime).getEncoderCapabilities();
++            if (caps != null && caps.isBitrateModeSupported(MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)) {
++                format.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR);
++                return true;
++            }
++        } catch (IllegalArgumentException | IllegalStateException e) {
++            // Missing/broken capability reporting is not evidence that this codec accepts CBR.
++            // Keep its original mode; transport and requested bitrate never change here.
++        }
++        return false;
++    }
++}
+--- a/server/src/main/java/com/genymobile/scrcpy/video/VideoEncoderDiagnostics.java
++++ b/server/src/main/java/com/genymobile/scrcpy/video/VideoEncoderDiagnostics.java
+@@ -0,0 +1,205 @@
++package com.genymobile.scrcpy.video;
++
++import android.media.MediaCodec;
++import android.media.MediaCodecInfo;
++import android.media.MediaFormat;
++import com.genymobile.scrcpy.util.Ln;
++
++/** Optional, bounded format metadata. Never prints raw codec formats or frame contents. */
++public final class VideoEncoderDiagnostics {
++    private VideoEncoderDiagnostics() {
++    }
++
++    public static void emit(MediaCodec codec, MediaFormat requested, String mime, boolean preferCbr, String stage, int sdk) {
++        try {
++            Ln.writeEncoderMetadata(snapshot(codec, requested, mime, preferCbr, stage, sdk));
++        } catch (RuntimeException ignored) {
++            // Diagnostics must not end a working capture.
++        }
++    }
++
++    /** Room for names in one metadata line, which the Agent caps at 2048 bytes. */
++    static final int VENDOR_NAMES_BUDGET = 1_500;
++    private static final String[] RATE_WORDS = {"qp", "bitrate", "rc", "rate", "vbr", "cbr", "latency", "quality", "hq"};
++
++    public static void emitVendorParameters(MediaCodec codec, boolean preferCbr, int sdk) {
++        try {
++            String record = vendorParameters(codec, preferCbr, sdk);
++            if (record != null) {
++                Ln.writeEncoderMetadata(record);
++            }
++        } catch (RuntimeException ignored) {
++            // Diagnostics must not end a working capture.
++        }
++    }
++
++    /**
++     * The names and types of the encoder's vendor parameters (Android 12+), never their values, in
++     * one record: a newer record of the same kind replaces a waiting one on its way to the phone.
++     * Names lose the dotted prefix they all share, and rate control names come first, so those fit.
++     */
++    public static String vendorParameters(MediaCodec codec, boolean preferCbr, int sdk) {
++        if (sdk < 31) {
++            return null;
++        }
++        java.util.List<String> names = new java.util.ArrayList<>();
++        for (String name : codec.getSupportedVendorParameters()) {
++            if (name != null && name.length() <= 120 && name.matches("[A-Za-z0-9_.-]+")) {
++                names.add(name);
++            }
++        }
++        java.util.Collections.sort(names, (a, b) -> {
++            boolean rateA = rateControl(a), rateB = rateControl(b);
++            return rateA != rateB ? (rateA ? -1 : 1) : a.compareTo(b);
++        });
++        String prefix = names.isEmpty() ? "" : names.get(0);
++        for (String name : names) {
++            while (!name.startsWith(prefix)) {
++                int dot = prefix.lastIndexOf('.', prefix.length() - 2);
++                prefix = dot < 0 ? "" : prefix.substring(0, dot + 1);
++            }
++        }
++        if (!prefix.endsWith(".")) {
++            int dot = prefix.lastIndexOf('.');
++            prefix = dot < 0 ? "" : prefix.substring(0, dot + 1);
++        }
++        StringBuilder json = new StringBuilder("{\"kind\":\"screen_encoder\",\"version\":1,\"stage\":\"vendor_parameters\",\"sdk\":")
++                .append(sdk).append(",\"preferCbr\":").append(preferCbr);
++        try {
++            String name = codec.getName();
++            if (name.length() <= 128 && name.matches("[A-Za-z0-9_.-]+")) {
++                json.append(",\"encoder\":\"").append(name).append('"');
++            }
++        } catch (RuntimeException ignored) { }
++        json.append(",\"prefix\":\"").append(prefix).append("\",\"names\":[");
++        int used = 0, listed = 0;
++        for (String name : names) {
++            String entry = name.substring(prefix.length()) + ":" + type(codec, name);
++            if (used + entry.length() + 3 > VENDOR_NAMES_BUDGET) {
++                break;
++            }
++            json.append(listed == 0 ? "" : ",").append('"').append(entry).append('"');
++            used += entry.length() + 3;
++            listed++;
++        }
++        return json.append("],\"count\":").append(names.size()).append(",\"omitted\":").append(names.size() - listed).append('}').toString();
++    }
++
++    private static boolean rateControl(String name) {
++        String lower = name.toLowerCase(java.util.Locale.ROOT);
++        for (String word : RATE_WORDS) {
++            if (lower.contains(word)) {
++                return true;
++            }
++        }
++        return false;
++    }
++
++    /** i, l, f, s or b as MediaFormat stores it; ? when the codec won't say. */
++    private static char type(MediaCodec codec, String name) {
++        try {
++            MediaCodec.ParameterDescriptor descriptor = codec.getParameterDescriptor(name);
++            if (descriptor == null) {
++                return '?';
++            }
++            switch (descriptor.getType()) {
++                case MediaFormat.TYPE_INTEGER: return 'i';
++                case MediaFormat.TYPE_LONG: return 'l';
++                case MediaFormat.TYPE_FLOAT: return 'f';
++                case MediaFormat.TYPE_STRING: return 's';
++                case MediaFormat.TYPE_BYTE_BUFFER: return 'b';
++                default: return '?';
++            }
++        } catch (RuntimeException e) {
++            return '?';
++        }
++    }
++
++    public static String snapshot(MediaCodec codec, MediaFormat requested, String mime, boolean preferCbr, String stage, int sdk) {
++        if (!"configured".equals(stage) && !"output_format".equals(stage)) {
++            throw new IllegalArgumentException("Invalid diagnostic stage");
++        }
++        StringBuilder json = new StringBuilder("{\"kind\":\"screen_encoder\",\"version\":1,\"stage\":\"")
++                .append(stage).append("\",\"sdk\":").append(sdk).append(",\"preferCbr\":").append(preferCbr);
++        try {
++            String name = codec.getName();
++            if (name.length() <= 128 && name.matches("[A-Za-z0-9_.-]+")) {
++                json.append(",\"encoder\":\"").append(name).append('"');
++            }
++        } catch (RuntimeException ignored) { }
++        try {
++            MediaCodecInfo info = codec.getCodecInfo();
++            if (sdk >= 29) {
++                json.append(",\"hardware\":").append(info.isHardwareAccelerated());
++            }
++            MediaCodecInfo.CodecCapabilities codecCaps = info.getCapabilitiesForType(mime);
++            MediaCodecInfo.EncoderCapabilities caps = codecCaps.getEncoderCapabilities();
++            if (caps != null) {
++                json.append(",\"cbrSupported\":").append(caps.isBitrateModeSupported(MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR));
++            }
++            String videoCaps = capabilities(codecCaps.getVideoCapabilities(), requested);
++            if (videoCaps != null) { json.append(",\"capabilities\":").append(videoCaps); }
++        } catch (RuntimeException ignored) { }
++        format(json, "configured", requested);
++        try { format(json, "input", codec.getInputFormat()); } catch (RuntimeException ignored) { }
++        if ("output_format".equals(stage)) {
++            try { format(json, "output", codec.getOutputFormat()); } catch (RuntimeException ignored) { }
++        }
++        return json.append('}').toString();
++    }
++
++    private static String capabilities(MediaCodecInfo.VideoCapabilities caps, MediaFormat requested) {
++        if (caps == null) { return null; }
++        StringBuilder json = new StringBuilder("{");
++        try {
++            android.util.Range<Integer> range = caps.getBitrateRange();
++            int lower = range.getLower(), upper = range.getUpper();
++            json.append("\"bitrateMin\":").append(lower).append(",\"bitrateMax\":").append(upper);
++        } catch (RuntimeException ignored) { }
++        try {
++            int width = requested.getInteger("width"), height = requested.getInteger("height");
++            double fps;
++            try { fps = requested.getInteger(MediaFormat.KEY_FRAME_RATE); }
++            catch (ClassCastException floating) { fps = requested.getFloat(MediaFormat.KEY_FRAME_RATE); }
++            if (width > 0 && height > 0 && fps > 0 && !Double.isNaN(fps) && !Double.isInfinite(fps)) {
++                boolean size = caps.isSizeSupported(width, height);
++                boolean rate = caps.areSizeAndRateSupported(width, height, fps);
++                if (json.length() > 1) { json.append(','); }
++                json.append("\"width\":").append(width).append(",\"height\":").append(height)
++                        .append(",\"sizeSupported\":").append(size)
++                        .append(",\"sizeRateSupported\":").append(rate);
++                if (size) {
++                    android.util.Range<Double> range = caps.getSupportedFrameRatesFor(width, height);
++                    if (!Double.isInfinite(range.getLower()) && !Double.isInfinite(range.getUpper())
++                            && !Double.isNaN(range.getLower()) && !Double.isNaN(range.getUpper())) {
++                        json.append(",\"fpsMin\":").append(range.getLower()).append(",\"fpsMax\":").append(range.getUpper());
++                    }
++                }
++            }
++        } catch (RuntimeException ignored) { }
++        return json.length() > 1 ? json.append('}').toString() : null;
++    }
++
++    private static void format(StringBuilder json, String prefix, MediaFormat format) {
++        number(json, prefix + "Bitrate", format, MediaFormat.KEY_BIT_RATE);
++        number(json, prefix + "BitrateMode", format, MediaFormat.KEY_BITRATE_MODE);
++        number(json, prefix + "Fps", format, MediaFormat.KEY_FRAME_RATE);
++        number(json, prefix + "Latency", format, "latency");
++        if (!"output".equals(prefix)) { number(json, prefix + "MaxBFrames", format, "max-bframes"); }
++        if ("input".equals(prefix)) { number(json, "inputOperatingRate", format, "operating-rate"); }
++        if ("output".equals(prefix)) { number(json, "outputReorderDepth", format, "output-reorder-depth"); }
++    }
++
++    private static void number(StringBuilder json, String label, MediaFormat format, String key) {
++        try {
++            if (!format.containsKey(key)) { return; }
++            double value;
++            try { value = format.getInteger(key); }
++            catch (ClassCastException wrongType) { value = format.getFloat(key); }
++            if (!Double.isNaN(value) && !Double.isInfinite(value) && value >= 0 && value <= 1_000_000_000L) {
++                json.append(",\"").append(label).append("\":");
++                if (value == (long) value) { json.append((long) value); } else { json.append(value); }
++            }
++        } catch (RuntimeException ignored) { }
++    }
++}
+--- a/server/src/main/java/com/genymobile/scrcpy/video/VideoEncoderOutputDiagnostics.java
++++ b/server/src/main/java/com/genymobile/scrcpy/video/VideoEncoderOutputDiagnostics.java
+@@ -0,0 +1,99 @@
++package com.genymobile.scrcpy.video;
++
++/** Optional source-side accounting before the UDP relay. No frame data, timer, or extra thread. */
++public final class VideoEncoderOutputDiagnostics {
++    public interface Sink { void publish(String json); }
++    private final Sink sink;
++    private final int sdk;
++    private final boolean preferCbr;
++    private final int target;
++    private long window = Long.MIN_VALUE;
++    private long previousPts = Long.MIN_VALUE;
++    private long frames, bytes, keys, intervals, intervalBytes, span, invalidPts;
++    private long maxFrame, maxDequeue, maxWrite, maxAge, negativeAge;
++    // Only with an input log: pictures and copies matched to their input, by inputs behind them.
++    private final EncoderInputLog inputs;
++    private long pictures, copies, unmatched, pictureLatency, maxPictureLatency, maxCopyLatency, maxBehind;
++    private final long[] behind = new long[4];
++
++    public VideoEncoderOutputDiagnostics(int sdk, boolean preferCbr, int target, Sink sink) {
++        this(sdk, preferCbr, target, sink, null);
++    }
++
++    public VideoEncoderOutputDiagnostics(int sdk, boolean preferCbr, int target, Sink sink, EncoderInputLog inputs) {
++        this.sdk = sdk; this.preferCbr = preferCbr; this.target = target; this.sink = sink; this.inputs = inputs;
++    }
++
++    public void record(int size, boolean key, long pts, long dequeueStarted, long dequeued, long writeStarted, long written) {
++        record(size, key, pts, dequeueStarted, dequeued, writeStarted, written, null);
++    }
++
++    /** With the input the log matched to this output, null if none. */
++    public void record(int size, boolean key, long pts, long dequeueStarted, long dequeued, long writeStarted, long written,
++            EncoderInputLog.Match input) {
++        if (size <= 0 || written < writeStarted || dequeued < dequeueStarted || writeStarted < dequeued) { return; }
++        if (window == Long.MIN_VALUE) { window = dequeueStarted; }
++        frames++; bytes += size; if (key) { keys++; }
++        maxFrame = Math.max(maxFrame, size);
++        maxDequeue = Math.max(maxDequeue, (dequeued - dequeueStarted) / 1000);
++        maxWrite = Math.max(maxWrite, (written - writeStarted) / 1000);
++        long age = dequeued / 1000 - pts;
++        if (age >= 0) { maxAge = Math.max(maxAge, age); } else { negativeAge++; }
++        if (previousPts != Long.MIN_VALUE) {
++            long delta = pts - previousPts;
++            if (delta > 0) { intervals++; intervalBytes += size; span += delta; }
++            else { invalidPts++; }
++        }
++        previousPts = pts;
++        if (inputs != null) { matchInput(input, dequeued); }
++        long elapsed = written - window;
++        if (elapsed < 2_000_000_000L) { return; }
++        StringBuilder json = new StringBuilder("{\"kind\":\"screen_encoder\",\"version\":1,\"stage\":\"output_sample\",\"sdk\":")
++                .append(sdk).append(",\"preferCbr\":").append(preferCbr).append(",\"targetBitrate\":").append(target)
++                .append(",\"elapsedMillis\":").append(elapsed / 1_000_000).append(",\"frames\":").append(frames)
++                .append(",\"encodedBytes\":").append(bytes).append(",\"keyFrames\":").append(keys)
++                .append(",\"maxFrameBytes\":").append(maxFrame).append(",\"ptsIntervals\":").append(intervals)
++                .append(",\"ptsIntervalBytes\":").append(intervalBytes).append(",\"ptsSpanMicros\":").append(span)
++                .append(",\"invalidPtsIntervals\":").append(invalidPts).append(",\"maxDequeueWaitMicros\":").append(maxDequeue)
++                .append(",\"maxLocalWriteMicros\":").append(maxWrite).append(",\"maxOutputAgeMicros\":").append(maxAge)
++                .append(",\"negativeOutputAges\":").append(negativeAge);
++        if (span > 0 && intervals > 0 && invalidPts == 0) {
++            json.append(",\"mediaBitrate\":").append((long) (intervalBytes * 8_000_000.0 / span));
++        }
++        try { sink.publish(json.append('}').toString()); } catch (RuntimeException ignored) { }
++        if (inputs != null) { publishInputs(elapsed); }
++        window = written;
++        frames = bytes = keys = intervals = intervalBytes = span = invalidPts = 0;
++        maxFrame = maxDequeue = maxWrite = maxAge = negativeAge = 0;
++    }
++
++    private void matchInput(EncoderInputLog.Match match, long dequeued) {
++        if (match == null) { unmatched++; return; }
++        long latency = Math.max(0, (dequeued - match.submittedNanos) / 1000);
++        maxBehind = Math.max(maxBehind, match.behind);
++        if (match.copy) { copies++; maxCopyLatency = Math.max(maxCopyLatency, latency); return; }
++        pictures++; pictureLatency += latency; maxPictureLatency = Math.max(maxPictureLatency, latency);
++        behind[Math.min(match.behind, behind.length - 1)]++;
++    }
++
++    /** From going into the encoder to coming out of it, for what OpenGL drew; nothing if it drew nothing. */
++    private void publishInputs(long elapsed) {
++        long[] drawn = inputs.drain();
++        if (drawn[0] + drawn[1] + pictures + copies > 0) {
++            StringBuilder json = new StringBuilder("{\"kind\":\"screen_encoder\",\"version\":1,\"stage\":\"input_sample\",\"sdk\":")
++                    .append(sdk).append(",\"preferCbr\":").append(preferCbr).append(",\"elapsedMillis\":").append(elapsed / 1_000_000)
++                    .append(",\"submittedPictures\":").append(drawn[0]).append(",\"submittedCopies\":").append(drawn[1])
++                    .append(",\"skippedInputs\":").append(drawn[2]).append(",\"overflowedInputs\":").append(drawn[3])
++                    .append(",\"outputPictures\":").append(pictures).append(",\"outputCopies\":").append(copies)
++                    .append(",\"unmatchedOutputs\":").append(unmatched)
++                    .append(",\"maxPictureLatencyMicros\":").append(maxPictureLatency)
++                    .append(",\"meanPictureLatencyMicros\":").append(pictures > 0 ? pictureLatency / pictures : 0)
++                    .append(",\"maxCopyLatencyMicros\":").append(maxCopyLatency).append(",\"maxInputsBehind\":").append(maxBehind)
++                    .append(",\"picturesNoneBehind\":").append(behind[0]).append(",\"picturesOneBehind\":").append(behind[1])
++                    .append(",\"picturesTwoBehind\":").append(behind[2]).append(",\"picturesMoreBehind\":").append(behind[3]);
++            try { sink.publish(json.append('}').toString()); } catch (RuntimeException ignored) { }
++        }
++        pictures = copies = unmatched = pictureLatency = maxPictureLatency = maxCopyLatency = maxBehind = 0;
++        java.util.Arrays.fill(behind, 0);
++    }
++}
+--- a/server/src/main/java/com/genymobile/scrcpy/video/EncoderInputLog.java
++++ b/server/src/main/java/com/genymobile/scrcpy/video/EncoderInputLog.java
+@@ -0,0 +1,139 @@
++package com.genymobile.scrcpy.video;
++
++/**
++ * When each picture drawn through OpenGL went into the encoder. OpenGL holds new pictures back
++ * while the encoder is backed up, and diagnostics tell from it how long the encoder kept each one
++ * and how many later inputs it took in first. The drawing thread adds entries in timestamp order and
++ * the encoder thread takes them in the same order; an output whose timestamp was never drawn here
++ * (a framework repeat) matches nothing.
++ */
++public final class EncoderInputLog {
++
++    public static final int CAPACITY = 256;
++    /**
++     * Backed up: at least this many inputs in the encoder, the oldest there for {@link #BACKLOG_NANOS},
++     * and outputs still coming. MediaTek's encoders keep their last four inputs until more arrive,
++     * and in the normal flow a picture comes out within about 80 ms.
++     */
++    public static final int BACKLOG_INPUTS = 6;
++    public static final long BACKLOG_NANOS = 100_000_000L;
++    /**
++     * An encoder that gave nothing back for this long is waiting for input, not backed up. One that
++     * keeps its newest inputs looks backed up for this long after the screen stops changing.
++     */
++    public static final long OUTPUT_IDLE_NANOS = 100_000_000L;
++
++    /** One output's input; [behind] is how many later inputs were already in the encoder. */
++    public static final class Match {
++        public final long submittedNanos;
++        public final boolean copy;
++        public final int behind;
++
++        Match(long submittedNanos, boolean copy, int behind) {
++            this.submittedNanos = submittedNanos;
++            this.copy = copy;
++            this.behind = behind;
++        }
++    }
++
++    private final long[] ptsUs = new long[CAPACITY];
++    private final long[] submitted = new long[CAPACITY];
++    private final boolean[] copies = new boolean[CAPACITY];
++    private final boolean[] awaited = new boolean[CAPACITY];
++    private int awaitedHeld;
++    private int head;
++    private int size;
++    private boolean outputSeen;
++    private long lastOutput;
++    private Runnable drained;
++    private long submittedPictures;
++    private long submittedCopies;
++    private long skipped;
++    private long overflowed;
++
++    /** Called by the drawing thread just before the picture is swapped into the encoder's surface. */
++    public void submitted(long presentationNanos, boolean copy, long now) {
++        submitted(presentationNanos, copy, !copy, now);
++    }
++
++    /** awaited: the stream waits for this input to come out, as for a picture or a refresh's copy. */
++    public synchronized void submitted(long presentationNanos, boolean copy, boolean awaited, long now) {
++        if (size == CAPACITY) {
++            pop();
++            overflowed++;
++        }
++        int index = (head + size) % CAPACITY;
++        ptsUs[index] = presentationNanos / 1000;
++        submitted[index] = now;
++        copies[index] = copy;
++        this.awaited[index] = awaited;
++        if (awaited) {
++            awaitedHeld++;
++        }
++        size++;
++        if (copy) {
++            submittedCopies++;
++        } else {
++            submittedPictures++;
++        }
++    }
++
++    /**
++     * Called by the encoder thread once an output has been written out; returns its input, or null.
++     * Inputs older than it that never came out were dropped before the encoder.
++     */
++    public Match output(long presentationUs, long now) {
++        Match match = null;
++        Runnable listener = null;
++        synchronized (this) {
++            outputSeen = true;
++            lastOutput = now;
++            while (size > 0 && ptsUs[head] < presentationUs) {
++                pop();
++                skipped++;
++            }
++            if (size > 0 && ptsUs[head] == presentationUs) {
++                match = new Match(submitted[head], copies[head], size - 1);
++                pop();
++            }
++            if (drained != null && !backedUp(now)) {
++                listener = drained;
++                drained = null;
++            }
++        }
++        if (listener != null) {
++            listener.run();
++        }
++        return match;
++    }
++
++    /** Whether pictures are piling up in the encoder, or behind it, faster than they come out. */
++    public synchronized boolean backedUp(long now) {
++        return size >= BACKLOG_INPUTS && now - submitted[head] >= BACKLOG_NANOS && outputSeen && now - lastOutput < OUTPUT_IDLE_NANOS;
++    }
++
++    /** Whether a picture, or a copy the stream waits for, is still in the encoder. */
++    public synchronized boolean holdsAwaited() {
++        return awaitedHeld > 0;
++    }
++
++    /** Runs the listener once, on the encoder thread, after an output that ends the backlog. */
++    public synchronized void whenDrained(Runnable listener) {
++        drained = listener;
++    }
++
++    private void pop() {
++        if (awaited[head]) {
++            awaitedHeld--;
++        }
++        head = (head + 1) % CAPACITY;
++        size--;
++    }
++
++    /** Pictures and copies drawn, inputs skipped, records lost to a full log; then starts over. */
++    public synchronized long[] drain() {
++        long[] counts = {submittedPictures, submittedCopies, skipped, overflowed};
++        submittedPictures = submittedCopies = skipped = overflowed = 0;
++        return counts;
++    }
++}
+--- a/server/src/main/java/com/genymobile/scrcpy/opengl/PresentationGate.java
++++ b/server/src/main/java/com/genymobile/scrcpy/opengl/PresentationGate.java
+@@ -0,0 +1,54 @@
++package com.genymobile.scrcpy.opengl;
++
++/**
++ * When the next picture may go into the encoder. It stands in for the framework's frame rate
++ * limit, which drops a picture that comes too soon after the last input: one that came just after a
++ * copy of the last picture was lost that way. Here a picture early for the rate waits for its turn
++ * instead. Copies count against the rate too, so that the encoder, and the display at the other end,
++ * never get two inputs within one frame interval. While the encoder is backed up the waiting
++ * picture is held, so that newer pictures replace it rather than queue behind the old ones; it goes
++ * in once the encoder has worked through its backlog, or after {@link #MAX_HOLD_NANOS} at most.
++ */
++public final class PresentationGate {
++
++    /** The framework's limit lets pictures in this early too, so a steady display isn't held. */
++    public static final long JITTER_NANOS = 2_000_000L;
++    /** Even an encoder that never drains gets a new picture this often. */
++    public static final long MAX_HOLD_NANOS = 200_000_000L;
++
++    private final long intervalNanos;
++    private boolean started;
++    private long dueNanos;
++    private boolean holding;
++    private long heldSince;
++
++    /** At most maxFps pictures a second; 0 or less for no limit. */
++    public PresentationGate(float maxFps) {
++        this.intervalNanos = maxFps > 0 ? (long) (1_000_000_000.0 / maxFps) : 0;
++    }
++
++    /** How long the waiting picture must still wait, 0 if it may go in now. */
++    public long delay(long now, boolean backedUp) {
++        if (intervalNanos > 0 && started && now < dueNanos - JITTER_NANOS) {
++            return dueNanos - JITTER_NANOS - now;
++        }
++        if (!backedUp) {
++            return 0;
++        }
++        if (!holding) {
++            holding = true;
++            heldSince = now;
++        }
++        return Math.max(0, heldSince + MAX_HOLD_NANOS - now);
++    }
++
++    /** A picture or a copy went in. Like the framework's limit, a late one doesn't earn a burst. */
++    public void presented(long now) {
++        holding = false;
++        if (intervalNanos <= 0) {
++            return;
++        }
++        dueNanos = !started || now >= dueNanos + intervalNanos ? now + intervalNanos : dueNanos + intervalNanos;
++        started = true;
++    }
++}

@@ -1,0 +1,58 @@
+package dev.ticbox.companion.platform.data
+
+/** SQLite DDL also exercised by the offline schema check; no Android runtime required to inspect it. */
+internal object DataSyncSqlSchema {
+    // The baseline shipped in 0.2.0. Any format change must raise this, add a migration, and update the
+    // data migration file in MigrationTables (docs/dev/data-migration.md).
+    const val VERSION = 1
+    val statements = listOf(
+        """CREATE TABLE scopes (scope_id TEXT PRIMARY KEY NOT NULL, peer TEXT NOT NULL,
+            local_node TEXT NOT NULL, remote_node TEXT NOT NULL, network_id TEXT)""",
+        """CREATE TABLE sequences (scope_id TEXT PRIMARY KEY NOT NULL REFERENCES scopes(scope_id) ON DELETE CASCADE,
+            value INTEGER NOT NULL)""",
+        """CREATE TABLE cursors (scope_id TEXT NOT NULL REFERENCES scopes(scope_id) ON DELETE CASCADE,
+            source_node TEXT NOT NULL, sequence_id INTEGER NOT NULL, PRIMARY KEY(scope_id, source_node))""",
+        """CREATE TABLE items (item_id TEXT PRIMARY KEY NOT NULL,
+            scope_id TEXT NOT NULL REFERENCES scopes(scope_id) ON DELETE CASCADE,
+            package_name TEXT NOT NULL, package_digest TEXT NOT NULL, uri TEXT NOT NULL,
+            source_node TEXT NOT NULL, sequence_id INTEGER NOT NULL, relay_sequence INTEGER NOT NULL,
+            deleted INTEGER NOT NULL, body BLOB, modified INTEGER, received_at INTEGER NOT NULL,
+            local INTEGER NOT NULL, wire BLOB NOT NULL,
+            UNIQUE(scope_id, package_name, package_digest, uri))""",
+        """CREATE INDEX items_scope_source_sequence ON items(scope_id, source_node, sequence_id)""",
+        """CREATE INDEX items_scope_relay ON items(scope_id, relay_sequence)""",
+        """CREATE TABLE item_assets (item_id TEXT NOT NULL REFERENCES items(item_id) ON DELETE CASCADE,
+            ordinal INTEGER NOT NULL, name TEXT NOT NULL, digest TEXT NOT NULL, type INTEGER NOT NULL,
+            PRIMARY KEY(item_id, ordinal))""",
+        """CREATE TABLE assets (scope_id TEXT NOT NULL REFERENCES scopes(scope_id) ON DELETE CASCADE,
+            digest TEXT NOT NULL, body BLOB, received_at INTEGER NOT NULL, PRIMARY KEY(scope_id, digest))""",
+        """CREATE TABLE asset_acl (scope_id TEXT NOT NULL, digest TEXT NOT NULL,
+            package_name TEXT NOT NULL, package_digest TEXT NOT NULL,
+            PRIMARY KEY(scope_id, digest, package_name, package_digest),
+            FOREIGN KEY(scope_id, digest) REFERENCES assets(scope_id, digest) ON DELETE CASCADE)""",
+        """CREATE TABLE observation_samples (sample_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            peer TEXT NOT NULL, kind TEXT NOT NULL, received_at INTEGER NOT NULL,
+            battery INTEGER, steps INTEGER, goal INTEGER)""",
+        """CREATE INDEX observation_peer_kind ON observation_samples(peer, kind, sample_id DESC)""",
+        """CREATE TABLE cloud_cache (owner_key TEXT NOT NULL, kind TEXT NOT NULL,
+            record_key TEXT NOT NULL, source_name TEXT, data_type TEXT, start_ms INTEGER,
+            end_ms INTEGER, time_zone TEXT, deleted INTEGER NOT NULL, payload TEXT NOT NULL,
+            updated_at INTEGER NOT NULL, PRIMARY KEY(owner_key, kind, record_key))""",
+        """CREATE INDEX cloud_cache_window ON cloud_cache(owner_key, kind, start_ms, end_ms)""",
+        """CREATE TABLE cloud_sync_windows (owner_key TEXT NOT NULL, kind TEXT NOT NULL,
+            from_ms INTEGER NOT NULL, to_ms INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+            PRIMARY KEY(owner_key, kind, from_ms, to_ms))""",
+        """CREATE TABLE local_health_sources (local_user TEXT NOT NULL, peer TEXT NOT NULL, kind TEXT NOT NULL,
+            after_id INTEGER, upper_id INTEGER, in_progress INTEGER NOT NULL, partial INTEGER NOT NULL,
+            accessible INTEGER NOT NULL, provider_version TEXT, last_success INTEGER,
+            PRIMARY KEY(local_user, peer, kind))""",
+        """CREATE TABLE local_health_records (local_user TEXT NOT NULL, peer TEXT NOT NULL, kind TEXT NOT NULL,
+            record_key TEXT NOT NULL, source_name TEXT NOT NULL, device_id TEXT, data_type TEXT, parent_key TEXT, start_ms INTEGER,
+            end_ms INTEGER, deleted INTEGER NOT NULL, payload TEXT NOT NULL, parsed_payload TEXT NOT NULL, updated_at INTEGER NOT NULL,
+            PRIMARY KEY(local_user, peer, kind, record_key),
+            FOREIGN KEY(local_user, peer, kind) REFERENCES local_health_sources(local_user, peer, kind) ON DELETE CASCADE)""",
+        """CREATE INDEX local_health_window ON local_health_records(local_user, peer, kind, start_ms, end_ms)""",
+        """CREATE INDEX local_health_device_window ON local_health_records(local_user, peer, kind, device_id, data_type, end_ms)""",
+        """CREATE INDEX local_fitness_parent_window ON local_health_records(local_user, peer, kind, parent_key, start_ms)""",
+    )
+}

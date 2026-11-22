@@ -1,0 +1,78 @@
+syntax = "proto2";
+package ticbox.reference.google_companion;
+// Wire reference, not original source. Scope: the phone's wear-companion SDK and the watch firmware.
+// Preserve unknown fields and presence. No field below is declared required by the
+// descriptors. Runtime consumers impose additional validation.
+message NoPayload {}
+enum CallAction { ACTION_UNKNOWN = 0; ACTION_ANSWER = 1; ACTION_DISCONNECT = 2; ACTION_HOLD = 3; ACTION_UNHOLD = 4; ACTION_MUTE = 5; ACTION_UNMUTE = 6; ACTION_SILENCE = 7; }
+message CallActionRequest { optional string call_id = 1; optional CallAction action = 2; }
+message CallRejectRequest { optional string call_id = 1; optional int32 reason = 2; optional string text_message = 3; } // reason: 0 unknown, 1 declined, 2 unwanted
+message CallDialRequest { optional string number = 1; }
+message CallDtmfRequest { optional string call_id = 1; optional string code = 2; }
+message CallAudioState { optional bool is_muted = 1; }
+// State and direction retained as int32 to preserve unknown/negative enum values.
+message Call {
+  optional int32 state = 1 [default = -1];
+  optional string call_id = 2;
+  optional string handle_uri = 3;
+  optional int32 handle_presentation = 4;
+  optional string caller_display_name = 5;
+  optional int32 caller_display_name_presentation = 6;
+  optional int32 call_capabilities = 7;
+  optional int32 call_properties = 8;
+  optional bytes disconnect_cause_message = 9; // opaque nested DisconnectCause
+  optional int64 connect_time_millis = 10;
+  optional int32 video_state = 11;
+  optional int64 creation_time_millis = 12;
+  optional string contact_display_name = 13;
+  optional int32 call_direction = 14 [default = -1];
+  optional bool companion_can_answer_calls = 15 [default = true];
+  optional bytes voip_call_message = 16; // opaque nested VoipCall
+  optional bytes extras = 17;
+}
+// The source uses proto3 (default elision); optional here also retains presence.
+message BatteryState {
+  optional int32 battery_level = 1; // percent
+  optional int32 charging_status = 2; // 0 unknown, 1 charging, 2 discharging, 3 not_charging, 4 full
+  optional int32 power_source_type = 3; // 0 none, 1 AC, 2 USB, 3 dock, 4 wireless
+  optional int32 low_battery_level = 4;
+  optional int32 critical_battery_level = 5;
+  optional int32 battery_saver_mode = 6; // 0 none, 1 light, 2 traditional_watch, 3 time_only, 4 custom
+  optional int64 timestamp_ms = 7;
+  optional int64 charge_time_remaining_ms = 8;
+  optional int64 battery_time_remaining_ms = 9;
+}
+message BatteryStateResponse { optional bool successfully_refreshed_battery_state = 1; }
+message RemoteEventRequest { optional int32 event_type = 1; optional bytes event = 2; optional string event_id = 3; }
+message RemoteEventResponse { optional string event_id = 1; optional bool is_success = 2; optional int32 failure_code = 3; optional string failure_message = 4; }
+message RemoteEventPermission { optional string permission_name = 1; }
+message RemoteEventCertificate { optional bytes hash_bytes = 1; }
+message RemoteEventSecurity { repeated RemoteEventPermission required_permissions = 1; repeated RemoteEventCertificate app_certificates = 2; }
+message RemoteEventInfo { optional int32 event_type = 1; optional string path = 2; optional RemoteEventSecurity security_spec = 3; }
+message SupportedRemoteEvents { repeated RemoteEventInfo events = 1; }
+// Sent through SmsManager by the official phone app.
+message SendSmsRemoteEvent { optional string destination_address = 1; optional string body = 2; }
+message InstalledAppInfo { optional string package_name = 1; optional string app_name = 2; optional string icon_asset_name = 3; optional bool is_launchable = 4; optional int32 notification_permission_default_state = 5; }
+message SettingValue {
+  oneof value { int32 int_val = 1; bool bool_val = 2; bytes serialized_val = 3; string string_val = 4; float float_val = 5; int64 long_val = 6; }
+}
+message Setting { optional SettingValue setting_value = 1; optional int64 last_changed_ms = 2; }
+// Media controls v2: the watch declares fields 1..25; the phone SDK adds 26..30.
+// Field meanings are unknown, so names are positional; repeated message fields use
+// bytes so their exact nested wire bodies survive without unproven interpretation.
+// This is MessageApi protobuf, distinct from /mediacontrols/mediacontrols DataMap.
+message MediaNotificationV2Raw {
+  optional string field_1 = 1; optional bool field_2 = 2; optional float field_3 = 3;
+  optional bool field_4 = 4; optional bool field_5 = 5; optional string field_6 = 6;
+  optional string field_7 = 7; repeated bytes field_8_message = 8;
+  optional string field_9 = 9; optional int32 field_10 = 10; optional bool field_11 = 11;
+  repeated bytes field_12_message = 12; optional bool field_13 = 13;
+  optional string field_14 = 14; optional string field_15 = 15;
+  optional int64 field_16 = 16; optional int64 field_17 = 17; optional int64 field_18 = 18;
+  optional string field_19 = 19; optional float field_20 = 20; optional bool field_21 = 21;
+  optional int64 field_22 = 22; optional int64 field_23 = 23; optional bytes field_24 = 24;
+  optional int32 field_25 = 25;
+  // Phone SDK additions, not declared by the watch.
+  optional int64 field_26 = 26; optional int32 field_27 = 27; optional bytes field_28 = 28;
+  optional string field_29 = 29; optional bool field_30 = 30;
+}

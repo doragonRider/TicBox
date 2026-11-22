@@ -1,0 +1,47 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- ISO dates need literal hyphens, not typographic range dashes. -->
+    <string name="app_name">本地橋接</string>
+    <string name="bridge_enable">允許手機讀取</string>
+    <string name="bridge_enable_summary">透過藍牙讀取健康記錄</string>
+    <string name="bridge_permission">授予藍牙權限</string>
+    <string name="bridge_explanation">開啟後，已配對的手機可在背景讀取健康記錄，資料只經藍牙傳輸，平時不需開啟這裡。尋找手錶不受這個開關影響。本應用程式不登入，也不連線到廠商雲端。</string>
+    <string name="bridge_root_enable">讀取完整運動記錄（root）</string>
+    <string name="bridge_root_off">需要 root</string>
+    <string name="bridge_root_requesting">請在 Magisk 中確認…</string>
+    <string name="bridge_root_granted">已啟用，可在手機同步</string>
+    <string name="bridge_root_denied">未取得 root 授權</string>
+    <string name="bridge_root_explanation">可在背景額外讀取運動、GPS 路線和逐點明細。開啟時請在 Magisk 提示中允許。只在本應用程式的私有目錄建立暫存資料庫快照，讀取後刪除，不修改原廠運動記錄。關閉後一般健康讀取不受影響。</string>
+    <string name="export_open">匯出健康 JSON</string>
+    <string name="export_intro">儲存到 Download/TicBox，不上傳。檔案含健康值、記錄編號和時間。完整運動逐點還含 GPS 位置，預設不選取，分享前請檢查路線隱私。root 來源需要先在上一頁啟用。</string>
+    <string name="export_sources">來源</string>
+    <string name="export_table_point">測量（POINT）</string>
+    <string name="export_table_session">工作階段（SESSION）</string>
+    <string name="export_table_sport">運動摘要（SPORT）</string>
+    <string name="export_table_fitness_record">完整運動記錄（root RECORD）</string>
+    <string name="export_table_fitness_point">運動逐點與 GPS（root POINT）</string>
+    <string name="export_types">類型編號</string>
+    <string name="export_types_all">全部</string>
+    <string name="export_point_types">血氧 28，睡眠分期 2</string>
+    <string name="export_session_types">睡眠 100</string>
+    <string name="export_sport_types">使用獨立運動編號</string>
+    <string name="export_sleep_oxygen_preset">使用睡眠與血氧樣本預設</string>
+    <string name="export_range">時間範圍</string>
+    <string name="export_from">開始</string>
+    <string name="export_to">結束</string>
+    <string name="export_range_any">不限</string>
+    <string name="export_range_note" tools:ignore="TypographyDashes">可填日期、日期時間或 epoch 毫秒，如 2026-11-03 或 2026-11-03 08:30，日期時間依手錶時區解讀。結束日期包括當天。</string>
+    <string name="export_options">選項</string>
+    <string name="export_maximum">每個來源最多筆數</string>
+    <string name="export_maximum_range">1 到 5000</string>
+    <string name="export_redact">去識別化帳戶與裝置識別碼</string>
+    <string name="export_redact_summary">替換為本次匯出內一致的匿名值</string>
+    <string name="export_notes">依來源游標順序讀取，並非最新的記錄。取消、筆數上限、查詢遭拒等情況會寫入檔案狀態。匯出前可關閉手錶 Wi-Fi、藍牙，僅透過 USB 取得檔案。</string>
+    <string name="export_start">開始匯出</string>
+    <string name="export_cancel">取消</string>
+    <string name="export_invalid_selection" tools:ignore="TypographyDashes">請選擇至少一個來源，並確認類型編號、日期和筆數。日期如 2026-11-03，時間如 2026-11-03 08:30；開始不可晚於結束。</string>
+    <string name="export_running">正在匯出…取消會儲存已讀取的內容。</string>
+    <string name="export_progress">%1$s\n已檢查 %2$d 筆，已匯出 %3$d 筆</string>
+    <string name="export_done">已儲存 %1$d 筆，狀態 %2$s\nrunId: %3$s\n儲存位置：%4$s</string>
+    <string name="export_failed">匯出失敗：%1$s。以前下載的檔案保持不變。</string>
+    <string name="export_busy">上一次匯出正在結束，請稍後再試。</string>
+</resources>

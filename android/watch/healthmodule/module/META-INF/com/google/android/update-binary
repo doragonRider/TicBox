@@ -1,0 +1,12 @@
+#!/sbin/sh
+# Adapted from Magisk v26.0 scripts/module_installer.sh (GPL-3.0).
+umask 022
+ui_print() { echo "$1"; }
+require_magisk() { ui_print "Magisk 26+ is required"; exit 1; }
+OUTFD=$2
+ZIPFILE=$3
+[ -f /data/adb/magisk/util_functions.sh ] || require_magisk
+. /data/adb/magisk/util_functions.sh
+[ "$MAGISK_VER_CODE" -ge 26000 ] || require_magisk
+install_module
+exit 0

@@ -1,0 +1,100 @@
+// Reference reconstruction from phone and watch GMS 24.28.35, not original source.
+syntax = "proto2";
+package ticbox.reference.gms_data;
+
+message AppKey {
+  required string package_name = 1;
+  required string certificate_digest = 2;
+}
+message AssetPermissions { repeated AppKey apps = 1; }
+message SetAsset {
+  required string digest = 1;
+  optional bytes inline_data = 2;
+  optional AssetPermissions permissions = 3;
+}
+message AckAsset { required string digest = 1; }
+message FetchAsset {
+  required string package_name = 1;
+  required string digest = 2;
+  optional bool permission_only = 3;
+  required string certificate_digest = 4;
+}
+message FilePiece {
+  required string owner_message_digest = 1;
+  required bool final_piece = 2;
+  required bytes data = 3;
+  optional string file_digest = 4;
+}
+message SetDataItem {
+  required string package_name = 1;
+  required string uri = 2;
+  // field 3 is absent in GMS 24.28.
+  optional bytes data = 4;
+  optional int64 sequence_id = 5;
+  optional bool deleted = 6;
+  optional string source_node_id = 7;
+  repeated AssetEntry assets = 8;
+  required string certificate_digest = 9;
+  optional int64 last_modified = 10;
+}
+message AssetEntry {
+  required string name = 1;
+  required AssetReference value = 2;
+  required int32 type = 3 [default = 1]; // transmitter explicitly writes 4.
+}
+message AssetReference { optional string digest = 4; }
+message SyncStart {
+  optional int64 received_sequence_id = 1;
+  repeated SyncEntry sync_table = 2;
+  optional int32 version = 3; // sender writes 2; receiver also has version 1.
+  optional SyncRestrictions restrictions = 4;
+}
+message SyncEntry {
+  optional string source_node_id = 1;
+  optional int64 sequence_id = 2;
+}
+message SyncRestrictions { repeated PackageRestriction packages = 1; }
+message PackageRestriction {
+  optional string package_name = 1;
+  optional DataFilters data_filters = 2;
+  optional CapabilityFilters capability_filters = 3;
+}
+message DataFilters { repeated DataFilter filters = 1; }
+message DataFilter {
+  optional int32 kind = 1; // enum: 0 unspecified, 1 literal, 2 prefix.
+  optional string uri = 2;
+}
+message CapabilityFilters { repeated CapabilityFilter filters = 1; }
+message CapabilityFilter { optional string name = 1; }
+
+// DataMap is another protobuf inside SetDataItem.data where the application
+// uses PutDataMapRequest. Arbitrary DataApi bytes need not be a DataMap.
+// Same layout in the Mobvoi Health OEM SDK.
+message DataMap { repeated DataMapEntry entries = 1; }
+message DataMapEntry {
+  required string name = 1;
+  required DataMapValue value = 2;
+}
+message DataMapValue {
+  required int32 type = 1 [default = 1];
+  optional DataMapStorage storage = 2;
+}
+message DataMapStorage {
+  optional bytes byte_array = 1;
+  optional string string_value = 2;
+  optional double double_value = 3;
+  optional float float_value = 4;
+  optional int64 long_value = 5;
+  optional int32 int_value = 6;
+  optional sint32 byte_value = 7;
+  optional bool bool_value = 8;
+  repeated DataMapEntry map_entries = 9;
+  repeated DataMapValue list_values = 10;
+  repeated string string_array = 11;
+  repeated int64 long_array = 12 [packed = false];
+  optional int64 asset_index = 13;
+  repeated float float_array = 14 [packed = false];
+}
+// Value.type: 1 bytes, 2 string, 3 double, 4 float, 5 long, 6 int, 7 byte,
+// 8 bool, 9 DataMap, 10 ArrayList, 11 String[], 12 long[], 13 Asset index,
+// 14 null, 15 float[]. Assets are bound outside these bytes by numeric keys.

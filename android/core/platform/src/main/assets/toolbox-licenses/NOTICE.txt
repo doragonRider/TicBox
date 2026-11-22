@@ -1,0 +1,46 @@
+TicBox
+Copyright (C) 2026 TicBox contributors.
+Original project code is licensed under GNU GPL version 3 only (GPL-3.0-only).
+Project license: https://github.com/doragonRider/TicBox/blob/main/LICENSE
+Source and build instructions: https://github.com/doragonRider/TicBox
+
+Third-party toolbox transport dependencies retain their own licenses below.
+
+Kadb 2.1.5 — Copyright flyfishxu, Apache-2.0.
+https://github.com/flyfishxu/Kadb
+Pinned source: 3d1c13e8df261cc4a2bb57b03aa8c392cb8386c3 (tag 2.1.5).
+Local Android binding: android/thirdparty/kadb.
+Modified by TicBox contributors in 2026: Android-only source binding
+and replacement of the STLS connection transport with platform SSLSocket.
+The original ADB protocol and SPAKE2 pairing implementation are retained.
+License: KADB-APACHE-2.0.txt
+
+SPAKE2-Java 1.1.1 — Copyright Muntashir Al-Islam and Flyfish233, GPL-3.0.
+https://github.com/Flyfish233/spake2-java/tree/1.1.1
+Artifact: com.github.Flyfish233:spake2-java:1.1.1
+License: SPAKE2-GPL-3.0.txt
+
+curve25519-elisabeth 0.1.0 and ed25519-elisabeth 0.1.0 — MIT.
+https://github.com/cryptography-cafe/curve25519-elisabeth
+https://github.com/cryptography-cafe/ed25519-elisabeth
+Licenses: CURVE25519-ELISABETH-MIT.txt, ED25519-ELISABETH-MIT.txt
+
+Bouncy Castle bcprov/bcpkix/bcutil 1.86 — Bouncy Castle License (MIT style).
+https://www.bouncycastle.org/
+License: BOUNCY-CASTLE.txt
+
+HiddenApiBypass 6.1 — Copyright LSPosed, Apache-2.0.
+https://github.com/LSPosed/AndroidHiddenApiBypass
+License: KADB-APACHE-2.0.txt (standard Apache-2.0 license text)
+
+termlib 0.3.14 — Copyright Kenny Root, Apache-2.0. The command line page's terminal emulator.
+https://github.com/connectbot/termlib
+Artifact: org.connectbot:termlib:0.3.14
+License: KADB-APACHE-2.0.txt (standard Apache-2.0 license text)
+
+libvterm, built into termlib's native library — Copyright Paul Evans, MIT.
+https://www.leonerd.org.uk/code/libvterm/
+License: LIBVTERM-MIT.txt
+
+The separately bundled scrcpy server has its notice and Apache-2.0 license in
+assets/toolbox/SCRCPY-NOTICE.txt and assets/toolbox/SCRCPY-LICENSE.

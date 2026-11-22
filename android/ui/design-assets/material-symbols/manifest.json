@@ -1,0 +1,800 @@
+{
+  "upstream": "https://github.com/google/material-design-icons",
+  "revision": "10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7",
+  "style": "materialsymbolsoutlined",
+  "license": "Apache-2.0",
+  "files": [
+    {
+      "name": "account_circle",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/account_circle/materialsymbolsoutlined/account_circle_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_account_circle.xml"
+    },
+    {
+      "name": "add",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/add/materialsymbolsoutlined/add_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_add.xml"
+    },
+    {
+      "name": "air",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/air/materialsymbolsoutlined/air_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_air.xml"
+    },
+    {
+      "name": "android",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/android/materialsymbolsoutlined/android_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_android.xml"
+    },
+    {
+      "name": "alarm",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/alarm/materialsymbolsoutlined/alarm_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_alarm.xml"
+    },
+    {
+      "name": "apps",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/apps/materialsymbolsoutlined/apps_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_apps.xml"
+    },
+    {
+      "name": "archive",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/archive/materialsymbolsoutlined/archive_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_archive.xml"
+    },
+    {
+      "name": "arrow_back",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/arrow_back/materialsymbolsoutlined/arrow_back_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_arrow_back.xml"
+    },
+    {
+      "name": "arrow_drop_down",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/arrow_drop_down/materialsymbolsoutlined/arrow_drop_down_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_arrow_drop_down.xml"
+    },
+    {
+      "name": "arrow_upward",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/arrow_upward/materialsymbolsoutlined/arrow_upward_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_arrow_upward.xml"
+    },
+    {
+      "name": "auto_awesome",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/auto_awesome/materialsymbolsoutlined/auto_awesome_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_auto_awesome.xml"
+    },
+    {
+      "name": "backspace",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/backspace/materialsymbolsoutlined/backspace_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_backspace.xml"
+    },
+    {
+      "name": "battery_full",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/battery_full/materialsymbolsoutlined/battery_full_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_battery_full.xml"
+    },
+    {
+      "name": "bedtime",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/bedtime/materialsymbolsoutlined/bedtime_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_bedtime.xml"
+    },
+    {
+      "name": "bedtime",
+      "filled": true,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/bedtime/materialsymbolsoutlined/bedtime_fill1_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_bedtime_filled.xml"
+    },
+    {
+      "name": "block",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/block/materialsymbolsoutlined/block_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_block.xml"
+    },
+    {
+      "name": "bluetooth",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/bluetooth/materialsymbolsoutlined/bluetooth_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_bluetooth.xml"
+    },
+    {
+      "name": "bluetooth_disabled",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/bluetooth_disabled/materialsymbolsoutlined/bluetooth_disabled_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_bluetooth_disabled.xml"
+    },
+    {
+      "name": "bolt",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/bolt/materialsymbolsoutlined/bolt_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_bolt.xml"
+    },
+    {
+      "name": "bug_report",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/bug_report/materialsymbolsoutlined/bug_report_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_bug_report.xml"
+    },
+    {
+      "name": "calendar_today",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/calendar_today/materialsymbolsoutlined/calendar_today_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_calendar_today.xml"
+    },
+    {
+      "name": "call",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/call/materialsymbolsoutlined/call_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_call.xml"
+    },
+    {
+      "name": "call_split",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/call_split/materialsymbolsoutlined/call_split_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_call_split.xml"
+    },
+    {
+      "name": "cast",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/cast/materialsymbolsoutlined/cast_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_cast.xml"
+    },
+    {
+      "name": "check",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/check/materialsymbolsoutlined/check_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_check.xml"
+    },
+    {
+      "name": "check_circle",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/check_circle/materialsymbolsoutlined/check_circle_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_check_circle.xml"
+    },
+    {
+      "name": "check_circle",
+      "filled": true,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/check_circle/materialsymbolsoutlined/check_circle_fill1_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_check_circle_filled.xml"
+    },
+    {
+      "name": "chevron_left",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/chevron_left/materialsymbolsoutlined/chevron_left_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_chevron_left.xml"
+    },
+    {
+      "name": "chevron_right",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/chevron_right/materialsymbolsoutlined/chevron_right_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_chevron_right.xml"
+    },
+    {
+      "name": "close",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/close/materialsymbolsoutlined/close_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_close.xml"
+    },
+    {
+      "name": "cloud",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/cloud/materialsymbolsoutlined/cloud_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_cloud.xml"
+    },
+    {
+      "name": "code",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/code/materialsymbolsoutlined/code_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_code.xml"
+    },
+    {
+      "name": "construction",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/construction/materialsymbolsoutlined/construction_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_construction.xml"
+    },
+    {
+      "name": "content_copy",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/content_copy/materialsymbolsoutlined/content_copy_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_content_copy.xml"
+    },
+    {
+      "name": "content_paste",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/src/content/content_paste/materialiconsoutlined/24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_content_paste.xml"
+    },
+    {
+      "name": "create_new_folder",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/create_new_folder/materialsymbolsoutlined/create_new_folder_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_create_new_folder.xml"
+    },
+    {
+      "name": "database",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/database/materialsymbolsoutlined/database_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_database.xml"
+    },
+    {
+      "name": "delete",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/delete/materialsymbolsoutlined/delete_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_delete.xml"
+    },
+    {
+      "name": "device_thermostat",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/device_thermostat/materialsymbolsoutlined/device_thermostat_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_device_thermostat.xml"
+    },
+    {
+      "name": "directions_bike",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/directions_bike/materialsymbolsoutlined/directions_bike_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_directions_bike.xml"
+    },
+    {
+      "name": "directions_run",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/directions_run/materialsymbolsoutlined/directions_run_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_directions_run.xml"
+    },
+    {
+      "name": "directions_walk",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/directions_walk/materialsymbolsoutlined/directions_walk_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_directions_walk.xml"
+    },
+    {
+      "name": "do_not_disturb_on",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/do_not_disturb_on/materialsymbolsoutlined/do_not_disturb_on_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_do_not_disturb_on.xml"
+    },
+    {
+      "name": "download",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/download/materialsymbolsoutlined/download_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_download.xml"
+    },
+    {
+      "name": "draft",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/draft/materialsymbolsoutlined/draft_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_draft.xml"
+    },
+    {
+      "name": "edit",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/edit/materialsymbolsoutlined/edit_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_edit.xml"
+    },
+    {
+      "name": "error",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/error/materialsymbolsoutlined/error_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_error.xml"
+    },
+    {
+      "name": "expand_more",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/expand_more/materialsymbolsoutlined/expand_more_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_expand_more.xml"
+    },
+    {
+      "name": "extension",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/extension/materialsymbolsoutlined/extension_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_extension.xml"
+    },
+    {
+      "name": "favorite",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/favorite/materialsymbolsoutlined/favorite_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_favorite.xml"
+    },
+    {
+      "name": "favorite",
+      "filled": true,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/favorite/materialsymbolsoutlined/favorite_fill1_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_favorite_filled.xml"
+    },
+    {
+      "name": "filter_list",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/filter_list/materialsymbolsoutlined/filter_list_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_filter_list.xml"
+    },
+    {
+      "name": "fitness_center",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/fitness_center/materialsymbolsoutlined/fitness_center_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_fitness_center.xml"
+    },
+    {
+      "name": "flag",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/flag/materialsymbolsoutlined/flag_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_flag.xml"
+    },
+    {
+      "name": "fullscreen",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/fullscreen/materialsymbolsoutlined/fullscreen_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_fullscreen.xml"
+    },
+    {
+      "name": "fullscreen_exit",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/fullscreen_exit/materialsymbolsoutlined/fullscreen_exit_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_fullscreen_exit.xml"
+    },
+    {
+      "name": "folder",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/folder/materialsymbolsoutlined/folder_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_folder.xml"
+    },
+    {
+      "name": "hearing",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/hearing/materialsymbolsoutlined/hearing_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_hearing.xml"
+    },
+    {
+      "name": "history",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/history/materialsymbolsoutlined/history_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_history.xml"
+    },
+    {
+      "name": "home",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/home/materialsymbolsoutlined/home_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_home.xml"
+    },
+    {
+      "name": "info",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/info/materialsymbolsoutlined/info_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_info.xml"
+    },
+    {
+      "name": "key",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/key/materialsymbolsoutlined/key_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_key.xml"
+    },
+    {
+      "name": "keyboard",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/keyboard/materialsymbolsoutlined/keyboard_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_keyboard.xml"
+    },
+    {
+      "name": "keyboard_return",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/keyboard_return/materialsymbolsoutlined/keyboard_return_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_keyboard_return.xml"
+    },
+    {
+      "name": "language",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/language/materialsymbolsoutlined/language_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_language.xml"
+    },
+    {
+      "name": "link",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/link/materialsymbolsoutlined/link_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_link.xml"
+    },
+    {
+      "name": "link_off",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/link_off/materialsymbolsoutlined/link_off_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_link_off.xml"
+    },
+    {
+      "name": "local_fire_department",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/local_fire_department/materialsymbolsoutlined/local_fire_department_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_local_fire_department.xml"
+    },
+    {
+      "name": "location_on",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/location_on/materialsymbolsoutlined/location_on_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_location_on.xml"
+    },
+    {
+      "name": "lock",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/lock/materialsymbolsoutlined/lock_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_lock.xml"
+    },
+    {
+      "name": "login",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/login/materialsymbolsoutlined/login_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_login.xml"
+    },
+    {
+      "name": "logout",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/logout/materialsymbolsoutlined/logout_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_logout.xml"
+    },
+    {
+      "name": "monitor_heart",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/monitor_heart/materialsymbolsoutlined/monitor_heart_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_monitor_heart.xml"
+    },
+    {
+      "name": "mood",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/mood/materialsymbolsoutlined/mood_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_mood.xml"
+    },
+    {
+      "name": "more_horiz",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/more_horiz/materialsymbolsoutlined/more_horiz_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_more_horiz.xml"
+    },
+    {
+      "name": "more_vert",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/more_vert/materialsymbolsoutlined/more_vert_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_more_vert.xml"
+    },
+    {
+      "name": "music_note",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/music_note/materialsymbolsoutlined/music_note_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_music_note.xml"
+    },
+    {
+      "name": "notifications",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/notifications/materialsymbolsoutlined/notifications_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_notifications.xml"
+    },
+    {
+      "name": "open_in_new",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/open_in_new/materialsymbolsoutlined/open_in_new_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_open_in_new.xml"
+    },
+    {
+      "name": "palette",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/palette/materialsymbolsoutlined/palette_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_palette.xml"
+    },
+    {
+      "name": "pause_circle",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/pause_circle/materialsymbolsoutlined/pause_circle_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_pause_circle.xml"
+    },
+    {
+      "name": "person",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/person/materialsymbolsoutlined/person_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_person.xml"
+    },
+    {
+      "name": "phonelink_ring",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/phonelink_ring/materialsymbolsoutlined/phonelink_ring_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_phonelink_ring.xml"
+    },
+    {
+      "name": "photo_camera",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/photo_camera/materialsymbolsoutlined/photo_camera_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_photo_camera.xml"
+    },
+    {
+      "name": "play_arrow",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/play_arrow/materialsymbolsoutlined/play_arrow_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_play_arrow.xml"
+    },
+    {
+      "name": "play_circle",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/play_circle/materialsymbolsoutlined/play_circle_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_play_circle.xml"
+    },
+    {
+      "name": "pool",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/pool/materialsymbolsoutlined/pool_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_pool.xml"
+    },
+    {
+      "name": "power_settings_new",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/power_settings_new/materialsymbolsoutlined/power_settings_new_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_power_settings_new.xml"
+    },
+    {
+      "name": "refresh",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/refresh/materialsymbolsoutlined/refresh_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_refresh.xml"
+    },
+    {
+      "name": "restart_alt",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/restart_alt/materialsymbolsoutlined/restart_alt_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_restart_alt.xml"
+    },
+    {
+      "name": "schedule",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/schedule/materialsymbolsoutlined/schedule_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_schedule.xml"
+    },
+    {
+      "name": "screen_share",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/screen_share/materialsymbolsoutlined/screen_share_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_screen_share.xml"
+    },
+    {
+      "name": "science",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/science/materialsymbolsoutlined/science_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_science.xml"
+    },
+    {
+      "name": "search",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/search/materialsymbolsoutlined/search_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_search.xml"
+    },
+    {
+      "name": "self_improvement",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/self_improvement/materialsymbolsoutlined/self_improvement_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_self_improvement.xml"
+    },
+    {
+      "name": "send",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/src/content/send/materialiconsoutlined/24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_send.xml"
+    },
+    {
+      "name": "settings",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/settings/materialsymbolsoutlined/settings_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_settings.xml"
+    },
+    {
+      "name": "settings",
+      "filled": true,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/settings/materialsymbolsoutlined/settings_fill1_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_settings_filled.xml"
+    },
+    {
+      "name": "shield",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/shield/materialsymbolsoutlined/shield_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_shield.xml"
+    },
+    {
+      "name": "smartphone",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/smartphone/materialsymbolsoutlined/smartphone_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_smartphone.xml"
+    },
+    {
+      "name": "sim_card",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/sim_card/materialsymbolsoutlined/sim_card_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_sim_card.xml"
+    },
+    {
+      "name": "sms",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/sms/materialsymbolsoutlined/sms_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_sms.xml"
+    },
+    {
+      "name": "sos",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/sos/materialsymbolsoutlined/sos_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_sos.xml"
+    },
+    {
+      "name": "sort",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/sort/materialsymbolsoutlined/sort_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_sort.xml"
+    },
+    {
+      "name": "sort_by_alpha",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/sort_by_alpha/materialsymbolsoutlined/sort_by_alpha_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_sort_by_alpha.xml"
+    },
+    {
+      "name": "speed",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/speed/materialsymbolsoutlined/speed_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_speed.xml"
+    },
+    {
+      "name": "spo2",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/spo2/materialsymbolsoutlined/spo2_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_spo2.xml"
+    },
+    {
+      "name": "sports",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/sports/materialsymbolsoutlined/sports_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_sports.xml"
+    },
+    {
+      "name": "stairs",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/stairs/materialsymbolsoutlined/stairs_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_stairs.xml"
+    },
+    {
+      "name": "steps",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/steps/materialsymbolsoutlined/steps_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_steps.xml"
+    },
+    {
+      "name": "storage",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/storage/materialsymbolsoutlined/storage_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_storage.xml"
+    },
+    {
+      "name": "stop",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/stop/materialsymbolsoutlined/stop_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_stop.xml"
+    },
+    {
+      "name": "straighten",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/straighten/materialsymbolsoutlined/straighten_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_straighten.xml"
+    },
+    {
+      "name": "sync",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/sync/materialsymbolsoutlined/sync_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_sync.xml"
+    },
+    {
+      "name": "thermometer",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/thermometer/materialsymbolsoutlined/thermometer_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_thermometer.xml"
+    },
+    {
+      "name": "timer",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/timer/materialsymbolsoutlined/timer_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_timer.xml"
+    },
+    {
+      "name": "touch_app",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/touch_app/materialsymbolsoutlined/touch_app_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_touch_app.xml"
+    },
+    {
+      "name": "tune",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/tune/materialsymbolsoutlined/tune_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_tune.xml"
+    },
+    {
+      "name": "upload",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/upload/materialsymbolsoutlined/upload_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_upload.xml"
+    },
+    {
+      "name": "vibration",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/vibration/materialsymbolsoutlined/vibration_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_vibration.xml"
+    },
+    {
+      "name": "visibility",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/visibility/materialsymbolsoutlined/visibility_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_visibility.xml"
+    },
+    {
+      "name": "visibility_off",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/visibility_off/materialsymbolsoutlined/visibility_off_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_visibility_off.xml"
+    },
+    {
+      "name": "volume_down",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/volume_down/materialsymbolsoutlined/volume_down_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_volume_down.xml"
+    },
+    {
+      "name": "volume_off",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/volume_off/materialsymbolsoutlined/volume_off_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_volume_off.xml"
+    },
+    {
+      "name": "volume_up",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/volume_up/materialsymbolsoutlined/volume_up_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_volume_up.xml"
+    },
+    {
+      "name": "keyboard_tab",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/keyboard_tab/materialsymbolsoutlined/keyboard_tab_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_keyboard_tab.xml"
+    },
+    {
+      "name": "warning",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/warning/materialsymbolsoutlined/warning_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_warning.xml"
+    },
+    {
+      "name": "watch",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/watch/materialsymbolsoutlined/watch_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_watch.xml"
+    },
+    {
+      "name": "watch",
+      "filled": true,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/watch/materialsymbolsoutlined/watch_fill1_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_watch_filled.xml"
+    },
+    {
+      "name": "watch_screentime",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/watch_screentime/materialsymbolsoutlined/watch_screentime_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_watch_screentime.xml"
+    },
+    {
+      "name": "water_drop",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/water_drop/materialsymbolsoutlined/water_drop_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_water_drop.xml"
+    },
+    {
+      "name": "wifi",
+      "filled": false,
+      "url": "https://raw.githubusercontent.com/google/material-design-icons/10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7/symbols/web/wifi/materialsymbolsoutlined/wifi_24px.svg",
+      "resource": "android/ui/src/main/res/drawable/ic_wifi.xml"
+    }
+  ]
+}

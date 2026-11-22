@@ -1,0 +1,11 @@
+<resources>
+    <string name="sample_title">Local health check</string>
+    <string name="sample_explanation">SESSION and SPORT checks reuse the background reader and read one record at most. They keep only status, column names, types and provider permissions on this watch, with no health values or identifiers. An empty table and a refused permission are reported separately. SPORT may need a vendor signature permission. The raw sample reads the newest 5 POINT records at most. Its file contains health values and times, with wwid and device_id removed. Nothing here is uploaded. Turn off Wi-Fi, Bluetooth and other networks on the watch first, and keep only USB connected.</string>
+    <string name="sample_offline">Watch network turned off</string>
+    <string name="sample_start">Read up to 5 raw records</string>
+    <string name="session_probe_start">Check SESSION reading (metadata only)</string>
+    <string name="sport_probe_start">Check SPORT source and permission (metadata only)</string>
+    <string name="sample_running">Reading…</string>
+    <string name="sample_done">Read finished: %1$d, status %2$s. Private file: files/%3$s</string>
+    <string name="sample_failed">Sample not finished: %1$s. Diagnostics contain no health values.</string>
+</resources>

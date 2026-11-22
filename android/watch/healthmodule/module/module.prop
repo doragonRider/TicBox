@@ -1,0 +1,6 @@
+id=ticwatch_health_settings
+name=TicBox Health Settings (Zygisk)
+version=${versionName}
+versionCode=${versionCode}
+author=TicBox contributors
+description=Verified TicHealth process settings, with a separately opted-in notification alert patch for a verified SystemUI APK. Requires Magisk 26+, Zygisk, Android 11+; reboot after installation. No vendor APK or global security policy changes.

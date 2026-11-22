@@ -1,0 +1,1 @@
+package w9;import android.content.Context;import dev.ticbox.companion.healthmodule.TestOem;public final class a{public static void c(Context c){TestOem.alarm("wake_alarm");}public static void e(Context c){TestOem.alarm("bedtime_alarm");}}

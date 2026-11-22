@@ -1,0 +1,217 @@
+syntax = "proto2";
+
+package ticbox.reference.setup;
+
+// Wire reference for the Setup Channel; field names are descriptive, not original.
+// "Phone" means the official phone app; "watch" means the watch's setup wizard.
+// See docs/spec/pairing-setup.md. This is a wire description, not an activation recipe.
+// Transport: ChannelClient path /setup/channel; each record is BE int32 length
+// followed by serialized SetupMessage. This is INSIDE a Wear Channel stream.
+// Raw fields must be retained separately when an enum or nested message is unknown.
+
+message SetupMessage {
+  enum Type {
+    TYPE_UNKNOWN = 0;
+    COMMAND = 1;
+    EVENT = 2;
+    STATUS = 3;
+    SYSTEM_INFO = 4;
+    TIME = 5;
+    TIME_ZONE = 6;
+    CONNECTION_INFO = 7;
+    ENROLLMENT_INFO = 8;
+  }
+  // Fields are independent optional
+  // messages; this is not a protobuf oneof. No field 7 occurs in these descriptors.
+  optional Type type = 1;
+  optional Command command = 2;
+  optional Event event = 3;
+  optional Status status = 4;
+  optional SystemInfo info = 5;
+  optional CompanionTime companion_time = 6;
+  optional ConnectionInfo connection_info = 8;
+  optional EnrollmentInfo enrollment_info = 9;
+}
+
+message Command {
+  enum Type {
+    TYPE_UNKNOWN = 0;
+    GET_STATUS = 1;
+    GET_SYSTEM_INFO = 2;
+    STOP = 3;
+    SYNC_TIME = 4;
+    GET_CONNECTION_INFO = 5;
+    // Known to the phone, absent from the watch's Command.Type enum.
+    HEARTBEAT_REQUEST = 6;
+  }
+  // The long field is INT64 (not uint64/sint64).
+  optional Type type = 1;
+  optional int64 id = 2;
+}
+
+message Event {
+  enum Type {
+    TYPE_UNKNOWN = 0;
+    STARTED = 1;
+    STOPPED = 2;
+    OPTIN_UPDATED = 3;
+    UNKNOWN_COMMAND = 4;
+    UNSUPPORTED_COMMAND = 5;
+    // Known to the phone, absent from the watch's Event.Type enum.
+    HEARTBEAT_RESPONSE = 6;
+  }
+  // Phone and watch agree on the embedded schema.
+  optional Type type = 1;
+  optional OptinStatus optin = 2;
+  optional int64 command_id = 3;
+}
+
+message OptinStatus {
+  enum Type {
+    OPTIN_TYPE_UNKNOWN = 0;
+    ACCOUNTS = 1;
+    CLOUDSYNC = 2;
+    COMMUNICATION = 3;
+    CALENDAR = 4;
+    NOTIFICATIONS = 5;
+    LOGGING = 6;
+    LOCATION = 7;
+  }
+  enum State {
+    OPTIN_STATE_UNKNOWN = 0;
+    ACCEPTED = 1;
+    DECLINED = 2;
+    SKIPPED = 3;
+  }
+  optional Type type = 1;
+  optional State state = 2;
+  optional int64 time = 3;
+}
+
+message Status {
+  enum State {
+    STATE_UNKNOWN = 0;
+    READY = 1;
+    COMPLETE_PENDING = 2;
+    COMPLETE = 3;
+    UPDATING = 4;
+    OOBE_DONE = 5;
+    // The phone knows these newer resumable-OOBE values; the reference watch
+    // Status.State enum has only 0..5. Do not infer support from phone code alone.
+    STATUS_READY_RESUMABLE_OOBE = 10;
+    STATUS_START_RESUMABLE_OOBE = 11;
+    STATUS_CRITICAL_PHASE_COMPLETE = 12;
+    STATUS_EXITING_TO_WATCHFACE = 13;
+    STATUS_WATCH_FAILURE = 14;
+    STATUS_PHONE_FAILURE = 15;
+  }
+  optional State state = 1;
+}
+
+message SystemInfo {
+  enum Version {
+    VERSION_UNKNOWN = 0;
+    EMERALD_AND_BELOW = 1;
+    FELDSPAR = 2;
+    IOLITE = 3;
+    KYANITE = 4;
+  }
+  enum Capability {
+    CAPABILITY_UNKNOWN = 0;
+    WIFI = 1;
+    SPEAKER = 2;
+    CELLULAR = 3;
+    ACCOUNTS = 4;
+    LEGACY_CALLING = 5;
+    SETUP_PROTOCOMM_CHANNEL = 6;
+  }
+  enum Edition {
+    EDITION_UNKNOWN = 0;
+    GLOBAL = 1;
+    LOCAL = 2;
+  }
+  enum SetupCapability {
+    SETUP_CAPABILITY_UNKNOWN = 0;
+    RESTORE_SUPPORTED = 1;
+    GMS_CHECKIN = 2;
+    DAY0_OTA = 3;
+    FACTORY_RESET_PROTECTION = 4;
+    TETHER_CONFIG = 5;
+    SIGNALS_OOBE_DONE = 6;
+    TALKBACK_MISTRIGGER = 7;
+    PRELOADED_ASSISTANT = 8;
+    STANDALONE_CONNECTIVITY = 9;
+    RESTRICTED_CONNECTIVITY = 10;
+    // These next two are known to the phone, absent from the reference watch enum.
+    ENABLE_BACKUP_IN_SETUP_SUPPORTED = 11;
+    RESUMABLE_OOBE = 12;
+  }
+  enum SetupCapabilityVersion {
+    UNKNOWN = 0;
+    V1 = 1;
+  }
+  // Phone and watch descriptors agree.
+  optional Version version = 1;
+  repeated Capability capabilities = 2 [packed = false];
+  optional Edition edition = 3;
+  optional int32 platform_version = 4;
+  optional int32 maintenance_release_version = 5;
+  repeated SetupCapability setup_capabilities = 6 [packed = true];
+  optional SetupCapabilityVersion setup_capability_version = 7;
+}
+
+message CompanionTime {
+  // currentTimeMillis() and the TimeZone ID.
+  optional int64 companion_time_ms = 2;
+  optional string time_zone_id = 5;
+}
+
+message ConnectionInfo {
+  optional CellularInfo cell_info = 1;
+}
+
+message CellularInfo {
+  // Names match the watch's class.
+  optional int32 mnc = 1;
+  optional int32 mcc = 2;
+  optional string carrier_name = 3;
+}
+
+message EnrollmentInfo {
+  optional string enrollment_intent = 1;
+}
+
+// Additional MessageClient RPC payloads, not /setup/channel records.
+message SetTetherConfigRequest {
+  enum TetherConfig {
+    UNKNOWN = 0;
+    STANDALONE = 1;
+    TETHERED = 2;
+    RESTRICTED = 3;
+  }
+  optional TetherConfig config = 1; // Path: /clockworkSetupWizard/set_tether_config_request.
+}
+message SetTetherConfigResponse {}
+
+// Watch restore-status handler. MessageApi RPC, no Channel framing.
+// Path: /clockworkSetupWizard/watch_restore_status_request
+// Even SKIPPED starts OEM initialization; this is not a cloud restore request.
+message WatchRestoreStatusRequest {
+  enum Status { UNSPECIFIED = 0; SKIPPED = 1; STARTED = 2; }
+  optional Status status = 1;
+}
+message WatchRestoreStatusResponse {}
+
+// The phone's message is proto3 with optional presence. The proto2 declaration here
+// preserves the observed field wire types/presence, not the original syntax.
+message WatchGmsCheckinStatusResponse {
+  enum Status {
+    UNKNOWN = 0;
+    STARTED = 1;
+    STARTED_NON_BLOCKING = 2;
+    FINISHED_SUCCESS = 3;
+    FINISHED_FAILURE = 4;
+  }
+  optional Status status = 1;
+  optional bool factory_reset = 2;
+}

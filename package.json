@@ -1,0 +1,19 @@
+{
+  "name": "ticbox",
+  "private": true,
+  "version": "1.0.0",
+  "license": "GPL-3.0-only",
+  "description": "TicBox: a local-first companion app for TicWatch watches, with standalone protocol specifications",
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "docs:check": "node tools/check-report-links.mjs",
+    "check": "npm test && npm run docs:check",
+    "android:check": "node tools/run-android-check.mjs",
+    "android:package": "node tools/package-android.mjs",
+    "android:sqlite-check": "node android/core/platform/src/test/resources/data-sync-sqlite-check.mjs"
+  }
+}

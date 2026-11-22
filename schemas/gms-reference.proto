@@ -1,0 +1,66 @@
+// Reference reconstruction, not original source. Based on GMS 23.25.18 and
+// cross-checked with phone and watch GMS 24.28.35.
+// Names are descriptive. proto2 is the reconstruction notation for explicit
+// presence/required flags, not a claim about Google's original source syntax.
+syntax = "proto2";
+package ticbox.reference.gms;
+import "gms-data-reference.proto";
+import "gms-channel-reference.proto";
+import "gms-control-reference.proto";
+
+message MessagePiece {
+  required bytes fragment = 1;
+  required string sha1_base64url_unpadded = 2;
+  required int32 piece_index_one_based = 3;
+  required int32 piece_count = 4;
+  optional int32 queue_id = 5 [default = -1];
+}
+
+message WearMessage {
+  optional ticbox.reference.gms_data.SetAsset set_asset = 4;
+  optional ticbox.reference.gms_data.AckAsset ack_asset = 5;
+  optional ticbox.reference.gms_data.FetchAsset fetch_asset = 6;
+  optional Connect connect = 7;
+  optional ticbox.reference.gms_data.SyncStart sync_start = 8;
+  optional ticbox.reference.gms_data.SetDataItem set_data_item = 9;
+  optional RpcRequest rpc_request = 10;
+  optional ticbox.reference.gms_control.Heartbeat heartbeat = 11;
+  optional ticbox.reference.gms_data.FilePiece file_piece = 12;
+  optional bool has_file = 13;
+  optional RpcRequest channel_rpc_request = 16;
+  optional ticbox.reference.gms_control.CryptoMessage crypto = 17;
+  optional RpcRequest rpc_service_request = 18;
+  // Present only in the selected watch container. Android phone has no field19.
+  optional ticbox.reference.gms_control.IosAuthMessage ios_auth = 19;
+  optional ticbox.reference.gms_control.ControlMessage control = 20;
+}
+
+message Connect {
+  required string node_id = 1;
+  required string node_name = 2;
+  optional int64 android_id = 3;
+  optional int32 connection_version = 4; // writer sets 3; meaning not fully named
+  optional int32 wire_version = 5; // writer sets 1
+  optional int32 min_wire_version = 6; // writer sets 0
+  optional string network_id = 7;
+  optional string companion_package = 8;
+  optional bool is_migrating = 9;
+  optional string previous_node_id = 10;
+  optional int32 sender_sdk_version = 11; // writer: Build.VERSION.SDK_INT; 24.28 only
+}
+
+message RpcRequest {
+  required int32 request_id = 1;
+  required string package_name = 2;
+  required string package_digest = 3;
+  required string target_node_id = 4;
+  required int32 unknown_zero = 5;
+  required string path = 6;
+  optional bytes payload = 7;
+  optional string source_node_id = 8;
+  optional ticbox.reference.gms_channel.ChannelRequest channel = 9;
+  optional int32 generation = 10;
+  optional bool expects_response = 11;
+  optional int32 response_correlation_token = 12;
+  optional int32 message_option = 13; // original enum, not an arbitrary opcode
+}

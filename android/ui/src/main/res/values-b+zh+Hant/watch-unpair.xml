@@ -1,0 +1,29 @@
+<resources>
+    <string name="phone_transfer_title">更換綁定的手機</string>
+    <string name="phone_transfer_intro">移轉在手錶和新手機上完成，這支手機只負責開始和最後清理自己的記錄。</string>
+    <string name="phone_transfer_warning">在手錶徹底完成與新手機的配對之前，不要解除與這支手機的配對，也不要在系統藍牙設定裡忘記手錶，否則可能導致移轉失敗，或這支手機的藍牙記錄無法清除。</string>
+    <string name="phone_transfer_disconnected">手錶未連線。前兩步需要手錶連線這支手機。</string>
+    <string name="phone_transfer_step_check">先檢查手錶</string>
+    <string name="phone_transfer_step_check_body">讀取手錶的服務版本，與本應用程式驗證過的版本對比，不會改動手錶。</string>
+    <string name="unpair_check_support">檢查手錶支援情況</string>
+    <string name="unpair_support_observed">手錶是已驗證的版本</string>
+    <string name="unpair_unsupported">手錶不是已驗證的版本</string>
+    <string name="phone_transfer_unsupported">Wear OS 3.5 不支援保留資料遷移手機。</string>
+    <string name="unpair_check_interrupted">檢查期間手錶連線發生變化，請等連線穩定後重新檢查。</string>
+    <string name="unpair_check_timed_out">未及時收到錶端服務版本，請稍後重試。</string>
+    <string name="unpair_check_version_unavailable">未能讀取錶端服務版本，請稍後重試。</string>
+    <string name="phone_transfer_step_transfer">在手錶和新手機上完成移轉</string>
+    <string name="phone_transfer_step_transfer_body">開啟移轉流程後，在手錶和新手機上完成全部操作，包括確認配對碼。完成後確認手錶回到錶面、新手機連線穩定、健康同步恢復。</string>
+    <string name="watch_transfer_action">在手錶上開啟移轉流程</string>
+    <string name="watch_transfer_opened">已在手錶上開啟移轉流程，請在手錶和新手機上完成整個移轉。</string>
+    <string name="phone_transfer_step_clear">移轉完成後清理這支手機</string>
+    <string name="phone_transfer_step_clear_body">手錶結束與這支手機的關聯後，這支手機會停止重新連線，但藍牙記錄可能還在。可以在這裡清除，不會向手錶傳送任何內容。</string>
+    <string name="phone_transfer_clear_action">清除這支手機的配對記錄</string>
+    <string name="phone_transfer_clear_linked">手錶還連線著這支手機，移轉可能還沒有完成。連線結束後才能清除。</string>
+    <string name="phone_transfer_association_ended">手錶已結束與這支手機的關聯，現在可以清除配對記錄。</string>
+    <string name="phone_transfer_clear_confirm_offline">手錶現在沒有連線這支手機，不會向手錶傳送任何內容。繼續會停止重新連線，並清除這支手機的藍牙配對和關聯記錄，這支手機上的健康記錄會保留。\n\n請確認手錶已徹底完成與新手機的配對，否則可能導致移轉失敗。</string>
+    <string name="phone_transfer_clear_confirm_ended">手錶已結束與這支手機的關聯。繼續會停止重新連線，並清除這支手機的藍牙配對和關聯記錄。不會向手錶傳送任何內容，這支手機上的健康記錄會保留。</string>
+    <string name="phone_transfer_cleared">已清除這支手機的配對記錄。</string>
+    <string name="phone_transfer_clear_refused">沒有清除這支手機的配對記錄。手錶可能又連線上了，請稍後再試。</string>
+    <string name="unpair_local_cleanup_failed">本機清理尚未完成。請在系統藍牙設定中忘記這隻手錶，並在重新配對前確認手錶狀態。</string>
+</resources>

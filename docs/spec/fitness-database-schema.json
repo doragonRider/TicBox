@@ -1,0 +1,340 @@
+{
+  "schema": "ticbox-fitness-database-schema-v1",
+  "reference": {
+    "package": "com.mobvoi.wear.fitness.at",
+    "versionName": "5.5.0-2536.2932",
+    "versionCode": 50502536
+  },
+  "database": {
+    "filename": "fitness.db",
+    "observedUserVersion": 1021,
+    "encoding": "UTF-8"
+  },
+  "evidence": {
+    "staticDdlMatches": true,
+    "scope": "database declarations only; no rows, device identifiers or file digests"
+  },
+  "tables": {
+    "RECORD": {
+      "columns": [
+        {
+          "name": "_id",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 1
+        },
+        {
+          "name": "HASH",
+          "declaredType": "TEXT",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "TYPE",
+          "declaredType": "INTEGER",
+          "declaredNotNull": true,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "TARGET_TYPE",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "TARGET_VALUE",
+          "declaredType": "REAL",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "ACCOUNT_ID",
+          "declaredType": "TEXT",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "SYNCED",
+          "declaredType": "INTEGER",
+          "declaredNotNull": true,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "DELETED",
+          "declaredType": "INTEGER",
+          "declaredNotNull": true,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "START_TIME",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "END_TIME",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "TIMESTAMP",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "DURATION",
+          "declaredType": "INTEGER",
+          "declaredNotNull": true,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "DISTANCE",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "CALORIE",
+          "declaredType": "REAL",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "STEP",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "HEART",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "GROUPS",
+          "declaredType": "TEXT",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "SWIM_TRIPS",
+          "declaredType": "REAL",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "SWIM_DISTANCE",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "SWIM_POOL_LENGTH",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "SWIM_STROKE",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "DEVICE_ID",
+          "declaredType": "TEXT",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "SESSION_MODE",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "MAX_ELEVATION",
+          "declaredType": "REAL",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "MIN_ELEVATION",
+          "declaredType": "REAL",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "CUMULATIVE_UP",
+          "declaredType": "REAL",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "CUMULATIVE_DOWN",
+          "declaredType": "REAL",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "SCORE",
+          "declaredType": "REAL",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "EXTRA",
+          "declaredType": "TEXT",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        }
+      ],
+      "declaredForeignKeys": [],
+      "indexes": [
+        {
+          "name": "IDX_RECORD_HASH",
+          "unique": false,
+          "columns": [
+            "HASH"
+          ]
+        }
+      ]
+    },
+    "POINT": {
+      "columns": [
+        {
+          "name": "_id",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 1
+        },
+        {
+          "name": "TIME",
+          "declaredType": "INTEGER",
+          "declaredNotNull": true,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "HEART",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "STEP",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "LAT",
+          "declaredType": "REAL",
+          "declaredNotNull": true,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "LON",
+          "declaredType": "REAL",
+          "declaredNotNull": true,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "ACC",
+          "declaredType": "REAL",
+          "declaredNotNull": true,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "DISTANCE",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "SPEED",
+          "declaredType": "REAL",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "CALORIE",
+          "declaredType": "REAL",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "RECORD_ID",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "RESUME",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "SWIM_TRIPS",
+          "declaredType": "REAL",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "SWIM_DISTANCE",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "SWIM_STROKE",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "SWIM_TYPE",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "TIMESTAMP",
+          "declaredType": "INTEGER",
+          "declaredNotNull": true,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "ELEVATION",
+          "declaredType": "REAL",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        },
+        {
+          "name": "STRIDE_FREQ",
+          "declaredType": "INTEGER",
+          "declaredNotNull": false,
+          "primaryKeyPosition": 0
+        }
+      ],
+      "declaredForeignKeys": [],
+      "indexes": []
+    }
+  },
+  "internalTables": [
+    "android_metadata",
+    "sqlite_sequence",
+    "room_master_table"
+  ],
+  "views": [],
+  "triggers": [],
+  "notes": [
+    "POINT.RECORD_ID is a software-maintained link to RECORD._id, not to RECORD.HASH; no foreign key is declared.",
+    "RECORD.HASH has a non-unique index; source IDs and duplicate occurrences must be preserved.",
+    "One schema is reused across exercise modes; SWIM_* names do not establish swimming semantics for every mode.",
+    "Observed user_version is a sample identity, not a version allowlist for future readers."
+  ]
+}

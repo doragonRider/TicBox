@@ -1,0 +1,2289 @@
+{
+  "schema": "ticbox-health-types-v1",
+  "protocolVersion": 1,
+  "scope": {
+    "pointCodes": 41,
+    "pointTypesWithConfirmedFields": 39,
+    "unresolvedPointCodes": [
+      3,
+      31
+    ],
+    "partlyUnknownPointSlots": [
+      {
+        "code": 35,
+        "index": 0
+      }
+    ],
+    "pointFamily": "Health DataType",
+    "sessionFamily": "ActivityType",
+    "sportFamily": "SportType",
+    "unknownCodes": "preserve",
+    "negativeOrNonFiniteValues": "retain raw values; no physiology validation",
+    "sportAccess": "fitness_summary requires a signature permission; ordinary UIDs get provider_denied. Summary access does not provide GPS."
+  },
+  "units": {
+    "bpm": "beats per minute",
+    "kcal": "kilocalories",
+    "m": "metres",
+    "steps": "step count",
+    "s": "seconds",
+    "h": "hours",
+    "ms": "milliseconds",
+    "days": "calendar-duration days",
+    "epoch_s": "Unix seconds; separate from row epoch milliseconds",
+    "ms_since_midnight": "local wall-clock milliseconds since midnight",
+    "%": "percent-valued original scalar",
+    "°C": "degrees Celsius",
+    "breaths/min": "breaths per minute",
+    "ml/kg/min": "millilitres per kilogram per minute",
+    "score/100": "score with display scale 100",
+    "years": "years",
+    "ordinal": "ordered level, no ratio meaning",
+    "dB": "decibels; weighting not established",
+    "motion_code": "motion enumeration",
+    "period_event_code": "period event enumeration",
+    "heart_rate_warning_code": "warning category enumeration",
+    "mood_code": "mood enumeration",
+    "gender_code": "producer-dependent sex enumeration",
+    "sport_type_code": "explicit SportType number",
+    "heart_health_code": "consumer-dependent heart-health code",
+    "body_mind_code": "fatigue or energy enumeration"
+  },
+  "tables": {
+    "data_point": {
+      "kind": "POINT",
+      "providerUri": "content://com.mobvoi.heartrate.db.provider/data_point",
+      "logicalSourceName": "content://com.mobvoi.heartrate.db.provider/data_point",
+      "cursor": "numeric _id",
+      "key": "decimal provider _id string",
+      "columns": [
+        {
+          "name": "_id",
+          "storageType": "integer",
+          "meaning": "provider row identity"
+        },
+        {
+          "name": "values",
+          "storageType": "string",
+          "meaning": "comma-separated source tokens"
+        },
+        {
+          "name": "device_id",
+          "storageType": "string",
+          "meaning": "vendor device identity"
+        },
+        {
+          "name": "wwid",
+          "storageType": "string",
+          "meaning": "vendor account bookkeeping identity; may be empty"
+        },
+        {
+          "name": "type",
+          "storageType": "integer",
+          "meaning": "POINT DataType number"
+        },
+        {
+          "name": "time_to",
+          "storageType": "integer",
+          "meaning": "Unix milliseconds; interval end or measurement time"
+        },
+        {
+          "name": "time_from",
+          "storageType": "integer",
+          "meaning": "Unix milliseconds; interval start or measurement time"
+        },
+        {
+          "name": "synced",
+          "storageType": "integer",
+          "meaning": "vendor bookkeeping: 0 false,1 true,other unknown"
+        },
+        {
+          "name": "deleted",
+          "storageType": "integer",
+          "meaning": "0 false,1 true,other preserved; nonzero hidden by default"
+        }
+      ]
+    },
+    "data_session": {
+      "kind": "SESSION",
+      "providerUri": "content://com.mobvoi.heartrate.db.provider/data_point",
+      "logicalSourceName": "content://com.mobvoi.heartrate.db.provider/data_session",
+      "cursor": "private rowid through fixed projection",
+      "key": "original columns.id opaque text; never envelope rowid",
+      "columns": [
+        {
+          "name": "id",
+          "storageType": "string",
+          "meaning": "opaque logical session identity"
+        },
+        {
+          "name": "device_id",
+          "storageType": "string",
+          "meaning": "vendor device identity"
+        },
+        {
+          "name": "wwid",
+          "storageType": "string",
+          "meaning": "vendor account bookkeeping identity; may be empty"
+        },
+        {
+          "name": "type",
+          "storageType": "integer",
+          "meaning": "ActivityType number; AutoSleep100"
+        },
+        {
+          "name": "time_to",
+          "storageType": "integer",
+          "meaning": "Unix milliseconds; zero means open session"
+        },
+        {
+          "name": "time_from",
+          "storageType": "integer",
+          "meaning": "Unix milliseconds"
+        },
+        {
+          "name": "synced",
+          "storageType": "integer",
+          "meaning": "vendor bookkeeping: bit0"
+        },
+        {
+          "name": "deleted",
+          "storageType": "integer",
+          "meaning": "0 false,1 true,other preserved; nonzero hidden by default"
+        }
+      ]
+    },
+    "fitness_summary": {
+      "kind": "SPORT",
+      "providerUri": "content://com.mobvoi.fitness.db.provider/fitness_summary",
+      "logicalSourceName": "content://com.mobvoi.fitness.db.provider/fitness_summary",
+      "permission": {
+        "name": "com.mobvoi.ticwear.permission.FITNESS_DATA",
+        "protection": "signature",
+        "ordinaryUidResult": "provider_denied"
+      },
+      "cursor": "HASH BINARY text plus consumed duplicate occurrence count",
+      "key": "JSON array text [original HASH,zero-based sourceOccurrence]",
+      "deletionTombstones": false,
+      "calorieUnit": "kcal",
+      "columns": [
+        {
+          "name": "id",
+          "storageType": "string",
+          "origin": "RECORD.HASH",
+          "meaning": "opaque training identity; not private _id"
+        },
+        {
+          "name": "wwid",
+          "storageType": "string",
+          "origin": "current Provider account",
+          "meaning": "not original per-record ACCOUNT_ID"
+        },
+        {
+          "name": "device_id",
+          "storageType": "string",
+          "origin": "RECORD.DEVICE_ID",
+          "meaning": "vendor device identity"
+        },
+        {
+          "name": "time_from",
+          "storageType": "integer",
+          "origin": "RECORD.START_TIME",
+          "meaning": "Unix milliseconds"
+        },
+        {
+          "name": "time_to",
+          "storageType": "integer",
+          "origin": "RECORD.END_TIME",
+          "meaning": "Unix milliseconds"
+        },
+        {
+          "name": "type",
+          "storageType": "integer",
+          "origin": "RECORD.TYPE",
+          "meaning": "SportType explicit number"
+        },
+        {
+          "name": "synced",
+          "storageType": "integer",
+          "origin": "RECORD.SYNCED",
+          "meaning": "vendor bookkeeping"
+        },
+        {
+          "name": "during",
+          "storageType": "integer",
+          "origin": "RECORD.DURATION",
+          "meaning": "effective duration in milliseconds"
+        },
+        {
+          "name": "calorie",
+          "storageType": "float",
+          "origin": "RECORD.CALORIE",
+          "meaning": "original decimal; physical unit not closed"
+        },
+        {
+          "name": "heart",
+          "storageType": "integer",
+          "origin": "RECORD.HEART",
+          "meaning": "average heart rate bpm;0 may be placeholder"
+        }
+      ]
+    },
+    "fitness_record": {
+      "kind": "FITNESS_RECORD",
+      "logicalSourceName": "sqlite://com.mobvoi.wear.fitness.at/fitness.db/RECORD",
+      "access": "optional root readonly SQLite snapshot",
+      "cursor": "numeric _id; decimal int64",
+      "schemaReference": "fitness-database-schema.json#/tables/RECORD"
+    },
+    "fitness_point": {
+      "kind": "FITNESS_POINT",
+      "logicalSourceName": "sqlite://com.mobvoi.wear.fitness.at/fitness.db/POINT",
+      "access": "same snapshot as fitness_record",
+      "cursor": "numeric _id; decimal int64",
+      "parent": "POINT.RECORD_ID -> RECORD._id",
+      "schemaReference": "fitness-database-schema.json#/tables/POINT"
+    }
+  },
+  "pointTypes": [
+    {
+      "code": 1,
+      "name": "HeartRate",
+      "apiName": "HEART_RATE",
+      "wireName": "heart_rate",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "heart_rate",
+          "unit": "bpm"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "额外槽未确认；没有按生理范围删除原值。"
+      ]
+    },
+    {
+      "code": 2,
+      "name": "Motion",
+      "apiName": "MOTION",
+      "wireName": "sleep_motion",
+      "layoutStatus": "confirmed-consumer-slots",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "interval_state",
+          "unit": "motion_code"
+        },
+        {
+          "index": 1,
+          "kind": "number",
+          "semantic": "next_state",
+          "unit": "motion_code"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "槽0为原区间内状态，槽1为区间结束后的新状态；时间边界采用(time_from,time_to]关联。"
+      ],
+      "runtimeExpectedCount": 2,
+      "enumRef": "motion"
+    },
+    {
+      "code": 3,
+      "name": "Location",
+      "apiName": "LOCATION",
+      "wireName": "",
+      "layoutStatus": "unresolved",
+      "slots": [],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "所有槽均未确认；不能从独立 SPORT 轨迹类型借用纬度/经度含义。"
+      ]
+    },
+    {
+      "code": 4,
+      "name": "Calorie",
+      "apiName": "CALORIE",
+      "wireName": "calorie",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "calorie",
+          "unit": "kcal"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "原厂旧格式按本地自然日处理累计快照；入库保留原值，不在解析时差分。"
+      ]
+    },
+    {
+      "code": 5,
+      "name": "Distance",
+      "apiName": "DISTANCE",
+      "wireName": "distance",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "distance",
+          "unit": "m"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "原厂旧格式按本地自然日处理累计快照；入库保留原值，不在解析时差分。"
+      ]
+    },
+    {
+      "code": 6,
+      "name": "Step",
+      "apiName": "STEP_COUNT",
+      "wireName": "step_count",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "step_count",
+          "unit": "steps"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "原厂旧格式转换保留区间及首值；不能与最近步数观察值重复相加。"
+      ]
+    },
+    {
+      "code": 7,
+      "name": "Exercise",
+      "apiName": "EXERCISE",
+      "wireName": "exercise",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "exercise",
+          "unit": "s"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "区间秒数；不是毫秒或已生成的日总数。"
+      ]
+    },
+    {
+      "code": 8,
+      "name": "DeltaCalorie",
+      "apiName": "DELTA_CALORIE",
+      "wireName": "delta_calorie",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "delta_calorie",
+          "unit": "kcal"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "已是区间增量，不再求差；kcal单位由手机端能量转换器确认，基础代谢构成未由该转换器证明。"
+      ]
+    },
+    {
+      "code": 9,
+      "name": "DeltaDistance",
+      "apiName": "DELTA_DISTANCE",
+      "wireName": "delta_distance",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "delta_distance",
+          "unit": "m"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "已是区间增量，不再求差；显示km/mile不改变源单位m。"
+      ]
+    },
+    {
+      "code": 10,
+      "name": "DeltaStep",
+      "apiName": "DELTA_STEP",
+      "wireName": "delta_step",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "delta_step",
+          "unit": "steps"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "已是区间增量，不再求差；后端保留小数，原厂Health Connect导出取long不改变本地存储。"
+      ]
+    },
+    {
+      "code": 11,
+      "name": "DeltaExercise",
+      "apiName": "DELTA_EXERCISE",
+      "wireName": "delta_exercise",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "delta_exercise",
+          "unit": "s"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "区间增量秒数。"
+      ]
+    },
+    {
+      "code": 12,
+      "name": "PeriodEvent",
+      "apiName": "PERIOD_EVENT",
+      "wireName": "period_event",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "period_event",
+          "unit": "period_event_code"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "首值是事件枚举；未确认直接写者，不能据此断言所有生产路径。"
+      ],
+      "enumRef": "period_event"
+    },
+    {
+      "code": 13,
+      "name": "PeriodCycleLength",
+      "apiName": "PERIOD_CYCLE_LENGTH",
+      "wireName": "period_cycle_length",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "period_cycle_length",
+          "unit": "days"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "首值为周期天数；原厂28天默认值不是源记录。"
+      ]
+    },
+    {
+      "code": 14,
+      "name": "PeriodMenstruationLength",
+      "apiName": "PERIOD_MENSTRUATION_LENGTH",
+      "wireName": "period_menstruation_length",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "period_menstruation_length",
+          "unit": "days"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "首值为经期天数；原厂5天默认值不是源记录。"
+      ]
+    },
+    {
+      "code": 15,
+      "name": "HeartRateWarning",
+      "apiName": "HEART_RATE_WARNING",
+      "wireName": "heart_rate_warning",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "heart_rate_warning",
+          "unit": "heart_rate_warning_code"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "首值16/17/18指向告警类别，不是心率。原厂另从对应阈值历史及type1区间计算心率。",
+        "较早TicHealth5.5有11槽写者；当前5.6未闭合对应扩展字段，不解释其尾部。",
+        "Older TicHealth 5.5 builds also write 11 slots: the warning code, then raw sensor-array values in indices 2..11. Their physical meanings and units are unconfirmed; they are not declared obsolete."
+      ],
+      "enumRef": "heart_rate_warning"
+    },
+    {
+      "code": 16,
+      "name": "HeartRateWarningFitnessUpperLimit",
+      "apiName": "HEART_RATE_WARNING_FITNESS_UPPER_LIMIT",
+      "wireName": "heart_rate_warning_fitness_upper_limit",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "heart_rate_warning_fitness_upper_limit",
+          "unit": "bpm"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "阈值bpm；原厂年龄公式或默认值不能补造缺失记录。"
+      ]
+    },
+    {
+      "code": 17,
+      "name": "HeartRateWarningRestUpperLimit",
+      "apiName": "HEART_RATE_WARNING_REST_UPPER_LIMIT",
+      "wireName": "heart_rate_warning_rest_upper_limit",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "heart_rate_warning_rest_upper_limit",
+          "unit": "bpm"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "阈值bpm；原厂默认值不能补造缺失记录。"
+      ]
+    },
+    {
+      "code": 18,
+      "name": "HeartRateWarningRestLowerLimit",
+      "apiName": "HEART_RATE_WARNING_REST_LOWER_LIMIT",
+      "wireName": "heart_rate_warning_rest_lower_limit",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "heart_rate_warning_rest_lower_limit",
+          "unit": "bpm"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "阈值bpm；原厂默认值不能补造缺失记录。"
+      ]
+    },
+    {
+      "code": 19,
+      "name": "GoalTodayStep",
+      "apiName": "GOAL_TODAY_STEP",
+      "wireName": "goal_today_step",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "goal_today_step",
+          "unit": "steps"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "目标步数。"
+      ],
+      "observedWriterTokenCount": 1
+    },
+    {
+      "code": 20,
+      "name": "GoalTodayActive",
+      "apiName": "GOAL_TODAY_ACTIVE",
+      "wireName": "goal_today_active",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "goal_today_active",
+          "unit": "h"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "活动小时目标，原值为h。"
+      ],
+      "observedWriterTokenCount": 1
+    },
+    {
+      "code": 21,
+      "name": "GoalTodayExercise",
+      "apiName": "GOAL_TODAY_EXERCISE",
+      "wireName": "goal_today_exercise",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "goal_today_exercise",
+          "unit": "s"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "目标分钟在原厂写入前已乘60；源单位s。"
+      ],
+      "observedWriterTokenCount": 1
+    },
+    {
+      "code": 22,
+      "name": "TodayMood",
+      "apiName": "TODAY_MOOD",
+      "wireName": "today_mood",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "today_mood",
+          "unit": "mood_code"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "未知枚举码保留；手表消费者按小时分组，未确认手机端对应业务消费者。"
+      ],
+      "observedWriterTokenCount": 1,
+      "enumRef": "mood"
+    },
+    {
+      "code": 23,
+      "name": "InfoGender",
+      "apiName": "INFO_GENDER",
+      "wireName": "info_gender",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "info_gender",
+          "unit": "gender_code"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "官方手机包 com.mobvoi.companion.at 按包名选择四值编码，手表 TicHealth 5.5/5.6 直接写入相同编码；不是按手表系统版本选择。",
+        "AccountConstant.Sex另用0男/1女，非W3包旧POINT为0女/1男；zo.c在域之间显式转换，不能统一替换原码。"
+      ],
+      "observedWriterTokenCount": 1,
+      "enumRef": "gender_by_producer"
+    },
+    {
+      "code": 24,
+      "name": "InfoBirthday",
+      "apiName": "INFO_BIRTHDAY",
+      "wireName": "info_birthday",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "info_birthday",
+          "unit": "epoch_s",
+          "note": "Unix timestamp seconds for the selected birthday in local-calendar interpretation; not age and not yyyyMMdd. Official writer converts to float, so source may have float rounding."
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "生日为Unix秒，row时间仍为Unix毫秒；官方写者经float可能损失精度，后端不猜测修复。"
+      ],
+      "observedWriterTokenCount": 1
+    },
+    {
+      "code": 25,
+      "name": "InfoHeight",
+      "apiName": "INFO_HEIGHT",
+      "wireName": "info_height",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "info_height",
+          "unit": "cm"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "身高在原厂写入前从英制换算成cm。"
+      ],
+      "observedWriterTokenCount": 1
+    },
+    {
+      "code": 26,
+      "name": "InfoWeight",
+      "apiName": "INFO_WEIGHT",
+      "wireName": "info_weight",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "info_weight",
+          "unit": "kg"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "体重在原厂写入前换算成kg；保留原厂换算近似及原始精度。"
+      ],
+      "observedWriterTokenCount": 1
+    },
+    {
+      "code": 27,
+      "name": "NOISE_DECIBEL",
+      "apiName": "NOISE_DECIBEL",
+      "wireName": "noise_decibel",
+      "layoutStatus": "confirmed-vector-values-unknown-timing",
+      "slots": [],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "所有CSV槽均为dB样本；每槽采样时刻、间隔及dBA加权未确认。",
+        "The official phone app buckets the whole row by time_from and weights every CSV value equally in its arithmetic dB mean; no per-sample time is reconstructed. Not LAeq."
+      ],
+      "repeatedSlot": {
+        "firstIndex": 0,
+        "kind": "number",
+        "semantic": "noise_decibel",
+        "unit": "dB"
+      }
+    },
+    {
+      "code": 28,
+      "name": "BloodOxygen",
+      "apiName": "BLOOD_OXYGEN",
+      "wireName": "blood_oxygen",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "blood_oxygen",
+          "unit": "%"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "百分数原值；不再次乘除100，无全局缺失哨兵约定。"
+      ]
+    },
+    {
+      "code": 29,
+      "name": "Pressure",
+      "apiName": "PRESSURE",
+      "wireName": "pressure",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "pressure",
+          "unit": null
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "压力指数来自RRI相关算法；不是血压，无已确认物理单位。"
+      ]
+    },
+    {
+      "code": 30,
+      "name": "HighStrengthTraining",
+      "apiName": "HIGH_STRENGTH_TRAINING",
+      "wireName": "high_strength_training",
+      "layoutStatus": "confirmed-producer-consumer-slots",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "sport_type",
+          "unit": "sport_type_code",
+          "note": "com.mobvoi.health.common.data.pojo.SportType.typeCode, not DataType or ordinal"
+        },
+        {
+          "index": 1,
+          "kind": "number",
+          "semantic": "high_intensity_duration",
+          "unit": "ms",
+          "note": "Sum of active-time differences between consecutive above-threshold heart samples, not total workout duration."
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "TicFitness 5.5 writes the explicit SportType code plus high-intensity elapsed milliseconds to the health Provider. The threshold is int((220-age)*0.75), with age fallback 25; the parser does not recompute or filter by it."
+      ],
+      "runtimeExpectedCount": 2,
+      "enumRef": "sport_type"
+    },
+    {
+      "code": 31,
+      "name": "AISportGrade",
+      "apiName": "AI_SPORT_GRADE",
+      "wireName": "ai_sport_grade",
+      "layoutStatus": "unresolved",
+      "slots": [],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "所有槽均未确认；不猜测分数、百分比或满分。"
+      ]
+    },
+    {
+      "code": 32,
+      "name": "Temperature",
+      "apiName": "TEMPERATURE",
+      "wireName": "temperature",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "temperature",
+          "unit": "°C"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "手机独立消费链按摄氏解析；不因页面标签相近而合并type42或借用其私有baseline。"
+      ]
+    },
+    {
+      "code": 33,
+      "name": "ExpectedSleepTime",
+      "apiName": "EXPECTED_SLEEP_TIME",
+      "wireName": "expected_sleep_time",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "expected_sleep_time",
+          "unit": "ms_since_midnight",
+          "note": "Local wall-clock offset in milliseconds, not epoch timestamp; default23:00=82800000."
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "本地墙上时间距零点的毫秒；不是epoch时间，不转换成UTC；原厂23:00默认值不是源数据。"
+      ],
+      "observedWriterTokenCount": 1
+    },
+    {
+      "code": 34,
+      "name": "ExpectedGetUpTime",
+      "apiName": "EXPECTED_GET_UP_TIME",
+      "wireName": "expected_get_up_time",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "expected_get_up_time",
+          "unit": "ms_since_midnight",
+          "note": "Local wall-clock offset in milliseconds, default08:00=28800000; distinct from row epoch time."
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "本地墙上时间距零点的毫秒；不是epoch时间，不转换成UTC；原厂08:00默认值不是源数据。"
+      ],
+      "observedWriterTokenCount": 1
+    },
+    {
+      "code": 35,
+      "name": "ArtyData",
+      "apiName": "ARTY_DATA",
+      "wireName": "arty_data",
+      "layoutStatus": "partially-confirmed",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": null,
+          "unit": null
+        },
+        {
+          "index": 1,
+          "kind": "number",
+          "semantic": "arty_score",
+          "unit": "score/100"
+        },
+        {
+          "index": 2,
+          "kind": "number",
+          "semantic": "tru_hr",
+          "unit": "bpm"
+        },
+        {
+          "index": 3,
+          "kind": "number",
+          "semantic": "ecap",
+          "unit": "%"
+        },
+        {
+          "index": 4,
+          "kind": "number",
+          "semantic": "hsx",
+          "unit": "%"
+        },
+        {
+          "index": 5,
+          "kind": "number",
+          "semantic": "arty_age_lower",
+          "unit": "years"
+        },
+        {
+          "index": 6,
+          "kind": "number",
+          "semantic": "arty_age_upper",
+          "unit": "years"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "槽0未知；槽1至6已确认，存在更多或缺少槽时仍保留。",
+        "手机将部分浮点值转int仅是消费策略；年龄中点/跨度为派生显示；原生算法及直接写者未确认。"
+      ]
+    },
+    {
+      "code": 36,
+      "name": "HeartHealth",
+      "apiName": "HEART_HEALTH",
+      "wireName": "heart_health",
+      "layoutStatus": "confirmed-fields-conflicting-enum",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "heart_health_type",
+          "unit": "heart_health_code"
+        },
+        {
+          "index": 1,
+          "kind": "number",
+          "semantic": "heart_rate",
+          "unit": "bpm"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "历史详情与一键测量对代码1/4的标签冲突；保留原始数字，不输出统一医学诊断。",
+        "选中写者的第二槽为0占位；非零值的原始生产路径未确认。"
+      ],
+      "runtimeExpectedCount": 2,
+      "enumRef": "heart_health_by_consumer"
+    },
+    {
+      "code": 37,
+      "name": "BodyAndMindState",
+      "apiName": "BODY_MIND_STATE",
+      "wireName": "body_mind_state",
+      "layoutStatus": "confirmed-consumer-slots",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "body_mind_type",
+          "unit": "body_mind_code"
+        },
+        {
+          "index": 1,
+          "kind": "number",
+          "semantic": "level",
+          "unit": "ordinal"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "首槽1疲劳、2能量；等级1至5为序数且方向相反，不是百分比。",
+        "原生算法、采样间隔及直接写者未确认；不拒绝未知类别和等级。"
+      ],
+      "runtimeExpectedCount": 2,
+      "enumRef": "body_mind"
+    },
+    {
+      "code": 38,
+      "name": "RespirationRate",
+      "apiName": "RESPIRATION_RATE",
+      "wireName": "respiration_rate",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "respiration_rate",
+          "unit": "breaths/min"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "传感器/MCU缩放发生在入库前；读取后不再次除4。"
+      ]
+    },
+    {
+      "code": 39,
+      "name": "ClimbingStairs",
+      "apiName": "CLIMBING_STAIRS",
+      "wireName": "climbing_stairs",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "climbing_stairs",
+          "unit": "m"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "原值为上升高度m；楼层数由展示计算，原厂详情与Health Connect取整口径不同。"
+      ]
+    },
+    {
+      "code": 41,
+      "name": "Vo2Max",
+      "apiName": "VO2MAX",
+      "wireName": "vo2max",
+      "layoutStatus": "confirmed-producer-consumer-slots",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "vo2max",
+          "unit": "ml/kg/min",
+          "note": "Detail parser uses int; home card allows double. Preserve decimal source rather than enforce integral values."
+        },
+        {
+          "index": 1,
+          "kind": "text",
+          "semantic": "sport_type",
+          "unit": null,
+          "note": "SportType.from(String) uses Enum.valueOf plus legacy hiit alias; not numeric type code."
+        },
+        {
+          "index": 2,
+          "kind": "number",
+          "semantic": "duration",
+          "unit": "ms",
+          "note": "Long duration in SportItem, formatted as GMT HH:mm:ss by SportRecordAdapter."
+        },
+        {
+          "index": 3,
+          "kind": "text",
+          "semantic": "sport_id",
+          "unit": null,
+          "note": "Opaque sportId string forwarded to SportItem; retain even if token consists entirely of digits."
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "槽1/3为文本，即使全为数字或NaN字面文本也不转换数值。",
+        "SportType字符串按名称匹配，legacy hiit映射Hiit；未知文本保留。",
+        "TicFitness 5.5 的写入方依次写 round(vo2max)、SportType 名字、有效时长 ms、sportId，以逗号分隔；其他来源可能写小数，不因此拒收。"
+      ],
+      "runtimeExpectedCount": 4,
+      "enumRef": "sport_type"
+    },
+    {
+      "code": 42,
+      "name": "SkinTemperature",
+      "apiName": "SKIN_TEMPERATURE",
+      "wireName": "skin_temperature",
+      "layoutStatus": "confirmed-first-slot",
+      "slots": [
+        {
+          "index": 0,
+          "kind": "number",
+          "semantic": "skin_temperature",
+          "unit": "°C"
+        }
+      ],
+      "unknownTrailingSlots": "preserve",
+      "notes": [
+        "摄氏皮温；私有baseline不在POINT中，不合成偏差或基线。"
+      ]
+    }
+  ],
+  "enums": {
+    "motion": [
+      {
+        "code": -1,
+        "name": "UNKNOWN"
+      },
+      {
+        "code": 0,
+        "name": "STATIC"
+      },
+      {
+        "code": 1,
+        "name": "WALK"
+      },
+      {
+        "code": 2,
+        "name": "FAST_WALK"
+      },
+      {
+        "code": 3,
+        "name": "RUN"
+      },
+      {
+        "code": 4,
+        "name": "FAST_RUN"
+      },
+      {
+        "code": 5,
+        "name": "BIKE"
+      },
+      {
+        "code": 6,
+        "name": "OFF_WRIST"
+      },
+      {
+        "code": 7,
+        "name": "AWAKE"
+      },
+      {
+        "code": 8,
+        "name": "REM"
+      },
+      {
+        "code": 9,
+        "name": "LIGHT_SLEEP"
+      },
+      {
+        "code": 10,
+        "name": "DEEP_SLEEP"
+      },
+      {
+        "code": 11,
+        "name": "SWIMMING"
+      },
+      {
+        "code": 99,
+        "name": "UNDEFINED"
+      },
+      {
+        "code": 100,
+        "name": "FREE_TRAIN"
+      }
+    ],
+    "period_event": [
+      {
+        "code": -1,
+        "name": "Unknown"
+      },
+      {
+        "code": 0,
+        "name": "Start"
+      },
+      {
+        "code": 1,
+        "name": "End"
+      }
+    ],
+    "heart_rate_warning": [
+      {
+        "code": 16,
+        "name": "fitness_upper_limit"
+      },
+      {
+        "code": 17,
+        "name": "rest_upper_limit"
+      },
+      {
+        "code": 18,
+        "name": "rest_lower_limit"
+      }
+    ],
+    "mood": [
+      {
+        "code": -1,
+        "name": "Unknown"
+      },
+      {
+        "code": 0,
+        "name": "Excited"
+      },
+      {
+        "code": 1,
+        "name": "Smile"
+      },
+      {
+        "code": 2,
+        "name": "Normal"
+      },
+      {
+        "code": 3,
+        "name": "Sad"
+      },
+      {
+        "code": 4,
+        "name": "Angry"
+      }
+    ],
+    "gender_by_producer": {
+      "phoneLegacy": [
+        {
+          "code": 0,
+          "name": "FEMALE"
+        },
+        {
+          "code": 1,
+          "name": "MALE"
+        }
+      ],
+      "globalNormalization": false,
+      "currentPackageGate": {
+        "phonePackage": "com.mobvoi.companion.at",
+        "mapping": "w3CompanionPoint",
+        "condition": "context.packageName equality; not watch firmware/Android version"
+      },
+      "phoneAccountSex": [
+        {
+          "code": 0,
+          "name": "MALE"
+        },
+        {
+          "code": 1,
+          "name": "FEMALE"
+        }
+      ],
+      "w3CompanionPoint": [
+        {
+          "code": 0,
+          "name": "UNKNOWN"
+        },
+        {
+          "code": 1,
+          "name": "MALE"
+        },
+        {
+          "code": 2,
+          "name": "FEMALE"
+        },
+        {
+          "code": 3,
+          "name": "NON_BINARY"
+        }
+      ]
+    },
+    "heart_health_by_consumer": {
+      "historyDetail": [
+        {
+          "code": 1,
+          "name": "atrial_fibrillation"
+        },
+        {
+          "code": 2,
+          "name": "tachycardia"
+        },
+        {
+          "code": 3,
+          "name": "bradycardia"
+        },
+        {
+          "code": 4,
+          "name": "premature_beat"
+        }
+      ],
+      "watchOneKey": [
+        {
+          "code": 0,
+          "name": "normal"
+        },
+        {
+          "code": 1,
+          "name": "premature_beats"
+        },
+        {
+          "code": 2,
+          "name": "irregular_heart_rhythm"
+        },
+        {
+          "code": 3,
+          "name": "irregular_heart_rhythm"
+        },
+        {
+          "code": 4,
+          "name": "atrial_fibrillation"
+        }
+      ],
+      "algorithmToStored": [
+        {
+          "algorithmCode": 1,
+          "storedCode": 4
+        },
+        {
+          "algorithmCode": 2,
+          "storedCode": 1
+        },
+        {
+          "algorithmCode": 3,
+          "storedCode": 2
+        },
+        {
+          "algorithmCode": 4,
+          "storedCode": 3
+        }
+      ],
+      "globalNormalization": false,
+      "sameRawChainConfirmed": true,
+      "watchOneKeyPersistence": "code0 is delivered to UI then skipped by that stock helper; client retains any acquired zero row"
+    },
+    "body_mind": [
+      {
+        "code": 1,
+        "name": "fatigue",
+        "levelRange": [
+          1,
+          5
+        ],
+        "level1": "refreshed",
+        "level5": "exhausted"
+      },
+      {
+        "code": 2,
+        "name": "energy",
+        "levelRange": [
+          1,
+          5
+        ],
+        "level1": "exhausted",
+        "level5": "refreshed"
+      }
+    ],
+    "session_activity": [
+      {
+        "code": -1,
+        "name": "Unknown"
+      },
+      {
+        "code": 0,
+        "name": "IndoorRunning"
+      },
+      {
+        "code": 1,
+        "name": "OutdoorWalk"
+      },
+      {
+        "code": 2,
+        "name": "OutdoorRunning"
+      },
+      {
+        "code": 3,
+        "name": "OutdoorBike"
+      },
+      {
+        "code": 4,
+        "name": "FreeWorkout"
+      },
+      {
+        "code": 10,
+        "name": "AutoRunning"
+      },
+      {
+        "code": 11,
+        "name": "AutoWalking"
+      },
+      {
+        "code": 12,
+        "name": "Swimming"
+      },
+      {
+        "code": 13,
+        "name": "AutoCycling"
+      },
+      {
+        "code": 14,
+        "name": "AutoSwimming"
+      },
+      {
+        "code": 20,
+        "name": "IndoorCycling"
+      },
+      {
+        "code": 21,
+        "name": "Basketball"
+      },
+      {
+        "code": 22,
+        "name": "Football"
+      },
+      {
+        "code": 23,
+        "name": "Gymnastics"
+      },
+      {
+        "code": 24,
+        "name": "RopeSkipping"
+      },
+      {
+        "code": 25,
+        "name": "Spinning"
+      },
+      {
+        "code": 26,
+        "name": "BodyMechanics"
+      },
+      {
+        "code": 27,
+        "name": "Climbing"
+      },
+      {
+        "code": 28,
+        "name": "EllipticalMachine"
+      },
+      {
+        "code": 29,
+        "name": "RowingMachine"
+      },
+      {
+        "code": 30,
+        "name": "OffRoad"
+      },
+      {
+        "code": 31,
+        "name": "Yoga"
+      },
+      {
+        "code": 100,
+        "name": "AutoSleep"
+      }
+    ],
+    "sport_type": [
+      {
+        "code": -1,
+        "name": "Unknown"
+      },
+      {
+        "code": -2,
+        "name": "More"
+      },
+      {
+        "code": 0,
+        "name": "OutdoorRunning"
+      },
+      {
+        "code": 1,
+        "name": "OutdoorWalk"
+      },
+      {
+        "code": 2,
+        "name": "IndoorRunning"
+      },
+      {
+        "code": 3,
+        "name": "OutdoorBike"
+      },
+      {
+        "code": 4,
+        "name": "FreeWorkout"
+      },
+      {
+        "code": 5,
+        "name": "AutoWalking"
+      },
+      {
+        "code": 6,
+        "name": "AutoRunning"
+      },
+      {
+        "code": 7,
+        "name": "BandRunning"
+      },
+      {
+        "code": 8,
+        "name": "BandAutoWalking"
+      },
+      {
+        "code": 9,
+        "name": "Swimming"
+      },
+      {
+        "code": 10,
+        "name": "AutoCycling"
+      },
+      {
+        "code": 11,
+        "name": "AutoSwimming"
+      },
+      {
+        "code": 12,
+        "name": "IndoorCycling"
+      },
+      {
+        "code": 13,
+        "name": "RowingMachine"
+      },
+      {
+        "code": 14,
+        "name": "EllipticalMachine"
+      },
+      {
+        "code": 15,
+        "name": "Yoga"
+      },
+      {
+        "code": 16,
+        "name": "BodyMechanics"
+      },
+      {
+        "code": 17,
+        "name": "Climbing"
+      },
+      {
+        "code": 18,
+        "name": "OffRoad"
+      },
+      {
+        "code": 19,
+        "name": "RopeSkipping"
+      },
+      {
+        "code": 20,
+        "name": "Gymnastics"
+      },
+      {
+        "code": 21,
+        "name": "Football"
+      },
+      {
+        "code": 22,
+        "name": "Basketball"
+      },
+      {
+        "code": 23,
+        "name": "Spinning"
+      },
+      {
+        "code": 24,
+        "name": "Hiit"
+      },
+      {
+        "code": 25,
+        "name": "Burpee"
+      },
+      {
+        "code": 26,
+        "name": "MountainClimber"
+      },
+      {
+        "code": 27,
+        "name": "HighKnees"
+      },
+      {
+        "code": 28,
+        "name": "SquatJumps"
+      },
+      {
+        "code": 29,
+        "name": "Plank"
+      },
+      {
+        "code": 30,
+        "name": "JumpingJack"
+      },
+      {
+        "code": 31,
+        "name": "TwistingMountainClimber"
+      },
+      {
+        "code": 32,
+        "name": "ReverseCrunch"
+      },
+      {
+        "code": 33,
+        "name": "SquatPunch"
+      },
+      {
+        "code": 34,
+        "name": "Bridge"
+      },
+      {
+        "code": 35,
+        "name": "Rest"
+      },
+      {
+        "code": 36,
+        "name": "GroupRest"
+      },
+      {
+        "code": 37,
+        "name": "HiitOther"
+      },
+      {
+        "code": 50,
+        "name": "Pilates"
+      },
+      {
+        "code": 51,
+        "name": "Taekwondo"
+      },
+      {
+        "code": 52,
+        "name": "Badminton"
+      },
+      {
+        "code": 53,
+        "name": "TableTennis"
+      },
+      {
+        "code": 54,
+        "name": "Skating"
+      },
+      {
+        "code": 55,
+        "name": "OpenWaterSwimming"
+      },
+      {
+        "code": 56,
+        "name": "Tennis"
+      },
+      {
+        "code": 57,
+        "name": "Baseball"
+      },
+      {
+        "code": 58,
+        "name": "Volleyball"
+      },
+      {
+        "code": 59,
+        "name": "Cricket"
+      },
+      {
+        "code": 60,
+        "name": "Rugby"
+      },
+      {
+        "code": 61,
+        "name": "Hockey"
+      },
+      {
+        "code": 62,
+        "name": "Dance"
+      },
+      {
+        "code": 63,
+        "name": "AbdominalCurl"
+      },
+      {
+        "code": 64,
+        "name": "Crawl"
+      },
+      {
+        "code": 65,
+        "name": "BendOverAndClimbTheRope"
+      },
+      {
+        "code": 66,
+        "name": "OneLegBalance"
+      },
+      {
+        "code": 67,
+        "name": "ChestExpandingExercise"
+      },
+      {
+        "code": 68,
+        "name": "WristRotation"
+      },
+      {
+        "code": 69,
+        "name": "SideStretch"
+      },
+      {
+        "code": 70,
+        "name": "SideLift"
+      },
+      {
+        "code": 71,
+        "name": "Recommend"
+      },
+      {
+        "code": 72,
+        "name": "Pingju"
+      },
+      {
+        "code": 73,
+        "name": "Strike"
+      },
+      {
+        "code": 74,
+        "name": "Swing"
+      },
+      {
+        "code": 75,
+        "name": "StraightBoxing"
+      },
+      {
+        "code": 76,
+        "name": "BowToRow"
+      },
+      {
+        "code": 77,
+        "name": "Rowing"
+      },
+      {
+        "code": 78,
+        "name": "Paddle"
+      },
+      {
+        "code": 79,
+        "name": "InclinedLowerSwingArm"
+      },
+      {
+        "code": 80,
+        "name": "HandDepression"
+      },
+      {
+        "code": 81,
+        "name": "HandDownAndBackSwing"
+      },
+      {
+        "code": 82,
+        "name": "BodyFlexionAndRotation"
+      },
+      {
+        "code": 83,
+        "name": "BendingLift"
+      },
+      {
+        "code": 84,
+        "name": "HardPull"
+      },
+      {
+        "code": 85,
+        "name": "UpperAndLowerSwingArms"
+      },
+      {
+        "code": 86,
+        "name": "OneHandedSmash"
+      },
+      {
+        "code": 87,
+        "name": "HipHighFive"
+      },
+      {
+        "code": 88,
+        "name": "PullUp"
+      },
+      {
+        "code": 89,
+        "name": "BackPullUp"
+      },
+      {
+        "code": 90,
+        "name": "HighLegRun"
+      },
+      {
+        "code": 91,
+        "name": "SittingPullDown"
+      },
+      {
+        "code": 92,
+        "name": "GoFishing"
+      },
+      {
+        "code": 93,
+        "name": "HuLaHoop"
+      },
+      {
+        "code": 94,
+        "name": "Riding"
+      },
+      {
+        "code": 95,
+        "name": "Polo"
+      },
+      {
+        "code": 96,
+        "name": "Golf"
+      },
+      {
+        "code": 97,
+        "name": "IceHockey"
+      },
+      {
+        "code": 98,
+        "name": "Squash"
+      },
+      {
+        "code": 99,
+        "name": "Archery"
+      },
+      {
+        "code": 100,
+        "name": "Weightlifting"
+      },
+      {
+        "code": 101,
+        "name": "PaddlePaddle"
+      },
+      {
+        "code": 102,
+        "name": "Sailboat"
+      },
+      {
+        "code": 103,
+        "name": "Surfing"
+      },
+      {
+        "code": 104,
+        "name": "AMartialArt"
+      },
+      {
+        "code": 105,
+        "name": "Shooting"
+      },
+      {
+        "code": 106,
+        "name": "TugOfWar"
+      },
+      {
+        "code": 107,
+        "name": "DifficultRockClimbing"
+      },
+      {
+        "code": 108,
+        "name": "FieldRockClimbing"
+      },
+      {
+        "code": 109,
+        "name": "Bouldering"
+      },
+      {
+        "code": 110,
+        "name": "RollerSkating"
+      },
+      {
+        "code": 111,
+        "name": "Fencing"
+      },
+      {
+        "code": 112,
+        "name": "OffRoadVehicle"
+      },
+      {
+        "code": 113,
+        "name": "AtvQuadFrenzy"
+      },
+      {
+        "code": 114,
+        "name": "Skydiving"
+      },
+      {
+        "code": 115,
+        "name": "BungeeJumping"
+      },
+      {
+        "code": 116,
+        "name": "Squat"
+      },
+      {
+        "code": 117,
+        "name": "Skate"
+      },
+      {
+        "code": 118,
+        "name": "TaijiBoxing"
+      },
+      {
+        "code": 119,
+        "name": "WaterPolo"
+      },
+      {
+        "code": 120,
+        "name": "BeachVolleyball"
+      },
+      {
+        "code": 121,
+        "name": "Snorkeling"
+      },
+      {
+        "code": 122,
+        "name": "InclineDumbbellPress"
+      },
+      {
+        "code": 123,
+        "name": "StandingOutsideStretch"
+      },
+      {
+        "code": 124,
+        "name": "MilitaryPress"
+      },
+      {
+        "code": 125,
+        "name": "ArnoldRecommended"
+      },
+      {
+        "code": 126,
+        "name": "ShoulderWrap"
+      },
+      {
+        "code": 127,
+        "name": "AlternatingFrontFlatLift"
+      },
+      {
+        "code": 128,
+        "name": "UpwardInclinedDumbbellCurl"
+      },
+      {
+        "code": 129,
+        "name": "FigureSkating"
+      },
+      {
+        "code": 130,
+        "name": "BattlingRopes"
+      },
+      {
+        "code": 131,
+        "name": "LegPress"
+      },
+      {
+        "code": 132,
+        "name": "TreadmillRunning"
+      },
+      {
+        "code": 133,
+        "name": "MountainBiking"
+      },
+      {
+        "code": 134,
+        "name": "Kayaking"
+      },
+      {
+        "code": 135,
+        "name": "Hike"
+      },
+      {
+        "code": 136,
+        "name": "InlineSkating"
+      },
+      {
+        "code": 137,
+        "name": "CoreTraining"
+      },
+      {
+        "code": 138,
+        "name": "StairStepper"
+      },
+      {
+        "code": 139,
+        "name": "Boxing"
+      },
+      {
+        "code": 140,
+        "name": "Crossfit"
+      },
+      {
+        "code": 141,
+        "name": "BackExtension"
+      },
+      {
+        "code": 142,
+        "name": "BenchPress"
+      },
+      {
+        "code": 143,
+        "name": "BicepsCurl"
+      },
+      {
+        "code": 144,
+        "name": "LatPullDown"
+      },
+      {
+        "code": 145,
+        "name": "MedicineBallSlam"
+      },
+      {
+        "code": 146,
+        "name": "ReverseFly"
+      },
+      {
+        "code": 147,
+        "name": "ShoulderPress"
+      },
+      {
+        "code": 148,
+        "name": "TricepsPushDown"
+      },
+      {
+        "code": 149,
+        "name": "BearCrawl"
+      },
+      {
+        "code": 150,
+        "name": "Crunch"
+      },
+      {
+        "code": 151,
+        "name": "GluteBridge"
+      },
+      {
+        "code": 152,
+        "name": "RussianTwists"
+      },
+      {
+        "code": 153,
+        "name": "SingleLegBalance"
+      },
+      {
+        "code": 154,
+        "name": "CrossCountrySkiing"
+      },
+      {
+        "code": 155,
+        "name": "IceSkating"
+      },
+      {
+        "code": 156,
+        "name": "AmericanFootball"
+      },
+      {
+        "code": 157,
+        "name": "AustralianFootball"
+      },
+      {
+        "code": 158,
+        "name": "RacquetBall"
+      },
+      {
+        "code": 159,
+        "name": "Softball"
+      },
+      {
+        "code": 160,
+        "name": "Flexibility"
+      },
+      {
+        "code": 161,
+        "name": "Stretching"
+      }
+    ],
+    "sport_string": {
+      "matching": "exact SportType enum name",
+      "legacyAliases": {
+        "hiit": "Hiit"
+      },
+      "unknown": "retain original token; no forced code conversion"
+    },
+    "cloud_sleep_stage": [
+      {
+        "code": 1,
+        "name": "AWAKE"
+      },
+      {
+        "code": 2,
+        "name": "REM"
+      },
+      {
+        "code": 3,
+        "name": "LIGHT_SLEEP"
+      },
+      {
+        "code": 4,
+        "name": "DEEP_SLEEP"
+      }
+    ]
+  },
+  "parsing": {
+    "csvDelimiter": ",",
+    "escaping": "no CSV quote escaping has been established",
+    "rawToken": "preserved verbatim including spaces and empty slots",
+    "numericValue": "arbitrary precision decimal string; no rescaling",
+    "integerMetadata": "exact signed int64 from decimal representation",
+    "valueStatuses": [
+      "NUMBER",
+      "EMPTY",
+      "NON_FINITE",
+      "TEXT"
+    ],
+    "knownTextSlots": [
+      {
+        "code": 41,
+        "indices": [
+          1,
+          3
+        ]
+      }
+    ],
+    "extraSlots": "preserve unnamed",
+    "unknownUnits": "null does not make record invalid",
+    "strictCountRejection": false,
+    "unconfirmedPointCodesHaveNamedFields": false
+  },
+  "sleepAssociation": {
+    "sessionActivityCode": 100,
+    "requiredIdentity": [
+      "localUserId",
+      "peer",
+      "device_id"
+    ],
+    "relatedPointCodes": [
+      1,
+      2,
+      28,
+      38,
+      42
+    ],
+    "measurementTimeColumn": "time_to",
+    "motionBounds": "(session.time_from,session.time_to]",
+    "otherBounds": "[session.time_from,session.time_to)",
+    "openEnd": "no upper bound when session.time_to<=0",
+    "missingDeviceIdentity": "do not join",
+    "relatedPointPageCap": null
+  },
+  "unresolved": [
+    "POINT3 Location slots",
+    "POINT31 AISportGrade slots",
+    "POINT35 slot0",
+    "universal POINT36 diagnostic labels",
+    "SPORT permission through an ordinary helper",
+    "real-device Magisk snapshot execution and nonempty GPS/lap/private fitness acquisition",
+    "private skin-temperature baseline",
+    "native algorithms and server sleep-quality formula",
+    "per-sample timestamps of noise vectors",
+    "HeartRateWarning15 extended sensor-array indices2..11 physical semantics"
+  ],
+  "stockHealthMessages": {
+    "scope": "official phone app receiver and TicHealth 5.5 sender; independent from the local bridge",
+    "format": "MessageProxy logical path with direct JSON or path-specific plain text; not GATT characteristics",
+    "routes": [
+      {
+        "path": "/health/cmd_new_wear_push_to_phone",
+        "direction": "watch-to-phone",
+        "format": "JSON",
+        "senderFields": {
+          "current_step": "int32",
+          "goal": "int32"
+        },
+        "receiverUses": [
+          "current_step",
+          "messageId"
+        ],
+        "historicalArraysConsumed": false
+      },
+      {
+        "path": "/health/cmd_new_wear_push_to_phone",
+        "direction": "phone-to-watch",
+        "format": "JSON",
+        "fields": {
+          "messageId": "int64",
+          "status": "int32; the official writer sends 0"
+        },
+        "ackScope": "official phone writer; no exactly-once guarantee"
+      },
+      {
+        "path": "/health/cmd_wear_push_to_phone",
+        "direction": "phone-to-watch",
+        "format": "empty bytes",
+        "effects": [
+          "schedule vendor health cloud synchronization",
+          "schedule vendor sport cloud synchronization",
+          "send current steps"
+        ],
+        "localHistoryRead": false
+      },
+      {
+        "path": "/health/cmd_wear_pull_from_phone",
+        "direction": "phone-to-watch",
+        "format": "JSON",
+        "fields": {
+          "goal": "positive int32; other fields not used by selected goal receiver"
+        },
+        "effects": [
+          "update step goal",
+          "may schedule vendor cloud synchronization"
+        ]
+      },
+      {
+        "path": "/health/sync_step_to_wechat",
+        "direction": "watch-to-phone",
+        "format": "decimal integer text",
+        "effects": [
+          "invoke phone WeChat step bridge"
+        ]
+      },
+      {
+        "path": "/health/sleep/share",
+        "direction": "watch-to-phone",
+        "format": "sleepId text",
+        "effects": [
+          "open phone sleep share UI"
+        ]
+      },
+      {
+        "path": "/health/open_wechat_qr_ticket",
+        "direction": "phone-to-watch",
+        "format": "qr_ticket text",
+        "effects": [
+          "open watch ticket UI"
+        ]
+      },
+      {
+        "path": "/health/cmd_change_heart_health_switch",
+        "direction": "phone-to-watch",
+        "format": "text; exact1 enables,other disables",
+        "effects": [
+          "update heart-health setting"
+        ]
+      }
+    ],
+    "legacyRecorderItem": {
+      "time": "int32",
+      "value": "int32"
+    },
+    "legacyRecorderArrays": [
+      "cals",
+      "distances",
+      "durations",
+      "heart_rates",
+      "motionTypes",
+      "steps",
+      "time_list"
+    ],
+    "legacyRecorderScalars": [
+      "startTime",
+      "endTime",
+      "interval",
+      "total",
+      "goal",
+      "health_count_goal",
+      "health_count_start",
+      "health_time_goal",
+      "err_code",
+      "err_msg",
+      "current_step",
+      "messageId"
+    ],
+    "noRecoveredFullHistoryMessageImplementation": true,
+    "defaultCloudSensitiveCommands": "refreshHealth requires explicit Mobvoi cloud opt-in; setStepGoal needs the frontend's warning and confirmation instead; localHealth.sync needs neither"
+  }
+}

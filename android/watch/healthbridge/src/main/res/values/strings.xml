@@ -1,0 +1,47 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- ISO dates need literal hyphens, not typographic range dashes. -->
+    <string name="app_name">Local Bridge</string>
+    <string name="bridge_enable">Allow phone to read</string>
+    <string name="bridge_enable_summary">Health records, over Bluetooth</string>
+    <string name="bridge_permission">Allow Bluetooth</string>
+    <string name="bridge_explanation">Your paired phone can read health records in the background, over Bluetooth only. You don\'t need to open this page day to day. Finding your watch works either way. This app doesn\'t sign in or connect to any vendor cloud.</string>
+    <string name="bridge_root_enable">Read full workouts (root)</string>
+    <string name="bridge_root_off">Needs root</string>
+    <string name="bridge_root_requesting">Confirm in Magisk…</string>
+    <string name="bridge_root_granted">On. Sync from your phone.</string>
+    <string name="bridge_root_denied">Root not granted</string>
+    <string name="bridge_root_explanation">Also reads workouts, GPS routes and per-point detail. Allow the Magisk prompt when turning this on. A temporary database snapshot is made in this app\'s private folder and deleted after reading. Stock workout records aren\'t changed. Regular health reading is unaffected when this is off.</string>
+    <string name="export_open">Export health JSON</string>
+    <string name="export_intro">Saved to Download/TicBox, never uploaded. The file contains health values, record IDs and times. Full workout points also contain GPS locations and are off by default, so check route privacy before sharing. Turn on root sources on the previous page first.</string>
+    <string name="export_sources">Sources</string>
+    <string name="export_table_point">Measurements (POINT)</string>
+    <string name="export_table_session">Sessions (SESSION)</string>
+    <string name="export_table_sport">Workout summaries (SPORT)</string>
+    <string name="export_table_fitness_record">Full workouts (root RECORD)</string>
+    <string name="export_table_fitness_point">Workout points and GPS (root POINT)</string>
+    <string name="export_types">Type IDs</string>
+    <string name="export_types_all">All</string>
+    <string name="export_point_types">Blood oxygen 28, sleep stages 2</string>
+    <string name="export_session_types">Sleep 100</string>
+    <string name="export_sport_types">Uses its own workout IDs</string>
+    <string name="export_sleep_oxygen_preset">Use sleep and oxygen sample preset</string>
+    <string name="export_range">Time range</string>
+    <string name="export_from">From</string>
+    <string name="export_to">To</string>
+    <string name="export_range_any">Any</string>
+    <string name="export_range_note" tools:ignore="TypographyDashes">Enter a date, a date and time, or epoch milliseconds, such as 2026-11-03 or 2026-11-03 08:30. Times use the watch\'s time zone. An end date includes that whole day.</string>
+    <string name="export_options">Options</string>
+    <string name="export_maximum">Rows per source</string>
+    <string name="export_maximum_range">1 to 5000</string>
+    <string name="export_redact">Anonymize account and device IDs</string>
+    <string name="export_redact_summary">Consistent within this export</string>
+    <string name="export_notes">Rows are read in source cursor order, so they aren\'t necessarily the newest. Cancelling, row limits and refused queries are recorded in the file\'s status. You can turn off Wi-Fi and Bluetooth first and fetch the file over USB only.</string>
+    <string name="export_start">Export</string>
+    <string name="export_cancel">Cancel</string>
+    <string name="export_invalid_selection" tools:ignore="TypographyDashes">Choose at least one source, and check the type IDs, dates and row count. Dates look like 2026-11-03 and times like 2026-11-03 08:30. The start can\'t be after the end.</string>
+    <string name="export_running">Exporting… Cancel keeps what has been read.</string>
+    <string name="export_progress">%1$s\nChecked: %2$d\nExported: %3$d</string>
+    <string name="export_done">Rows saved: %1$d\nStatus: %2$s\nrunId: %3$s\nSaved to: %4$s</string>
+    <string name="export_failed">Export failed: %1$s. Earlier downloads are kept.</string>
+    <string name="export_busy">The last export is still finishing. Try again shortly.</string>
+</resources>

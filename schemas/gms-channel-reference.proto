@@ -1,0 +1,82 @@
+// Reference reconstruction from phone and watch GMS 24.28.35. Not Google's original .proto.
+// proto2 is used as notation for the observed explicit presence and closed enums;
+// it is not a claim about the original source syntax.
+// Every field below has an explicit presence index in those descriptors.
+syntax = "proto2";
+package ticbox.reference.gms_channel;
+
+// Carried inside RpcRequest.channel (field 9), normally under WearMessage
+// channel_rpc_request (field 16). RpcRequest.path is "" for this transport;
+// the application path such as /setup/channel is in ChannelControl.path.
+message ChannelRequest {
+  // These are independent optional fields, NOT a protobuf oneof.
+  // Receiver dispatch prioritizes control, then data, then data_ack.
+  optional ChannelControl control = 2;
+  optional ChannelData data = 3;
+  optional ChannelDataAck data_ack = 4;
+  // ChannelApi writer sets 0; LargeAssetApi writer sets 1.
+  // Receiver drops values > 1. Runtime checks do not reject negatives.
+  optional int32 minimum_version = 6;
+  // int32 in the descriptor; enum labels below are analytical conveniences.
+  // Receiver accepts exactly 0 or 1, dropping unknown values.
+  optional int32 origin = 7;
+}
+
+enum ChannelOrigin {
+  ORIGIN_CHANNEL_API = 0;
+  ORIGIN_LARGE_ASSET_API = 1;
+}
+
+message ChannelControl {
+  enum Type {
+    CHANNEL_CONTROL_OPEN = 1;
+    CHANNEL_CONTROL_OPEN_ACK = 2;
+    CHANNEL_CONTROL_CLOSE = 3;
+  }
+  optional Type type = 1 [default = CHANNEL_CONTROL_OPEN];
+  // Wire type 1, always 8 little-endian bytes. Writer uses a nonnegative
+  // Java long generated as Random.nextLong() & Long.MAX_VALUE.
+  optional fixed64 channel_id = 2;
+  optional bool from_channel_opener = 3;
+  optional string package_name = 4;
+  optional string signature_digest = 5;
+  optional string path = 6;
+  optional int32 close_error_code = 7;
+  optional bool allow_over_metered = 8;
+  // Present in both descriptors; not written by the ordinary ChannelApi
+  // OPEN/ACK/CLOSE builders inspected. Received CLOSE reads but ignores it.
+  optional bytes unknown_close_bytes = 9;
+}
+
+message ChannelDataHeader {
+  optional fixed64 channel_id = 1;
+  // Sender's role, not original data direction: receiver matches local
+  // token.this_node_was_opener == !from_channel_opener, including for ACK.
+  optional bool from_channel_opener = 2;
+  optional int64 sequence_number = 3; // varint, starts at 0 per direction
+}
+
+// The receiver rejects payloads over 65536 bytes.
+message ChannelData {
+  optional ChannelDataHeader header = 1;
+  optional bytes payload = 2;
+  optional bool final_message = 3;
+}
+
+// ACK is generated after buffered payload has
+// drained to the local client pipe, or that pipe has closed.
+message ChannelDataAck {
+  optional ChannelDataHeader header = 1;
+  optional bool final_message = 2;
+}
+
+// Local Binder/API token representation, NOT an extra RFCOMM message.
+// Token is "chl-" + Android Base64.DEFAULT serialized bytes (flags=0),
+// unlike the unpadded URL-safe Base64 SHA-1 used by MessagePiece.
+message LocalChannelToken {
+  optional string peer_node_id = 1;
+  optional string package_name = 2;
+  optional string signature_digest = 3;
+  optional fixed64 channel_id = 4;
+  optional bool this_node_was_opener = 5;
+}

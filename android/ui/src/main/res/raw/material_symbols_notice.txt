@@ -1,0 +1,5 @@
+Material Symbols (Outlined) and Material Icons (Outlined)
+Copyright Google LLC. Licensed under the Apache License, Version 2.0.
+https://github.com/google/material-design-icons
+Revision: 10ecc14790612ca8fd164e3f4ffe9c16fc50d5b7
+License: material_symbols_license.txt
