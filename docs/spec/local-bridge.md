@@ -272,12 +272,15 @@ RECORD 的 HASH 不是分页键；POINT.RECORD_ID 指向 RECORD._id。原始 `co
 
 ```kotlin
 services.localHealth.journalStatus(LocalHealthJournalSource.HEALTH)
+services.localHealth.journalStatuses(LocalHealthJournalSource.entries) { source, result -> /* 每读完一个就交回 */ }
 services.localHealth.setJournalEnabled(LocalHealthJournalSource.HEALTH, true)
 services.localHealth.setJournalEnabled(LocalHealthJournalSource.FITNESS, true)
 services.localHealth.setJournalEnabled(LocalHealthJournalSource.HEALTH, false)
 ```
 
 复用本地蓝牙健康通道，要求手表已允许读取并授予 root。两个固定来源 `health_common.db` 和 `fitness.db` 分别启用，不声称跨文件原子。没有任意路径、表名、SQL 或反射入口。同步进行中返回 `journal_sync_in_progress`，避免打开第二个读取窗口；手表应用版本过旧时返回 `journal_bridge_update_required`。操作绑定当前手表和连接代际。
+
+`journalStatuses` 在同一个连接上依次读各来源的状态，读完一个就交回一个（1.0.11 起；变更日志页用它）。分开读时每个来源都要唤醒手表、建一次连接、开一个读取窗口。某个来源报错不影响后面的；手机等满 90 秒的那个之后，下一个重新建连接。每个来源各写一条 `journal_result` 诊断。
 
 `installed=null` 表示无法观察，不能当作未安装。写操作的回复丢失时不得自动重试，应先查询状态。安装可以幂等查询，但不会静默修补缺失的触发器：缺失期间可能已经漏记，必须移除后重新启用并重建基线。手机接口自身 90 秒超时时抛出 `LocalHealthJournalException("journal_operation_unconfirmed")`，不能据此判断安装或移除没有提交；调用方主动取消时照常传播取消异常；两者都不自动重放。
 
@@ -328,7 +331,7 @@ root 或日志不可用时，保留旧的日志游标，先完成一次独立的
 4. 模块只接受单条 SELECT、WITH，以及校验用到的 PRAGMA（user_version、table_xinfo、foreign_key_list、index_list、index_xinfo），PRAGMA 不能带赋值。连接以 `OPEN_READONLY | NO_LOCALIZED_COLLATORS` 打开，文件被替换后重新打开，空闲 30 秒后关闭；每条查询 5 秒超时。
 5. 单元格带存储类型：`i` 整数、`f` 浮点、`s` 文本、`b` Base64 的 BLOB，或 null。Local Bridge 据此还原出与直接读文件相同的游标。一个进程的 Binder 缓冲只有约 1 MB，由同一时刻所有进行中的调用共用，所以 256 KiB 以内的回复直接放在 Binder 回复里，更大的写进只读的共享内存（`SharedMemory`），回复里只带它的文件描述符。一次回复最多 4 MiB，这块内存由官方应用占用，答完就释放。按键取行时每次最多 128 个键，回复过大就分成两半再查。整行装不进 CursorWindow 时，模块返回 `journal_row_too_big`，Local Bridge 按上面的办法单独读这一行。
 
-所有检查都在 Local Bridge 里完成，用的是辅助进程读文件时的同一套代码：版本白名单、schema、日志命名空间和元数据，以及文件代际（来源、版本名、device、inode、schema 指纹）。所以两条路径算出的代际相同，游标在两条路径间通用，换路径不会重建基线。读取前后各取一次 device 和 inode，不同就报 `journal_source_replaced`。模块没有加载、令牌读不到、版本不在白名单或读取出错时，改用 root 辅助进程。开启和关闭日志总是由辅助进程完成。
+所有检查都在 Local Bridge 里完成，用的是辅助进程读文件时的同一套代码：版本白名单、schema、日志命名空间和元数据，以及文件代际（来源、版本名、device、inode、schema 指纹）。所以两条路径算出的代际相同，游标在两条路径间通用，换路径不会重建基线。读取前后各取一次 device 和 inode，不同就报 `journal_source_replaced`。模块没有加载、令牌读不到、版本不在白名单或读取出错时，改用 root 辅助进程。变更日志页读健康库的日志状态也先经模块（1.0.11 起），不启动辅助进程；开启和关闭日志总是由辅助进程完成。
 
 **运动库仍由 root 辅助进程读取**，模块不在运动应用里；1.0.9 起一个读取窗口里的读取共用一个辅助进程，见 [§5](#5-root-运动采集)。开着运动日志时，每轮先用 su 和 stat 取运动库及其 WAL 的修改时间和大小，与不开日志时的检查相同。和上次读窗口之前取的值一样，就沿用上次的窗口，不启动辅助进程；游标已在窗口头的表，这一轮就不用读。stat 在读窗口之前取，所以读窗口期间发生的写入，下一轮会表现为变化。开启或关闭日志会清除保存的窗口。
 

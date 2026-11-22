@@ -39,6 +39,9 @@ internal class HealthModuleJournal(private val context: Context, private val con
         HealthJournalRead.page(sql, SOURCE, table, request, generation)
     }
 
+    /** The log's status, as the helper reports it for the change log page. */
+    fun status(cancellation: CancellationSignal): JsonObject? = session(cancellation) { sql, _, _ -> AtomicHealthJournal.status(sql, SOURCE) }
+
     private fun session(cancellation: CancellationSignal, block: (ModuleJournalSql, String, String) -> JsonObject): JsonObject? {
         val started = android.os.SystemClock.elapsedRealtime()
         val call = connect(cancellation) ?: return null

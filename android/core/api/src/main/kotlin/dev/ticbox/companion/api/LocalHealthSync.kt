@@ -72,6 +72,16 @@ interface LocalHealthSyncClient : AutoCloseable {
         throw LocalHealthJournalException("journal_unavailable")
 
     /**
+     * [journalStatus] for each of [sources] in turn, each result handed to [each] as it comes: the status, or the
+     * LocalHealthJournalException that stopped that one. A backend may read them all over one connection.
+     */
+    suspend fun journalStatuses(sources: List<LocalHealthJournalSource>,
+        each: suspend (LocalHealthJournalSource, Result<LocalHealthJournalStatus>) -> Unit) {
+        for (source in sources) each(source, try { Result.success(journalStatus(source)) }
+            catch (problem: LocalHealthJournalException) { Result.failure(problem) })
+    }
+
+    /**
      * Explicitly installs/removes the same-database journal on this watch. Installing changes OEM schema,
      * not health values. Log failures may abort the OEM write; disabling removes the owned triggers.
      * This is never replayed automatically after a timeout or reconnect. No automatic opt-in.

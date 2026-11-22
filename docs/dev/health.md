@@ -31,12 +31,12 @@ services.localHealth.cancel()                      // 保留已提交的进度
 ### 1.1 变更日志
 
 ```kotlin
-services.localHealth.journalStatus(LocalHealthJournalSource.HEALTH)
+services.localHealth.journalStatuses(LocalHealthJournalSource.entries) { source, result -> /* 每读完一个就交回 */ }
 services.localHealth.setJournalEnabled(LocalHealthJournalSource.HEALTH, true)
 services.localHealth.setJournalEnabled(LocalHealthJournalSource.FITNESS, true)
 ```
 
-需要手表允许健康读取和 root。页面为 [HealthJournalScreen](../../android/ui/src/main/kotlin/dev/ticbox/companion/ui/bridge/HealthJournalScreen.kt)，在本地桥接页就绪后进入。
+需要手表允许健康读取和 root。页面为 [HealthJournalScreen](../../android/ui/src/main/kotlin/dev/ticbox/companion/ui/bridge/HealthJournalScreen.kt)，在本地桥接页就绪后进入。打开时用一个连接依次读两个来源的状态：健康库经模块读取（约零点几秒），运动库要启动一次 root 辅助进程（约 2 秒），所以健康库那一栏先出来。
 
 - 同步进行中返回 `journal_sync_in_progress`；旧版 Bridge 返回 `journal_bridge_update_required`。操作绑定当前手表和连接代次。
 - `installed=null` 表示未能观察，不是未安装。手机接口 90 秒截止时抛 `LocalHealthJournalException("journal_operation_unconfirmed")`，不能据此判断写入未提交；写回包丢失时不自动重试，先查询状态。

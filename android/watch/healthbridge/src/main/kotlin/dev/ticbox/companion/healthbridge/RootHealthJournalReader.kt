@@ -114,10 +114,12 @@ internal class RootHealthJournalReader(private val context: Context,
         if (action == "disable") BridgeSettings.setJournalEnabled(context, source!!, false)
         val result = try {
             if (!BridgeSettings.rootFitnessEnabled(context)) throw HealthJournalException("journal_root_not_enabled")
-            invoke(buildJsonObject { put("source", source); put("action", action) }, cancellation).also {
-                if (action == "enable" && it.flag("installed") == true && it.text("error") == null)
-                    BridgeSettings.setJournalEnabled(context, source!!, true)
-            }
+            // The module answers a look at the health log without starting a helper; changing the log always takes one.
+            (if (action == "status" && source == HealthModuleJournal.SOURCE) viaModule { module?.status(cancellation) } else null)
+                ?: invoke(buildJsonObject { put("source", source); put("action", action) }, cancellation).also {
+                    if (action == "enable" && it.flag("installed") == true && it.text("error") == null)
+                        BridgeSettings.setJournalEnabled(context, source!!, true)
+                }
         } catch (cancelled: android.os.OperationCanceledException) { throw cancelled }
         catch (problem: Exception) { buildJsonObject {
             if (problem !is HealthJournalException) Log.w("TicBoxHealthBridge", "Journal $action failed; exception=${problem.javaClass.simpleName}")
