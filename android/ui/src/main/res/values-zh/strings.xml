@@ -1146,7 +1146,7 @@
     <string name="adb_connected_to">已连接到 %1$s</string>
     <string name="adb_disconnect">断开连接</string>
     <string name="adb_step_developer_title">打开开发者选项</string>
-    <string name="adb_step_developer_body">在手表上打开“设置 → 系统 → 关于”，连续点按“版本号”七次。</string>
+    <string name="adb_step_developer_body">在手表上打开“设置 → 系统 → 关于 → 版本”，连续点按“版本号”七次。</string>
     <string name="adb_open_about">在手表上打开“关于”</string>
     <string name="adb_step_wireless_title">打开无线调试</string>
     <string name="adb_step_wireless_body">在“设置 → 开发者选项”里打开“ADB 调试”和“无线调试”，让手表和手机连接同一个 Wi-Fi。</string>

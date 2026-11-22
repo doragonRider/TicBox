@@ -1146,7 +1146,7 @@
     <string name="adb_connected_to">已連線到 %1$s</string>
     <string name="adb_disconnect">中斷連線</string>
     <string name="adb_step_developer_title">開啟開發人員選項</string>
-    <string name="adb_step_developer_body">在手錶上開啟「設定 → 系統 → 關於」，連續輕觸「版本號碼」七次。</string>
+    <string name="adb_step_developer_body">在手錶上開啟「設定 → 系統 → 關於 → 版本」，連續輕觸「版本號碼」七次。</string>
     <string name="adb_open_about">在手錶上開啟「關於」</string>
     <string name="adb_step_wireless_title">開啟無線偵錯</string>
     <string name="adb_step_wireless_body">在「設定 → 開發人員選項」裡開啟「ADB 偵錯」和「無線偵錯」，讓手錶和手機連線到同一個 Wi-Fi。</string>

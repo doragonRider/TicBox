@@ -1164,7 +1164,7 @@
     <string name="adb_connected_to">Connected to %1$s</string>
     <string name="adb_disconnect">Disconnect</string>
     <string name="adb_step_developer_title">Turn on developer options</string>
-    <string name="adb_step_developer_body">On the watch, open Settings → System → About and tap Build number seven times.</string>
+    <string name="adb_step_developer_body">On the watch, open Settings → System → About → Versions and tap Build number seven times.</string>
     <string name="adb_open_about">Open About on watch</string>
     <string name="adb_step_wireless_title">Turn on wireless debugging</string>
     <string name="adb_step_wireless_body">In Settings → Developer options, turn on ADB debugging and wireless debugging. Keep the watch on the same Wi-Fi as this phone.</string>
