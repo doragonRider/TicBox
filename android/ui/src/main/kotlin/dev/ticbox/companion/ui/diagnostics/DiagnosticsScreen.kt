@@ -464,7 +464,8 @@ private fun SyncTiming(run: LocalHealthSyncTiming?) {
 }
 
 /** Parts of open, then parts of read. */
-private val PartStages = setOf("wake", "wait", "connect", "handshake", "watch", "transfer")
+private val PartStages =
+    setOf("wake", "wait", "connect", "handshake", "watch", "queued", "transfer")
 
 private fun sizeText(context: Context, bytes: Long) =
     if (bytes > 0) " · " + formatShortFileSize(context, bytes) else ""

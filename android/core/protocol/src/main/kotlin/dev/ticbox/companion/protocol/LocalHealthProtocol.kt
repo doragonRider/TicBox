@@ -146,16 +146,27 @@ object LocalHealthProtocol {
         put("op", "ack"); put("receiver", receiver); put("table", table.wireName); put("batch", batch)
     }
 
+    /**
+     * A row whose JSON text this side wrote and stored itself, embedded as it is: printing the reply copies the text
+     * instead of parsing and rebuilding the row. [page] reads such rows back when a reply is used without the wire.
+     */
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    fun storedRow(text: String): JsonElement = JsonUnquotedLiteral(text)
+
     /** [wireBytes] is the size of the frame that carried [value], for diagnostics. */
     fun page(value: JsonObject, wireBytes: Long = 0): LocalHealthPage {
         val received = value["rows"] as? JsonArray
-        val rows = received.orEmpty().mapNotNull { it as? JsonObject }.map(::LocalHealthRow)
+        // A parsed frame only has objects here; a stored row is an unquoted object text, which no parser produces.
+        val rows = received.orEmpty().mapNotNull { item -> item as? JsonObject
+            ?: (item as? JsonPrimitive)?.takeIf { !it.isString && it.content.startsWith("{") }?.let { parse(it.content.toByteArray()) }
+        }.map(::LocalHealthRow)
         val incomplete = received == null || rows.size != received.size || rows.any { it.partial }
         return LocalHealthPage(rows, value.number("nextId") ?: rows.mapNotNull { it.id }.maxOrNull(),
             value.number("upperId"), value.flag("complete") ?: rows.isEmpty(),
             incomplete || value.flag("partial") == true, value.text("error"), value.text("providerVersion"),
             value.text("nextKey"), value.text("upperKey"), value.text("batch"), value.number("scannedRows") ?: 0,
-            value.number("watchMillis"), wireBytes, value.number("deferredBefore"), value.flag("inlineAck") == true)
+            value.number("watchMillis"), wireBytes, value.number("deferredBefore"), value.flag("inlineAck") == true,
+            value.number("queuedMillis"))
     }
 }
 
@@ -179,7 +190,9 @@ class LocalHealthPage(val rows: List<LocalHealthRow>, val nextId: Long?, val upp
     /** Rows older than this are still only on the watch, left behind by a first sync's window. */
     val deferredBefore: Long? = null,
     /** The bridge takes this batch's ACK on the table's next changes request. */
-    val inlineAck: Boolean = false) {
+    val inlineAck: Boolean = false,
+    /** How long the request waited on the watch while it read ahead; null from a bridge that doesn't say. */
+    val queuedMillis: Long? = null) {
     override fun toString() = "LocalHealthPage(rows=${rows.size}, complete=$complete, contents=<redacted>)"
 }
 
