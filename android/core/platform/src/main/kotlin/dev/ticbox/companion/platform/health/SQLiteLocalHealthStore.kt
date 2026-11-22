@@ -101,9 +101,9 @@ class SQLiteLocalHealthStore(private val database: SQLiteDataSyncStore,
                         }, "local_user=? AND peer=? AND kind=? AND record_key=?", source.args(kind) + parsed.key)
                         return@forEach
                     }
-                    if (row.partial && old != null) {
-                        // Keep the last readable value for unavailable cells; NULL that was actually
-                        // read is still an update. A complete later observation can remove a column.
+                    if ((row.partial || row.oversized) && old != null) {
+                        // Keep the last readable value for unavailable or oversized cells; NULL that was
+                        // actually read is still an update. A complete later observation can remove a column.
                         payload = JsonObject((old + row.raw).toMutableMap().apply {
                             remove("sourceAbsent")
                             put("columns", JsonObject((old["columns"] as? JsonObject).orEmpty() + row.columns))

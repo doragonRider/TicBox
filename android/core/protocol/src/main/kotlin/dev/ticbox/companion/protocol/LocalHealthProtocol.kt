@@ -175,6 +175,8 @@ class LocalHealthRow(val raw: JsonObject) {
     val columns: JsonObject get() = raw["columns"] as? JsonObject ?: raw
     val id: Long? get() = raw.number("id") ?: columns.number("_id")
     val partial: Boolean get() = raw.flag("partial") == true
+    /** Sent without the cells named in oversizedColumns, which never fit one delivery; unlike [partial], it reads the same next time. */
+    val oversized: Boolean get() = raw["oversizedColumns"] is JsonArray
     fun text(name: String): String? = columns.text(name)
     fun number(name: String): Long? = columns.number(name)
     override fun toString() = "LocalHealthRow(contents=<redacted>)"

@@ -383,7 +383,8 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
         var next = capture.copy(scopes = if (ended) capture.scopes.drop(1) else listOf(nextScope) + capture.scopes.drop(1),
             partial = partial, scanned = capture.scanned + page.rows.size,
             providerVersion = page.providerVersion ?: capture.providerVersion)
-        page.rows.firstOrNull { row -> !row.partial }?.let { row ->
+        // A row without its oversized cells doesn't show the table's columns either.
+        page.rows.firstOrNull { row -> !row.partial && !row.oversized }?.let { row ->
             val fields = JsonArray(row.columns.keys.sorted().map(::JsonPrimitive)).toString()
             val previousFields = it.rawQuery("SELECT schema_fields FROM progress WHERE receiver=? AND kind=?", args(receiver, table)).use { c ->
                 c.moveToFirst(); if (c.isNull(0)) null else c.getString(0)
@@ -506,9 +507,15 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
                 // The stored object text with the delivery fields appended, as adding them to the parsed row would print it.
                 val payload = c.getString(2)
                 val fields = "\"bridgeRevision\":\"${c.getLong(0)}\",\"bridgeEpoch\":$epoch,\"bridgeKey\":${JsonPrimitive(c.getString(1))}}"
-                val row = if (payload == "{}") "{$fields" else payload.substring(0, payload.length - 1) + "," + fields
-                val size = utf8Length(row)
-                if (bytes + size > LocalHealthProtocol.MAX_FRAME_BYTES - 8192) {
+                fun delivered(text: String) = if (text == "{}") "{$fields" else text.substring(0, text.length - 1) + "," + fields
+                var row = delivered(payload)
+                var size = utf8Length(row)
+                if (rows.isEmpty() && size > BATCH_BUDGET) {
+                    // Queued before 1.0.7 bounded rows at the source: it goes without its largest cells rather than never.
+                    row = delivered(boundHealthRow(LocalHealthProtocol.parse(payload.toByteArray()), BATCH_BUDGET - utf8Length(fields)).toString())
+                    size = utf8Length(row)
+                }
+                if (bytes + size > BATCH_BUDGET) {
                     if (rows.isEmpty()) return@transaction queryError("row_exceeds_budget")
                     break
                 }
@@ -573,23 +580,9 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
         private val WINDOWED = setOf(LocalHealthTable.POINT, LocalHealthTable.FITNESS_POINT)
         /** Keys per IN list, well under SQLite's 999 bound parameters. */
         private const val KEYS_PER_STATEMENT = 500
+        /** Room for one batch's rows, leaving the rest of the frame to its metadata. */
+        private const val BATCH_BUDGET = LocalHealthProtocol.MAX_FRAME_BYTES - 8192
 
-        /** The UTF-8 size of [text] without encoding it; a lone surrogate encodes as one replacement byte. */
-        private fun utf8Length(text: String): Int {
-            var bytes = 0; var index = 0
-            while (index < text.length) {
-                val char = text[index]
-                bytes += when {
-                    char.code < 0x80 -> 1
-                    char.code < 0x800 -> 2
-                    char.isHighSurrogate() && index + 1 < text.length && text[index + 1].isLowSurrogate() -> { index++; 4 }
-                    char.isSurrogate() -> 1
-                    else -> 3
-                }
-                index++
-            }
-            return bytes
-        }
     }
 }
 

@@ -12,7 +12,7 @@ internal class HealthRowFields(raw: HealthRawRecord) {
     private val columns = root?.get("columns") as? JsonObject ?: root ?: JsonObject(emptyMap())
     init {
         if (root == null) issues += HealthParseIssue.MALFORMED_ROW
-        if ((root?.get("partial") as? JsonPrimitive)?.booleanOrNull == true) issues += HealthParseIssue.PARTIAL_SOURCE_ROW
+        if (root.lacksSourceCells()) issues += HealthParseIssue.PARTIAL_SOURCE_ROW
     }
     fun text(name: String): String? = (columns[name] as? JsonPrimitive)?.contentOrNull
     fun integer(name: String, required: Boolean = true): Long? {
@@ -21,5 +21,8 @@ internal class HealthRowFields(raw: HealthRawRecord) {
         return healthInteger(value).also { if (it == null) issues += HealthParseIssue.INVALID_INTEGER }
     }
 }
+/** The watch sent this row without some of its cells: unreadable ones (partial) or ones too large to deliver. */
+internal fun JsonObject?.lacksSourceCells(): Boolean =
+    this != null && ((this["partial"] as? JsonPrimitive)?.booleanOrNull == true || this["oversizedColumns"] is JsonArray)
 internal fun healthInteger(value: String): Long? = try { BigDecimal(value.trim().removePrefix("\uFEFF")).longValueExact() }
     catch (_: NumberFormatException) { null } catch (_: ArithmeticException) { null }
