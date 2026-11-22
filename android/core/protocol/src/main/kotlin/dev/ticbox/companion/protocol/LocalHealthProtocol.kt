@@ -161,6 +161,69 @@ object LocalHealthProtocol {
     @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
     fun storedRow(text: String): JsonElement = JsonUnquotedLiteral(text)
 
+    /**
+     * A page as it was printed, each row kept as its text (see [storedRow]) rather than parsed: a stored batch goes out again
+     * as it was made, and parsing its thousand rows only to print them again cost the watch more than the rest of the reply.
+     * Text whose top-level "rows" isn't an array is parsed whole.
+     */
+    fun storedPage(text: String): JsonObject {
+        val (open, close, rows) = storedRows(text) ?: return parse(text.toByteArray())
+        val head = parse((text.substring(0, open + 1) + text.substring(close)).toByteArray())
+        return JsonObject(head + ("rows" to JsonArray(rows.map { storedRow(text.substring(it)) })))
+    }
+
+    /** The brackets of [text]'s top-level "rows" array and each element's span, found without parsing; null if it has none. */
+    private fun storedRows(text: String): Triple<Int, Int, List<IntRange>>? {
+        val n = text.length
+        fun space(from: Int): Int { var j = from; while (j < n && text[j].isWhitespace()) j++; return j }
+        fun string(from: Int): Int { // Just past the string that opens at [from], or -1.
+            var j = from + 1
+            while (j < n) when (text[j]) { '\\' -> j += 2; '"' -> return j + 1; else -> j++ }
+            return -1
+        }
+        fun value(from: Int): Int { // Just past the value that starts at [from], or -1.
+            var j = from; var depth = 0
+            while (j < n) {
+                val c = text[j]
+                when {
+                    c == '"' -> { j = string(j); if (j < 0) return -1; if (depth == 0) return j; continue }
+                    c == '{' || c == '[' -> depth++
+                    c == '}' || c == ']' -> { if (depth == 0) return j; depth--; if (depth == 0) return j + 1 }
+                    c == ',' && depth == 0 -> return j
+                }
+                j++
+            }
+            return if (depth == 0) j else -1
+        }
+        var j = space(0)
+        if (j >= n || text[j] != '{') return null
+        j = space(j + 1)
+        while (j < n && text[j] == '"') {
+            val keyEnd = string(j); if (keyEnd < 0) return null
+            val key = text.substring(j + 1, keyEnd - 1)
+            j = space(keyEnd); if (j >= n || text[j] != ':') return null
+            j = space(j + 1)
+            if (key == "rows" && j < n && text[j] == '[') {
+                val open = j; val rows = mutableListOf<IntRange>()
+                var k = space(j + 1)
+                if (k < n && text[k] == ']') return Triple(open, k, rows)
+                while (k < n) {
+                    val end = value(k); if (end <= k) return null
+                    rows += k until end
+                    k = space(end)
+                    if (k < n && text[k] == ']') return Triple(open, k, rows)
+                    if (k >= n || text[k] != ',') return null
+                    k = space(k + 1)
+                }
+                return null
+            }
+            j = value(j); if (j < 0) return null
+            j = space(j)
+            if (j < n && text[j] == ',') j = space(j + 1) else return null
+        }
+        return null
+    }
+
     /** [wireBytes] is the size of the frame that carried [value], for diagnostics. */
     fun page(value: JsonObject, wireBytes: Long = 0): LocalHealthPage {
         val received = value["rows"] as? JsonArray

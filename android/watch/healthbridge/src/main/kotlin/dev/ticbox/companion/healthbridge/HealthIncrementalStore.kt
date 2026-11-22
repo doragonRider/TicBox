@@ -377,64 +377,69 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
     }
 
     fun observe(receiver: String, table: LocalHealthTable, capture: HealthCapture, page: LocalHealthPage,
-        prepared: List<PreparedRow> = prepare(table, page.rows)): HealthCapture = transaction {
-        val scope = capture.scopes.first()
-        val changed = scope.changed + observeRows(receiver, table, capture, scope, prepared)
-        val remaining = scope.remaining?.let { budget -> (budget - page.rows.size).coerceAtLeast(0) }
-        val stalled = !page.complete && (if (table == LocalHealthTable.SPORT)
-            page.nextKey == scope.afterKey && page.nextId == scope.afterId
-            else page.nextId == null || page.nextId == scope.afterId)
-        val partial = capture.partial || page.partial || stalled
-        val nextScope = scope.copy(afterId = page.nextId ?: scope.afterId, upperId = page.upperId ?: scope.upperId,
-            afterKey = page.nextKey ?: scope.afterKey, upperKey = page.upperKey ?: scope.upperKey,
-            remaining = remaining, partial = scope.partial || page.partial || stalled, changed = changed)
-        val ended = page.complete || remaining == 0 || stalled
-        if (ended) {
-            if (scope.audit && !nextScope.partial) missing(receiver, table, nextScope, page.complete)
-            if (scope.remaining != null && !nextScope.partial) it.execSQL("UPDATE progress SET audit_after=? WHERE receiver=? AND kind=?",
-                arrayOf<Any?>(if (page.complete) 0L else nextScope.afterId ?: 0L, receiver, table.wireName))
-            scope.parent?.takeUnless { nextScope.partial }?.let { parent ->
-                val same = it.rawQuery("SELECT same_count FROM children WHERE receiver=? AND parent_id=?", arrayOf(receiver, parent.toString())).use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
-                it.execSQL("INSERT OR REPLACE INTO children VALUES (?,?,?,?)", arrayOf<Any?>(receiver, parent, now(), if (changed > 0) 0 else same + 1))
+        prepared: List<PreparedRow> = prepare(table, page.rows)): HealthCapture {
+        // Only the reading side writes the ledger, under the reader's scan lock, so it's read before the transaction:
+        // the answering thread's ACKs and batches wait for this transaction to commit, so the less it holds, the better.
+        val previous = previous(receiver, table, prepared)
+        return transaction {
+            val scope = capture.scopes.first()
+            val changed = scope.changed + observeRows(receiver, table, capture, scope, prepared, previous)
+            val remaining = scope.remaining?.let { budget -> (budget - page.rows.size).coerceAtLeast(0) }
+            val stalled = !page.complete && (if (table == LocalHealthTable.SPORT)
+                page.nextKey == scope.afterKey && page.nextId == scope.afterId
+                else page.nextId == null || page.nextId == scope.afterId)
+            val partial = capture.partial || page.partial || stalled
+            val nextScope = scope.copy(afterId = page.nextId ?: scope.afterId, upperId = page.upperId ?: scope.upperId,
+                afterKey = page.nextKey ?: scope.afterKey, upperKey = page.upperKey ?: scope.upperKey,
+                remaining = remaining, partial = scope.partial || page.partial || stalled, changed = changed)
+            val ended = page.complete || remaining == 0 || stalled
+            if (ended) {
+                if (scope.audit && !nextScope.partial) missing(receiver, table, nextScope, page.complete)
+                if (scope.remaining != null && !nextScope.partial) it.execSQL("UPDATE progress SET audit_after=? WHERE receiver=? AND kind=?",
+                    arrayOf<Any?>(if (page.complete) 0L else nextScope.afterId ?: 0L, receiver, table.wireName))
+                scope.parent?.takeUnless { nextScope.partial }?.let { parent ->
+                    val same = it.rawQuery("SELECT same_count FROM children WHERE receiver=? AND parent_id=?", arrayOf(receiver, parent.toString()))
+                        .use { c -> if (c.moveToFirst()) c.getInt(0) else 0 }
+                    it.execSQL("INSERT OR REPLACE INTO children VALUES (?,?,?,?)", arrayOf<Any?>(receiver, parent, now(), if (changed > 0) 0 else same + 1))
+                }
             }
-        }
-        var next = capture.copy(scopes = if (ended) capture.scopes.drop(1) else listOf(nextScope) + capture.scopes.drop(1),
-            partial = partial, scanned = capture.scanned + page.rows.size,
-            providerVersion = page.providerVersion ?: capture.providerVersion)
-        // A row without its oversized cells doesn't show the table's columns either.
-        page.rows.firstOrNull { row -> !row.partial && !row.oversized }?.let { row ->
-            val fields = JsonArray(row.columns.keys.sorted().map(::JsonPrimitive)).toString()
-            val previousFields = it.rawQuery("SELECT schema_fields FROM progress WHERE receiver=? AND kind=?", args(receiver, table)).use { c ->
-                c.moveToFirst(); if (c.isNull(0)) null else c.getString(0)
+            var next = capture.copy(scopes = if (ended) capture.scopes.drop(1) else listOf(nextScope) + capture.scopes.drop(1),
+                partial = partial, scanned = capture.scanned + page.rows.size,
+                providerVersion = page.providerVersion ?: capture.providerVersion)
+            // A row without its oversized cells doesn't show the table's columns either.
+            page.rows.firstOrNull { row -> !row.partial && !row.oversized }?.let { row ->
+                val fields = JsonArray(row.columns.keys.sorted().map(::JsonPrimitive)).toString()
+                val previousFields = it.rawQuery("SELECT schema_fields FROM progress WHERE receiver=? AND kind=?", args(receiver, table)).use { c ->
+                    c.moveToFirst(); if (c.isNull(0)) null else c.getString(0)
+                }
+                if (previousFields != fields) it.execSQL("UPDATE progress SET schema_fields=? WHERE receiver=? AND kind=?", arrayOf(fields, receiver, table.wireName))
+                if (previousFields != null && previousFields != fields && !capture.full) {
+                    // An observed schema change needs a fresh comparison of old rows too.
+                    next = next.copy(full = true, scopes = coverage(receiver, table, capture.window, capture.resend))
+                }
             }
-            if (previousFields != fields) it.execSQL("UPDATE progress SET schema_fields=? WHERE receiver=? AND kind=?", arrayOf(fields, receiver, table.wireName))
-            if (previousFields != null && previousFields != fields && !capture.full) {
-                // An observed schema change needs a fresh comparison of old rows too.
-                next = next.copy(full = true, scopes = coverage(receiver, table, capture.window, capture.resend))
+            if (next.scopes.isEmpty() && capture.full && !partial) {
+                it.execSQL("UPDATE progress SET baseline=1 WHERE receiver=? AND kind=?", args(receiver, table))
+                // Everything was read and resent, so nothing is left behind any more.
+                if (capture.resend && capture.window == null) it.delete("metadata", "name=?", arrayOf(deferredKey(receiver, table)))
+                if (table == LocalHealthTable.FITNESS_POINT) it.execSQL(
+                    "INSERT OR IGNORE INTO children SELECT receiver,source_id,?,0 FROM observations WHERE receiver=? AND kind=? AND source_id IS NOT NULL",
+                    arrayOf<Any?>(now(), receiver, LocalHealthTable.FITNESS_RECORD.wireName))
             }
+            if (next.done && !next.partial) {
+                next.stamp?.let { stamp -> setMetadata(stampKey(receiver, table), stamp) }
+                if (next.journalFallback) setMetadata(fallbackKey(receiver, table), "complete")
+            }
+            save(receiver, table, next); next
         }
-        if (next.scopes.isEmpty() && capture.full && !partial) {
-            it.execSQL("UPDATE progress SET baseline=1 WHERE receiver=? AND kind=?", args(receiver, table))
-            // Everything was read and resent, so nothing is left behind any more.
-            if (capture.resend && capture.window == null) it.delete("metadata", "name=?", arrayOf(deferredKey(receiver, table)))
-            if (table == LocalHealthTable.FITNESS_POINT) it.execSQL(
-                "INSERT OR IGNORE INTO children SELECT receiver,source_id,?,0 FROM observations WHERE receiver=? AND kind=? AND source_id IS NOT NULL",
-                arrayOf<Any?>(now(), receiver, LocalHealthTable.FITNESS_RECORD.wireName))
-        }
-        if (next.done && !next.partial) {
-            next.stamp?.let { stamp -> setMetadata(stampKey(receiver, table), stamp) }
-            if (next.journalFallback) setMetadata(fallbackKey(receiver, table), "complete")
-        }
-        save(receiver, table, next); next
     }
 
     /**
      * Compares a page with what was observed before and queues what the phone must receive; returns how many rows
      * changed. The page's earlier observations come from one query, and its writes use statements compiled once.
      */
-    private fun observeRows(receiver: String, table: LocalHealthTable, capture: HealthCapture, scope: HealthScanScope,
-        rows: List<PreparedRow>): Int {
-        if (rows.isEmpty()) return 0
+    /** What the ledger holds for these rows' keys: fingerprint, and whether the row was there when last read. */
+    private fun previous(receiver: String, table: LocalHealthTable, rows: List<PreparedRow>): HashMap<String, Pair<String?, Boolean>> {
         val previous = HashMap<String, Pair<String?, Boolean>>(rows.size * 2)
         rows.map { it.key }.distinct().chunked(KEYS_PER_STATEMENT).forEach { keys ->
             db.rawQuery("SELECT row_key,fingerprint,present FROM observations WHERE receiver=? AND kind=? AND row_key IN (${keys.joinToString(",") { "?" }})",
@@ -442,6 +447,12 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
                 while (c.moveToNext()) previous[c.getString(0)] = (if (c.isNull(1)) null else c.getString(1)) to (c.getInt(2) != 0)
             }
         }
+        return previous
+    }
+
+    private fun observeRows(receiver: String, table: LocalHealthTable, capture: HealthCapture, scope: HealthScanScope,
+        rows: List<PreparedRow>, previous: HashMap<String, Pair<String?, Boolean>> = previous(receiver, table, rows)): Int {
+        if (rows.isEmpty()) return 0
         val keepsPayload = table == LocalHealthTable.SESSION || table == LocalHealthTable.FITNESS_RECORD || table == LocalHealthTable.SPORT
         val seen = mutableListOf<String>(); var changed = 0
         db.compileStatement("INSERT OR REPLACE INTO pending(receiver,kind,row_key,payload) VALUES (?,?,?,?)").use { queue ->
@@ -567,7 +578,7 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
         // Read first: once reading is done, no row is queued until the next run begins.
         val capture = capture(receiver, table)
         val existing = db.rawQuery("SELECT payload FROM batches WHERE receiver=? AND kind=? AND batch_id=?", args(receiver, table) + chosen.id).use { c ->
-            c.moveToFirst(); LocalHealthProtocol.parse(c.getString(0).toByteArray())
+            c.moveToFirst(); LocalHealthProtocol.storedPage(c.getString(0))
         }
         // A last batch sent again in a later run that hasn't finished reading isn't the end any more.
         if (capture?.done != true) return if (existing.flag("complete") == false) existing else JsonObject(existing + ("complete" to JsonPrimitive(false)))

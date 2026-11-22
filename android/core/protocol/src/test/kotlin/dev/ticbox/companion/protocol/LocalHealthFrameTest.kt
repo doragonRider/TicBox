@@ -26,6 +26,28 @@ class LocalHealthFrameTest {
         return ByteBuffer.allocate(4 + packed.size).putInt(packed.size or Int.MIN_VALUE).put(packed).array()
     }
 
+    @Test fun aStoredPageKeepsItsRowsAsTextAndPrintsTheSameAsParsingIt() {
+        val awkward = listOf("]},{\"rows\":[1,2]}", "\\\"", "\u00e9\u2028{[", "", "a,b:c")
+        val stored = buildJsonObject {
+            put("op", "changes"); put("version", 1); put("table", "data_point")
+            put("rows", JsonArray(awkward.mapIndexed { id, value -> LocalHealthProtocol.storedRow(buildJsonObject {
+                put("id", id.toString()); put("columns", buildJsonObject { put("values", value); putJsonArray("list") { add(JsonNull); add(-1.5e3) } })
+            }.toString()) }))
+            put("batch", "b"); put("complete", false); putJsonObject("sourceJournal") { put("upper", "9") }
+        }.toString()
+        val page = LocalHealthProtocol.storedPage(stored)
+        assertEquals(stored, page.toString())
+        assertEquals(LocalHealthProtocol.parse(stored.toByteArray()), read(LocalHealthProtocol.frame(page, zlib = true)))
+        assertEquals(awkward, LocalHealthProtocol.page(page).rows.map { it.columns.getValue("values").jsonPrimitive.content })
+        // The flag a resend changes reads as before.
+        assertEquals(false, page.flag("complete"))
+        val empty = """{"op":"changes","rows":[ ],"batch":"b"}"""
+        assertEquals(LocalHealthProtocol.parse(empty.toByteArray()), LocalHealthProtocol.storedPage(empty))
+        // Without a top-level rows array, it is parsed as usual.
+        val nested = """{"op":"changes","x":{"rows":[1]},"rows":"none"}"""
+        assertEquals(LocalHealthProtocol.parse(nested.toByteArray()), LocalHealthProtocol.storedPage(nested))
+    }
+
     @Test fun aCompressedPageReadsBackUnchangedAndSmallOrUnaskedFramesStayPlain() {
         val packed = LocalHealthProtocol.frame(page, zlib = true)
         val plain = LocalHealthProtocol.frame(page)
