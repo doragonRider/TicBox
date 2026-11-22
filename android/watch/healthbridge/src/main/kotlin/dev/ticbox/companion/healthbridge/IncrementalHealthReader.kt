@@ -20,11 +20,15 @@ internal class IncrementalHealthReader(
     private val journal: HealthJournalReader? = null,
     /** Closed with the reader: the workout helper kept for this read window. */
     private val helper: AutoCloseable? = null,
+    /** Starts that helper ahead, once per window, when a full sync begins: it reads every workout page through it. */
+    private val warmUp: () -> Unit = {},
 ) : AutoCloseable {
     constructor(context: Context) : this(context, FitnessHelperSession(context))
     private constructor(context: Context, fitness: FitnessHelperSession) : this(HealthIncrementalStore(context), sourceReader(context, fitness),
         enabledHealthTables(context), { cancellation -> if (BridgeSettings.rootFitnessEnabled(context)) RootFitnessPageReader(context).stamp(cancellation) else null },
-        RootHealthJournalReader(context, fitness = fitness), fitness)
+        RootHealthJournalReader(context, fitness = fitness), fitness,
+        { if (BridgeSettings.rootFitnessEnabled(context) && RootFitnessPageReader(context).installed()) fitness.warm() })
+    private val warmed = java.util.concurrent.atomic.AtomicBoolean()
 
     /**
      * Held while a capture begins or reads the source: by the read-ahead thread for one source page at a time, and by the
@@ -101,6 +105,8 @@ internal class IncrementalHealthReader(
             store.acknowledge(receiver, table, batch)
         } else {
             val run = request.text("run") ?: return queryError("run_missing")
+            // Starting it takes about a second, which now passes while the health tables are read.
+            if (request.flag("full") == true && !warmed.getAndSet(true)) warmUp()
             val after = request.text("after")
             // The previous page's ACK may ride on this request. It commits on its own, whatever this read then finds.
             request.text("ack")?.let { batch ->
