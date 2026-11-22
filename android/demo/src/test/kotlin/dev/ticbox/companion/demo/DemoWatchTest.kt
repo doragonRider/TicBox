@@ -89,14 +89,21 @@ class DemoWatchTest {
 
     @Test
     fun watchFacesCarryDecodablePreviews() = runTest {
-        val faces = demo().watchFaces.state.value
+        val demo = demo()
+        val faces = demo.watchFaces.state.value
         assertEquals(3, faces.favorites.size)
         assertEquals(faces.favorites.first().id, faces.current?.favoriteId)
         faces.favorites.forEach { favorite ->
             val bytes = assertNotNull(favorite.preview).bytes
             assertNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size))
         }
-        assertEquals(1, faces.installed.size - faces.favorites.size)
+        // Two faces to add: one of the samples, and the photo face, which a real watch doesn't have
+        // among its favorites either.
+        assertEquals(2, faces.installed.size - faces.favorites.size)
+        val photo = assertNotNull(demo.watchFaces.queryPhoto().settings)
+        val component = "${photo.packageName}/${photo.className}"
+        assertTrue(faces.installed.any { it.componentName == component })
+        assertTrue(faces.favorites.none { it.componentName == component })
     }
 
     @Test
