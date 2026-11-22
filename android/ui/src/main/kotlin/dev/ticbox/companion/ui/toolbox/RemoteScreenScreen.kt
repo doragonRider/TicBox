@@ -224,29 +224,13 @@ class RemoteScreenViewModel(
 
     init {
         viewModelScope.launch(Dispatchers.Default) {
-            combine(wanted, visible, surface, settings, toolbox.access) {
-                    wanted,
-                    visible,
-                    surface,
-                    settings,
-                    access ->
-                    val target = access?.target.takeIf { access?.connected == true }
-                    ScreenDemand(
-                        wanted = wanted,
-                        connected = target != null,
-                        target = target,
-                        udpRequested = settings.advanced && settings.udp,
-                        request =
-                            if (wanted && visible && surface != null && target != null)
-                                StreamRequest(
-                                    surface,
-                                    settings.options(access?.selected),
-                                    target,
-                                    overWifi = access?.selected == ToolboxBackendKind.ADB,
-                                    smoothPlayback = settings.smoothPlayback,
-                                )
-                            else null,
-                    )
+            // A change to any input reads all of them again. Each reaches combine from its own
+            // collector, so the values it hands over can mix old and new: coming back from
+            // Advanced,
+            // the page being visible again could arrive before the surface's removal and open a
+            // stream on the old surface, only to close it at once.
+            combine(wanted, visible, surface, settings, toolbox.access) { _, _, _, _, _ ->
+                    demand()
                 }
                 .distinctUntilChanged()
                 .collectLatest { demand ->
@@ -269,6 +253,30 @@ class RemoteScreenViewModel(
                     }
                 }
         }
+    }
+
+    private fun demand(): ScreenDemand {
+        val wanted = wanted.value
+        val settings = settings.value
+        val access = toolbox.access.value
+        val surface = surface.value
+        val target = access?.target.takeIf { access?.connected == true }
+        return ScreenDemand(
+            wanted = wanted,
+            connected = target != null,
+            target = target,
+            udpRequested = settings.advanced && settings.udp,
+            request =
+                if (wanted && visible.value && surface != null && target != null)
+                    StreamRequest(
+                        surface,
+                        settings.options(access?.selected),
+                        target,
+                        overWifi = access?.selected == ToolboxBackendKind.ADB,
+                        smoothPlayback = settings.smoothPlayback,
+                    )
+                else null,
+        )
     }
 
     fun start() {
