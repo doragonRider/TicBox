@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -297,11 +298,15 @@ fun MetricCard(
     loading: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** The step goal; with it, the steps card shows how far the day is from it. */
+    goal: Int? = null,
 ) {
     val formatter = metricFormatter()
     val day = result?.day
     val hasData = day?.hasData(metric) == true
     val until = result?.until(metric)
+    val stepGoal = goal?.takeIf { metric == HealthMetric.ACTIVITY && hasData }
+    val steps = day?.stepTotal ?: 0
     Card(
         onClick = onClick,
         modifier = modifier.testTag("metric_" + metric.name),
@@ -309,7 +314,7 @@ fun MetricCard(
             CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(
-            Modifier.fillMaxWidth().heightIn(min = 156.dp).padding(16.dp),
+            Modifier.fillMaxSize().heightIn(min = 156.dp).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(
@@ -336,14 +341,23 @@ fun MetricCard(
                     else -> readStateText(result.state(metric), hasData)
                 }
             val naps = if (metric == HealthMetric.SLEEP) day?.naps?.size ?: 0 else 0
-            Text(
-                status
-                    ?: if (naps > 0) pluralStringResource(R.plurals.sleep_naps_included, naps, naps)
-                    else summaryCaption(metric, pastDay = until != null),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (hasData) MiniChart(day, metric, until)
+            if (status == null && stepGoal != null) {
+                StepsGoalStatus(steps, stepGoal, MaterialTheme.typography.labelMedium)
+            } else {
+                Text(
+                    status
+                        ?: if (naps > 0)
+                            pluralStringResource(R.plurals.sleep_naps_included, naps, naps)
+                        else summaryCaption(metric, pastDay = until != null),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (stepGoal != null) {
+                // At the bottom, level with the other cards' charts.
+                Spacer(Modifier.weight(1f))
+                GoalBar(steps / stepGoal.toFloat(), metricColor(metric))
+            } else if (hasData) MiniChart(day, metric, until)
         }
     }
 }

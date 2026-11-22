@@ -345,6 +345,10 @@
     <string name="health_detail_unavailable">這些資料尚未從手錶同步。</string>
     <string name="health_detail_failed">無法讀取已儲存的記錄，顯示上次的結果。</string>
     <string name="health_about_steps">步數由手錶統計，並按每30分鐘彙總。</string>
+    <string name="steps_goal_reached">已達成目標</string>
+    <string name="steps_goal_of">目標 %1$s</string>
+    <string name="steps_most_active">最活躍 %1$s · %2$s</string>
+    <string name="health_by_hour">按小時</string>
     <string name="health_about_heart">心率會隨活動、姿勢和壓力變化。這些讀數僅供參考，不能用於診斷。</string>
     <string name="health_about_sleep">一晚的睡眠計入結束當天。當天最長的一次是主要睡眠，其餘是小睡；間隔不到 1 小時的睡眠算作同一次。睡眠階段來自手錶的睡眠監測。</string>
     <string name="health_about_oxygen">血氧由手錶感測器測量。讀數僅供參考，不能用於診斷。</string>
@@ -471,6 +475,15 @@
     </plurals>
     <plurals name="health_days_recorded">
         <item quantity="other">%2$d 天中有 %1$d 天有記錄</item>
+    </plurals>
+    <plurals name="steps_to_go">
+        <item quantity="other">還差 %1$s 步</item>
+    </plurals>
+    <plurals name="steps_unit">
+        <item quantity="other">步</item>
+    </plurals>
+    <plurals name="health_days_goal_met">
+        <item quantity="other">%2$d 天中有 %1$d 天達標</item>
     </plurals>
     <plurals name="health_records_count">
         <item quantity="other">%1$d 筆記錄</item>

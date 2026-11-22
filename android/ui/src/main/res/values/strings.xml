@@ -346,6 +346,10 @@
     <string name="health_detail_unavailable">This data hasn\'t been synced from your watch yet.</string>
     <string name="health_detail_failed">Couldn\'t read the saved records. Showing the last results.</string>
     <string name="health_about_steps">Steps are counted by your watch and added up in half-hour intervals.</string>
+    <string name="steps_goal_reached">Goal reached</string>
+    <string name="steps_goal_of">Goal %1$s</string>
+    <string name="steps_most_active">Most active %1$s · %2$s</string>
+    <string name="health_by_hour">By hour</string>
     <string name="health_about_heart">Heart rate changes with activity, posture and stress. These readings are for reference, not diagnosis.</string>
     <string name="health_about_sleep">A night counts toward the day it ends. The day\'s longest sleep is the main sleep and the others are naps; sleep less than an hour apart counts as one. Stages come from your watch\'s sleep tracking.</string>
     <string name="health_about_oxygen">Blood oxygen is measured by your watch\'s sensor. Readings are for reference, not diagnosis.</string>
@@ -475,6 +479,18 @@
     <plurals name="health_days_recorded">
         <item quantity="one">%1$d of %2$d days recorded</item>
         <item quantity="other">%1$d of %2$d days recorded</item>
+    </plurals>
+    <plurals name="steps_to_go">
+        <item quantity="one">%1$s step to go</item>
+        <item quantity="other">%1$s steps to go</item>
+    </plurals>
+    <plurals name="steps_unit">
+        <item quantity="one">step</item>
+        <item quantity="other">steps</item>
+    </plurals>
+    <plurals name="health_days_goal_met">
+        <item quantity="one">Goal met on %1$d of %2$d day</item>
+        <item quantity="other">Goal met on %1$d of %2$d days</item>
     </plurals>
     <plurals name="health_records_count">
         <item quantity="one">%1$d record</item>

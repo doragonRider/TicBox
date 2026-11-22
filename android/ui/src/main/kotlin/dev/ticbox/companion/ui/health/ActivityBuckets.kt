@@ -63,5 +63,27 @@ internal fun activityBuckets(
         }
 }
 
+/**
+ * [buckets] added up into hours counted from [start], the day's own start, so a daylight-saving day
+ * has 23 or 25 of them. Hours with nothing recorded stay absent.
+ */
+internal fun hourlyTotals(
+    buckets: List<HealthPoint>,
+    start: Instant,
+    end: Instant,
+): List<HealthPoint> =
+    buckets
+        .filter { it.time >= start && it.time < end }
+        .groupBy { Duration.between(start, it.time).toHours() }
+        .toSortedMap()
+        .map { (hour, points) ->
+            val from = start.plus(Duration.ofHours(hour))
+            HealthPoint(
+                from,
+                points.sumOf { it.value },
+                endExclusive = minOf(from.plus(Duration.ofHours(1)), end),
+            )
+        }
+
 private fun elapsedMillis(start: Instant, end: Instant): Double =
     Duration.between(start, end).let { it.seconds.toDouble() * 1000 + it.nano / 1_000_000.0 }

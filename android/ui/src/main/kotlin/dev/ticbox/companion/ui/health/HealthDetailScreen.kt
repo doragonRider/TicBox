@@ -67,6 +67,7 @@ fun HealthDetailScreen(metric: HealthMetric, viewModel: HealthViewModel, onBack:
         viewModel.ensureLoaded(if (period == HealthPeriod.WEEK) week else listOf(state.date))
     }
     var showAll by rememberSaveable(metric, period, state.date) { mutableStateOf(false) }
+    val goal = if (metric == HealthMetric.ACTIVITY) stepGoal(viewModel) else null
     LifecycleStartEffect(viewModel) {
         viewModel.refreshRecent()
         onStopOrDispose {}
@@ -80,8 +81,8 @@ fun HealthDetailScreen(metric: HealthMetric, viewModel: HealthViewModel, onBack:
                 }
             }
             when (period) {
-                HealthPeriod.DAY -> dayContent(metric, state, showAll) { showAll = true }
-                HealthPeriod.WEEK -> weekContent(metric, state, week)
+                HealthPeriod.DAY -> dayContent(metric, state, goal, showAll) { showAll = true }
+                HealthPeriod.WEEK -> weekContent(metric, state, week, goal)
             }
             item(key = "about") { FootnoteText(stringResource(metric.explanation())) }
         }
@@ -129,6 +130,7 @@ private const val MetersPerFloor = 3
 private fun LazyListScope.dayContent(
     metric: HealthMetric,
     state: HealthUiState,
+    goal: Int?,
     showAll: Boolean,
     onShowAll: () -> Unit,
 ) {
@@ -140,6 +142,10 @@ private fun LazyListScope.dayContent(
     if (day == null || !day.hasData(metric)) return
     if (metric == HealthMetric.SLEEP) {
         sleepDayContent(day, showAll, onShowAll)
+        return
+    }
+    if (metric == HealthMetric.ACTIVITY) {
+        stepsDayContent(day, state.today, goal)
         return
     }
     val points = day.points(metric)
@@ -179,6 +185,34 @@ private fun LazyListScope.dayContent(
     }
     if (shown.size < points.size) {
         item(key = "show_all") { ShowAllButton(points.size, onShowAll) }
+    }
+}
+
+/**
+ * A day of steps: the ring toward the goal, the day's other activity, and its steps by the hour.
+ * Half-hour totals are too fine to read at a glance, and their lowest and highest say little.
+ */
+private fun LazyListScope.stepsDayContent(day: HealthDay, today: LocalDate, goal: Int?) {
+    val metric = HealthMetric.ACTIVITY
+    val zone = ZoneId.systemDefault()
+    val hours =
+        hourlyTotals(
+            day.steps,
+            day.date.atStartOfDay(zone).toInstant(),
+            day.date.plusDays(1).atStartOfDay(zone).toInstant(),
+        )
+    item(key = "summary") {
+        if (goal != null) StepsHero(day.stepTotal, goal)
+        else Summary(summaryCaption(metric), metricFormatter().value(metric, day.summary(metric)))
+    }
+    item(key = "stats") { ActivityStats(day) }
+    item(key = "chart") { DayChart(metric, day, hours, until = null, today, peakFirst = true) }
+    item(key = "records_title") { SectionTitle(stringResource(R.string.health_by_hour)) }
+    items(hours.asReversed(), key = { "hour_" + it.time.toEpochMilli() }) { point ->
+        RecordRow(
+            readingTime(point, today, rolling = false),
+            metricFormatter().value(metric, point.value),
+        )
     }
 }
 
@@ -293,6 +327,7 @@ private fun LazyListScope.weekContent(
     metric: HealthMetric,
     state: HealthUiState,
     week: List<LocalDate>,
+    goal: Int?,
 ) {
     val daily = week.mapNotNull { date ->
         state.result(date)?.day?.takeIf { it.hasData(metric) }?.let { date to it.summary(metric) }
@@ -320,7 +355,17 @@ private fun LazyListScope.weekContent(
         Summary(
             stringResource(R.string.health_caption_daily_average),
             metricFormatter().value(metric, average),
-            pluralStringResource(R.plurals.health_days_recorded, daily.size, daily.size, week.size),
+            if (goal != null) {
+                val met = daily.count { it.second >= goal }
+                pluralStringResource(R.plurals.health_days_goal_met, daily.size, met, daily.size)
+            } else {
+                pluralStringResource(
+                    R.plurals.health_days_recorded,
+                    daily.size,
+                    daily.size,
+                    week.size,
+                )
+            },
         )
     }
     item(key = "chart") {
@@ -332,7 +377,8 @@ private fun LazyListScope.weekContent(
                 endExclusive = date.plusDays(1).atStartOfDay(zone).toInstant(),
             )
         }
-        var selected by remember(points) { mutableStateOf<Int?>(points.lastIndex) }
+        // The latest day is read out until a bar is picked; only a picked bar dims the others.
+        var picked by remember(points) { mutableStateOf<Int?>(null) }
         val formatter = metricFormatter()
         val weekday =
             remember(locale) {
@@ -343,7 +389,7 @@ private fun LazyListScope.weekContent(
             }
         ChartCard {
             SelectionReadout(
-                selected?.let(points::getOrNull)?.let {
+                (picked ?: points.lastIndex).let(points::getOrNull)?.let {
                     stringResource(
                         R.string.chart_selection,
                         formatShortDate(it.time.atZone(zone).toLocalDate(), locale),
@@ -362,9 +408,10 @@ private fun LazyListScope.weekContent(
                     },
                 bars = true,
                 weekly = true,
-                selected = selected,
-                onSelect = { selected = it },
+                selected = picked,
+                onSelect = { picked = it },
                 description = chartDescription(metric, points, formatter),
+                goal = goal?.toDouble(),
             )
         }
     }
@@ -388,11 +435,17 @@ private fun DayChart(
     points: List<HealthPoint>,
     until: Instant?,
     today: LocalDate,
+    /** Read out the largest value until one is picked, rather than the latest. */
+    peakFirst: Boolean = false,
 ) {
     val zone = ZoneId.systemDefault()
     val locale = currentLocale()
     val formatter = metricFormatter()
-    var selected by remember(points) { mutableStateOf<Int?>(points.lastIndex) }
+    val bars = metric.dailySummary == DailySummary.TOTAL
+    // Bars are only dimmed around one the user picked; a line marks the reading it reads out.
+    var picked by remember(points) { mutableStateOf<Int?>(null) }
+    val peak = remember(points) { points.indices.maxByOrNull { points[it].value } }
+    val shown = picked ?: if (peakFirst) peak else points.lastIndex
     val start = until?.minus(Duration.ofDays(1)) ?: day.date.atStartOfDay(zone).toInstant()
     val end = until ?: day.date.plusDays(1).atStartOfDay(zone).toInstant()
     val marks = sixHourMarks(start, end, zone)
@@ -402,9 +455,10 @@ private fun DayChart(
         }
     ChartCard {
         SelectionReadout(
-            selected?.let(points::getOrNull)?.let {
+            shown?.let(points::getOrNull)?.let {
                 stringResource(
-                    R.string.chart_selection,
+                    if (picked == null && peakFirst) R.string.steps_most_active
+                    else R.string.chart_selection,
                     readingTime(it, today, rolling = until != null),
                     formatter.value(metric, it.value),
                 )
@@ -416,9 +470,9 @@ private fun DayChart(
             axisStart = start,
             axisEnd = end,
             labels = marks.map { AxisLabel(it, hour.format(it.atZone(zone))) },
-            bars = metric.dailySummary == DailySummary.TOTAL,
-            selected = selected,
-            onSelect = { selected = it },
+            bars = bars,
+            selected = if (bars) picked else shown,
+            onSelect = { picked = it },
             description = chartDescription(metric, points, formatter),
         )
     }

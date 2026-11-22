@@ -58,10 +58,7 @@ fun HealthOverviewScreen(
     val workouts by workoutsViewModel.state.collectAsStateWithLifecycle()
     val bridge = rememberLocalBridgeStatus()
     val pending by viewModel.pending.collectAsStateWithLifecycle()
-    val watch by viewModel.session.collectAsStateWithLifecycle()
-    val chosenGoal by viewModel.chosenStepGoal.collectAsStateWithLifecycle()
-    val watchGoal = watch?.client?.state?.collectAsStateWithLifecycle()?.value?.steps?.value?.goal
-    val goal = chosenGoal ?: watchGoal
+    val goal = stepGoal(viewModel)
     val syncing = state.sync is HealthSyncStatus.Syncing || HealthViewModel.SYNC in pending
     LifecycleStartEffect(viewModel) {
         viewModel.refreshRecent()
@@ -118,7 +115,7 @@ fun HealthOverviewScreen(
             }
             if (HealthMetric.primary.any(state::shows)) {
                 item(key = "metrics") {
-                    MetricGrid(state) { metric -> navigate(HealthDetailRoute(metric)) }
+                    MetricGrid(state, goal) { metric -> navigate(HealthDetailRoute(metric)) }
                 }
             }
             item(key = "workouts") { WorkoutsEntry(workouts) { navigate(WorkoutsRoute) } }
@@ -206,7 +203,7 @@ private fun MetricRows(
 }
 
 @Composable
-private fun MetricGrid(state: HealthUiState, onOpen: (HealthMetric) -> Unit) {
+private fun MetricGrid(state: HealthUiState, goal: Int?, onOpen: (HealthMetric) -> Unit) {
     val result = state.dayView(state.date)
     val loading = state.isLoading(state.date)
     BoxWithConstraints(Modifier.fillMaxWidth()) {
@@ -224,6 +221,7 @@ private fun MetricGrid(state: HealthUiState, onOpen: (HealthMetric) -> Unit) {
                             loading,
                             onClick = { onOpen(metric) },
                             modifier = Modifier.weight(1f).fillMaxHeight(),
+                            goal = goal,
                         )
                     }
                     if (row.size < columns) Spacer(Modifier.weight(1f))
