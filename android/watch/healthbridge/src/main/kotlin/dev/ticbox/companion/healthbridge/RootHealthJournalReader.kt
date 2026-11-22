@@ -108,7 +108,7 @@ internal class RootHealthJournalReader(private val context: Context) : HealthJou
             return LocalHealthProtocol.parse(output.readBytes()).also { reply ->
                 // The step and exception type say where an unexpected failure happened; neither carries data.
                 reply.text("error")?.let { error -> Log.w("TicBoxHealthBridge", "Journal helper failed; action=$action error=$error " +
-                    "step=${reply.text("step") ?: "none"} exception=${reply.text("exception") ?: "none"} millis=$millis") }
+                    "step=${reply.text("step") ?: "none"} exception=${reply.text("exception") ?: "none"} at=${reply.text("at") ?: "none"} millis=$millis") }
             }
         } finally { input.delete(); output.delete() }
     }
@@ -138,6 +138,10 @@ object HealthJournalMain {
                     step = "context"; val context = systemContext()
                     step = "verify"; val verified = HealthJournalProfiles.verify(context, source, forRemoval = action == "disable")
                     step = "stat"; val before = Os.stat(verified.file.path)
+                    // The first database this process opens makes SQLite read a global setting through the system context
+                    // created above. Under the vendor UID that binder call is refused, as the context's package no longer
+                    // matches the caller, and every open then throws SecurityException. Root skips that check.
+                    step = "sqlite"; SQLiteDatabase.create(null).close()
                     step = "uid"; Os.setgid(verified.uid); Os.setuid(verified.uid)
                     check(android.os.Process.myUid() == verified.uid && Os.getgid() == verified.uid)
                     val write = action == "enable" || action == "disable"
@@ -166,7 +170,9 @@ object HealthJournalMain {
                 } catch (problem: Exception) { buildJsonObject {
                     put("error", (problem as? HealthJournalException)?.code ?: "journal_operation_unconfirmed")
                     // Only for unexpected failures: where it happened and the exception type. Messages may carry SQL or values.
-                    if (problem !is HealthJournalException) { put("step", step); put("exception", problem.javaClass.simpleName) }
+                    if (problem !is HealthJournalException) {
+                        put("step", step); put("exception", problem.javaClass.simpleName); put("at", origin(problem))
+                    }
                 } }
                 val bytes = result.toString().toByteArray(Charsets.UTF_8)
                 require(bytes.size <= LocalHealthProtocol.MAX_FRAME_BYTES)
@@ -175,6 +181,11 @@ object HealthJournalMain {
             println("JOURNAL_OK")
         } finally { deadline.shutdownNow() }
     }
+
+    /** Where an exception came from as code locations only, past the binder plumbing that rethrows remote ones. */
+    private fun origin(problem: Throwable) = problem.stackTrace.asSequence()
+        .filterNot { it.className.startsWith("android.os.Parcel") || it.className.startsWith("android.os.BinderProxy") }
+        .take(4).joinToString(">") { "${it.className.substringAfterLast('.')}.${it.methodName}" }
 
     internal fun capture(database: SQLiteDatabase, source: String, table: LocalHealthTable, request: JsonObject): JsonObject {
         val read = AtomicHealthJournal.read(database, source, table, request.text("epoch") ?: "",

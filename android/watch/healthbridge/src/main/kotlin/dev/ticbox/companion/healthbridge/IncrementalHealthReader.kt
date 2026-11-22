@@ -123,8 +123,14 @@ internal class IncrementalHealthReader(
             val receiver = request.text("receiver") ?: return
             val run = request.text("run") ?: return
             val capture = begin(request, table, receiver, run, cancellation)
+            val started = android.os.SystemClock.elapsedRealtime()
             // The batch on its way still counts as pending until its ACK, so this stops one page ahead.
-            fill(receiver, table, run, capture, cancellation) { store.pendingCount(receiver, table) >= 2 * LocalHealthProtocol.PAGE_SIZE }
+            val (next, error) = fill(receiver, table, run, capture, cancellation) {
+                store.pendingCount(receiver, table) >= 2 * LocalHealthProtocol.PAGE_SIZE
+            }
+            Log.i("TicBoxHealthBridge", "Read-ahead; table=${table.wireName} scanned=${next.scanned - capture.scanned} " +
+                "pending=${store.pendingCount(receiver, table)} done=${next.done} error=${error?.text("error") ?: "none"} " +
+                "millis=${android.os.SystemClock.elapsedRealtime() - started}")
         } catch (_: android.os.OperationCanceledException) {
         } catch (problem: Exception) {
             Log.w("TicBoxHealthBridge", "Read-ahead stopped; exception=${problem.javaClass.simpleName}")
