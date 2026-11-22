@@ -25,7 +25,7 @@ services.localHealth.cancel()                      // 保留已提交的进度
 | `UNAVAILABLE` | 手表未响应、Provider 缺失或拒绝；已有缓存仍可读 |
 | `FAILED` / `CLOSED` | 本地操作失败 / 服务生命周期结束 |
 
-状态还包括 `mode`、`source`、`sessionId`、`pagesCommitted`、`recordsCommitted`（本次提交的行数，包括更新，不是新增数或总行数）、`lastSuccessAtMillis`（连接时从数据库各表的 `last_success` 恢复）、`lastRun`（上一轮按表和阶段 checkpoint / open / wake / wait / connect / handshake / read / save / ack / retry_wait 汇总的耗时）和 `advertisedTables`。完成后界面从 offset=0 重读缓存，不要等待某个可能一闪而过的中间阶段。
+状态还包括 `mode`、`source`、`sessionId`、`pagesCommitted`、`recordsCommitted`（本次提交的行数，包括更新，不是新增数或总行数）、`lastSuccessAtMillis`（连接时从数据库各表的 `last_success` 恢复）、`lastRun`（上一轮按表和阶段 checkpoint / open / wake / wait / connect / handshake / read / save / ack / retry_wait 汇总的耗时；手表报告自己的处理时间时，read 再拆成 watch / transfer，并带上收到的字节数）和 `advertisedTables`。完成后界面从 offset=0 重读缓存，不要等待某个可能一闪而过的中间阶段。
 
 ### 1.1 变更日志
 
@@ -138,6 +138,12 @@ debug 构建的手表 APK 另有 `HealthSampleActivity` 采样检查页（只输
 ```bash
 adb -s <phone> logcat -d -t 500 -s "TicBoxProtocol:I" "*:S"
 adb -s <watch> logcat -d -t 300 -s "TicBoxHealthBridge:D" "*:S"
+```
+
+一轮同步的完整耗时（每张表一行，另有一行总耗时）。“诊断 → 上次同步耗时”只保留最近一轮，所以全量同步结束后尽快读取：
+
+```bash
+adb -s <phone> logcat -d -s "TicBoxProtocol:I" | grep run_timing        # Windows 用 findstr run_timing
 ```
 
 手机 `component=local_health` 的 `page_committed`、`scan_completed`、`watch_read_unavailable`、`bridge_timeout`、`bridge_connection_failed`，以及手表的 `Local Bluetooth read window opened`、`Local page sent`（带错误码），可以区分主连接、唤醒、专用 RFCOMM、Provider 和入库各阶段。日志只有阶段、页和行的计数、异常类和稳定的原因码，不含 nonce、健康值、wwid 或数据库内容。

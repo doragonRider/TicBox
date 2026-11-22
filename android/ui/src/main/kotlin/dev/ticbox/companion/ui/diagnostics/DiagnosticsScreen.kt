@@ -1,5 +1,7 @@
 package dev.ticbox.companion.ui.diagnostics
 
+import android.content.Context
+import android.text.format.Formatter.formatShortFileSize
 import androidx.annotation.Keep
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.PaddingValues
@@ -7,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -425,6 +428,7 @@ private fun DeviceFields(info: WatchDeviceInfo) {
 @Composable
 private fun SyncTiming(run: LocalHealthSyncTiming?) {
     val locale = currentLocale()
+    val context = LocalContext.current
     if (run == null) {
         FootnoteText(stringResource(R.string.diagnostics_sync_timing_empty))
         return
@@ -442,16 +446,16 @@ private fun SyncTiming(run: LocalHealthSyncTiming?) {
     run.stages
         .groupBy { it.table }
         .forEach { (table, stages) ->
-            // Time inside open is already part of open, so counting it again would mislead.
-            val spent = stages.filterNot { it.name in OpenStages }.sumOf { it.millis }
+            // Time inside open and read is part of them; counting it again would mislead.
+            val spent = stages.filterNot { it.name in PartStages }.sumOf { it.millis }
             val title = listOfNotNull(table, millisText(spent, locale)).joinToString(" · ")
             ListGroup(title = title) {
                 stages.forEach { stage ->
                     val count = if (stage.count > 1) " ×${stage.count}" else ""
                     InlineValueRow(
                         stage.name,
-                        millisText(stage.millis, locale) + count,
-                        if (stage.name in OpenStages) Modifier.padding(start = 16.dp) else Modifier,
+                        millisText(stage.millis, locale) + count + sizeText(context, stage.bytes),
+                        if (stage.name in PartStages) Modifier.padding(start = 16.dp) else Modifier,
                     )
                 }
             }
@@ -459,7 +463,11 @@ private fun SyncTiming(run: LocalHealthSyncTiming?) {
     FootnoteText(stringResource(R.string.diagnostics_sync_timing_note))
 }
 
-private val OpenStages = setOf("wake", "wait", "connect", "handshake")
+/** Parts of open, then parts of read. */
+private val PartStages = setOf("wake", "wait", "connect", "handshake", "watch", "transfer")
+
+private fun sizeText(context: Context, bytes: Long) =
+    if (bytes > 0) " · " + formatShortFileSize(context, bytes) else ""
 
 @Composable
 private fun millisText(millis: Long, locale: Locale) =

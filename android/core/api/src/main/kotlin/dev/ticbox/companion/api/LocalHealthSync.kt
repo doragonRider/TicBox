@@ -27,11 +27,16 @@ data class LocalHealthSyncState(
 data class LocalHealthSyncStage(
     /** Table wire name, or null for a stage that belongs to the whole run. */
     val table: String?,
-    /** Stable identifier: checkpoint, open, wake, wait, connect, handshake, read, save, ack or retry_wait. */
+    /**
+     * Stable identifier: checkpoint, open, wake, wait, connect, handshake, read, save, ack or retry_wait. A bridge that reports
+     * its own time splits read into watch (its work on the pages) and transfer (Bluetooth both ways and parsing here).
+     */
     val name: String,
     val millis: Long,
     /** How often the stage ran, e.g. connection attempts or pages. */
     val count: Int = 1,
+    /** Bytes received during the stage; only read counts them. */
+    val bytes: Long = 0,
 )
 
 /** Diagnostics for one sync run; stages keep the order in which they first ran. */

@@ -58,7 +58,8 @@ class BluetoothLocalHealthRemote(context: Context,
                 override suspend fun page(table: LocalHealthTable, checkpoint: LocalHealthCheckpoint): LocalHealthPage {
                     frames.write(LocalHealthProtocol.changes(table, checkpoint.receiver ?: link.source.localUserId,
                         checkpoint.run ?: error("Missing acquisition run"), checkpoint.full))
-                    return LocalHealthProtocol.page(frames.read())
+                    val reply = frames.read()
+                    return LocalHealthProtocol.page(reply, frames.lastFrameBytes.toLong())
                 }
                 override suspend fun acknowledge(table: LocalHealthTable, page: LocalHealthPage) {
                     val batch = page.batchId ?: return

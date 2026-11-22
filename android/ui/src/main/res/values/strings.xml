@@ -428,7 +428,7 @@
     <string name="diagnostics_records_saved">Records saved</string>
     <string name="diagnostics_last_success">Last success</string>
     <string name="diagnostics_sync_timing">Last sync run</string>
-    <string name="diagnostics_sync_timing_note">checkpoint loads the resume point; indented stages are parts of open; read, save and ack are summed over their runs.</string>
+    <string name="diagnostics_sync_timing_note">checkpoint loads the resume point; indented stages are parts of open or read (watch is the watch\'s work on the pages, transfer is Bluetooth and parsing on this phone); read, save and ack are summed over their runs.</string>
     <string name="diagnostics_sync_started">Started</string>
     <string name="diagnostics_sync_total">Total</string>
     <string name="diagnostics_sync_timing_empty">No sync has finished since the app started.</string>

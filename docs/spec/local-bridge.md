@@ -105,6 +105,7 @@ table 只能是五个固定的逻辑表之一：`data_point / data_session / fit
 | partial | 有单元格或范围没读全，或源页无法继续；不能据此推断源端删除 |
 | scannedRows | 本轮该来源累计读取的源行数，可能因范围重叠超过表的总行数 |
 | providerVersion | 实际来源的版本，用于诊断，可能缺失；不作为固件白名单 |
+| watchMillis | 手表处理这个请求所用的毫秒数（从读到请求到写出回复之前），用于区分手表处理和蓝牙传输；`ack` 和 `journal` 的回复也带。旧版本没有这个字段 |
 | sourceAbsent | 行级字段；完整范围观察后发现该行已从来源消失，见第 4.4 节 |
 
 每次 changes 按页读取，并原子保存观察结果、待传队列和采集位置；某页没有待传行时继续读下一页（最多连续 3 秒），然后生成持久批次。没有变化行时也可以发送带 batch 的空进度批次。单帧最大 1 MiB，行内容预留 8192 字节给元数据；放不下的行留待下一批，单行超限时报告 `row_exceeds_budget`，不静默跳过。
@@ -296,3 +297,5 @@ adb shell am start -W -n dev.ticbox.companion/dev.ticbox.companion.healthbridge.
 ## 9. 诊断
 
 手机记录模式、阶段、累计提交的批次和行数、每批条数、手表累计读取的源行数，以及 read、save、ack、retry 等阶段的耗时；手表日志记录页和行、扫描数、partial 和稳定错误码。同一任务内的重放只计一次。手机日志在 `no_backup/protocol-diagnostics/`，手表的 Logcat tag 为 `TicBoxHealthBridge`。日志不包含健康值、GPS、nonce、账号或 SQL 参数。
+
+手表在每个回复里带 `watchMillis` 时，手机把 read 拆成 `watch`（手表处理）和 `transfer`（其余时间：请求和回复的蓝牙传输、手机解析），并累计每页收到的字节数。每轮结束后，手机为每张表写一条 `run_timing` 诊断（各阶段的毫秒数、次数和字节数，不含健康数据），另有一条带总耗时的汇总。

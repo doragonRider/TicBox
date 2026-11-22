@@ -6,6 +6,7 @@ import android.bluetooth.*
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.CancellationSignal
+import android.os.SystemClock
 import android.util.Log
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.WearableListenerService
@@ -56,15 +57,19 @@ class HealthWakeService : WearableListenerService() {
                     while (!cancellation.isCanceled) {
                         val request = LocalHealthProtocol.read(socket.inputStream) ?: return
                         if (request.text("op") !in setOf("changes", "ack", "journal")) continue
-                        val page = if (request.text("op") == "journal") RootHealthJournalReader(applicationContext).control(request, cancellation)
+                        val started = SystemClock.elapsedRealtime()
+                        val handled = if (request.text("op") == "journal") RootHealthJournalReader(applicationContext).control(request, cancellation)
                             else reader.handle(request, cancellation)
+                        // Lets the phone tell this side's work from the Bluetooth transfer in its sync timing.
+                        val page = JsonObject(handled + ("watchMillis" to JsonPrimitive(SystemClock.elapsedRealtime() - started)))
                         if (request.text("op") == "journal" && request.text("action") in setOf("enable", "disable") &&
                             (page.text("error") == null || request.text("action") == "disable")) reader.invalidateJournal(request.text("source")!!)
                         LocalHealthProtocol.write(socket.outputStream, page)
                         window.touch(60_000)
                         if (request.text("op") == "changes") {
                             pages++; rows += (page["rows"] as? JsonArray)?.size ?: 0
-                            Log.i(TAG, "Local changes sent; pages=$pages rows=$rows scanned=${page.number("scannedRows") ?: 0} partial=${page.flag("partial") == true} error=${page.text("error") ?: "none"}")
+                            Log.i(TAG, "Local changes sent; pages=$pages rows=$rows scanned=${page.number("scannedRows") ?: 0} " +
+                                "partial=${page.flag("partial") == true} error=${page.text("error") ?: "none"} millis=${page.number("watchMillis")}")
                         }
                     }
                 }
