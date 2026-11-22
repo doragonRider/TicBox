@@ -55,18 +55,29 @@ class BluetoothLocalHealthRemote(context: Context,
                 override val setupStages = setup.stages()
                 override val servesAllTables = true
                 override val supportedTables = LocalHealthProtocol.supportedTables(reply)
+                /**
+                 * A batch already committed here whose ACK goes with the table's next request, saving a round trip per page.
+                 * If that request never goes out, the watch resends the batch and the phone's commit repeats harmlessly.
+                 */
+                var held: Pair<LocalHealthTable, String>? = null
+                suspend fun send(table: LocalHealthTable, batch: String) {
+                    frames.write(LocalHealthProtocol.acknowledge(link.source.localUserId, table, batch))
+                    val result = frames.read()
+                    if (result.text("batch") != batch || result.flag("committed") != true)
+                        throw IOException("Local health acknowledgement was not persisted")
+                }
                 override suspend fun page(table: LocalHealthTable, checkpoint: LocalHealthCheckpoint): LocalHealthPage {
+                    held?.takeIf { it.first != table }?.let { (other, batch) -> held = null; send(other, batch) }
+                    val ack = held?.second; held = null
                     frames.write(LocalHealthProtocol.changes(table, checkpoint.receiver ?: link.source.localUserId,
-                        checkpoint.run ?: error("Missing acquisition run"), checkpoint.full, checkpoint.window))
+                        checkpoint.run ?: error("Missing acquisition run"), checkpoint.full, checkpoint.window, ack, zlib = true))
                     val reply = frames.read()
                     return LocalHealthProtocol.page(reply, frames.lastFrameBytes.toLong())
                 }
                 override suspend fun acknowledge(table: LocalHealthTable, page: LocalHealthPage) {
                     val batch = page.batchId ?: return
-                    frames.write(LocalHealthProtocol.acknowledge(link.source.localUserId, table, batch))
-                    val result = frames.read()
-                    if (result.text("batch") != batch || result.flag("committed") != true)
-                        throw IOException("Local health acknowledgement was not persisted")
+                    // The last page of a table has no next request to carry its ACK.
+                    if (page.inlineAck && !page.complete) held = table to batch else send(table, batch)
                 }
                 override suspend fun journal(source: LocalHealthJournalSource, enabled: Boolean?): LocalHealthJournalStatus {
                     if (reply.number("journalVersion") != 1L) throw LocalHealthJournalException("journal_bridge_update_required")

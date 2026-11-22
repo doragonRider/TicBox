@@ -1648,6 +1648,7 @@
     <string name="journal_error_connection">連線已變更，請重新讀取。</string>
     <string name="journal_error_root_switch">請先在手錶的本地橋接裡開啟「讀取完整運動記錄（root）」。</string>
     <string name="journal_error_unconfirmed">無法確認結果，已重新讀取狀態。</string>
+    <string name="journal_error_status_unread">無法從手錶讀取日誌的狀態。</string>
     <string name="journal_error_unsupported">這個版本的手錶健康應用程式不支援變更記錄。</string>
     <string name="journal_error_source_missing">手錶上沒有這個資料來源。</string>
     <string name="journal_error_broken">記錄不完整，請移除後重新開啟。</string>

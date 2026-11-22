@@ -449,6 +449,8 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
             put("rows", JsonArray(rows)); put("batch", batchId); put("nextId", step.toString())
             put("complete", capture.done && total <= rows.size); put("partial", capture.partial); put("scannedRows", capture.scanned)
             deferredBefore(receiver, table)?.let { before -> put("deferredBefore", before) }
+            // This batch's ACK may come with the table's next changes request.
+            put("inlineAck", true)
             capture.providerVersion?.let { put("providerVersion", it) }
             capture.journal?.let { journal -> put("sourceJournal", buildJsonObject {
                 put("version", 1); put("baseline", journal.baseline); put("finished", journal.finished)
@@ -460,6 +462,8 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
     }
     fun hasBatch(receiver: String, table: LocalHealthTable) = db.rawQuery("SELECT 1 FROM batches WHERE receiver=? AND kind=?", args(receiver, table)).use { it.moveToFirst() }
     fun hasPending(receiver: String, table: LocalHealthTable) = db.rawQuery("SELECT 1 FROM pending WHERE receiver=? AND kind=? LIMIT 1", args(receiver, table)).use { it.moveToFirst() }
+    fun pendingCount(receiver: String, table: LocalHealthTable) =
+        db.rawQuery("SELECT COUNT(*) FROM pending WHERE receiver=? AND kind=?", args(receiver, table)).use { it.moveToFirst(); it.getLong(0) }
 
     fun acknowledge(receiver: String, table: LocalHealthTable, batch: String): JsonObject = transaction {
         val stored = it.rawQuery("SELECT payload FROM batches WHERE receiver=? AND kind=? AND batch_id=?", args(receiver, table) + batch).use { c ->

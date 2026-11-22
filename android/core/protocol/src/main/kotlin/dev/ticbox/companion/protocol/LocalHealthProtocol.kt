@@ -1,9 +1,13 @@
 package dev.ticbox.companion.protocol
 
+import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.nio.ByteBuffer
+import java.util.zip.DataFormatException
+import java.util.zip.Deflater
+import java.util.zip.Inflater
 import kotlinx.serialization.json.*
 
 /** Our local bridge protocol, separate from stock Mobvoi messages. No network/Android dependency. */
@@ -31,15 +35,63 @@ object LocalHealthProtocol {
     /** The current self-owned protocol uses persistent batches and commit acknowledgements. */
     const val INCREMENTAL_VERSION = 3
     const val SOURCE_NAME = "content://com.mobvoi.heartrate.db.provider/data_point"
+    /** Value of a request's `compression`: its reply may come as a zlib frame. */
+    const val ZLIB = "zlib"
+    /** A set top bit in the length prefix marks a zlib body. */
+    private const val ZLIB_FLAG = Int.MIN_VALUE
+    /** Smaller bodies don't gain enough to be worth compressing. */
+    private const val ZLIB_MIN_BYTES = 1024
     private val json = Json { isLenient = true; ignoreUnknownKeys = true }
 
     fun parse(bytes: ByteArray): JsonObject = json.parseToJsonElement(bytes.toString(Charsets.UTF_8)) as? JsonObject
         ?: throw IllegalArgumentException("Expected a local health object")
 
-    fun frame(value: JsonObject): ByteArray {
+    /** With [zlib], a large body goes compressed when that makes it smaller; the reader may only expect that if it asked. */
+    fun frame(value: JsonObject, zlib: Boolean = false): ByteArray {
         val body = value.toString().toByteArray(Charsets.UTF_8)
         require(body.size in 1..MAX_FRAME_BYTES) { "Local health frame allocation budget exceeded" }
+        if (zlib && body.size >= ZLIB_MIN_BYTES) {
+            val packed = deflate(body)
+            if (packed.size < body.size) return ByteBuffer.allocate(4 + packed.size).putInt(packed.size or ZLIB_FLAG).put(packed).array()
+        }
         return ByteBuffer.allocate(4 + body.size).putInt(body.size).put(body).array()
+    }
+
+    /** The body size a length prefix announces, and whether that body is zlib. */
+    fun header(prefix: Int): Pair<Int, Boolean> {
+        val size = prefix and ZLIB_FLAG.inv()
+        require(size in 1..MAX_FRAME_BYTES) { "Local health frame allocation budget exceeded" }
+        return size to (prefix and ZLIB_FLAG != 0)
+    }
+
+    /** A zlib body may not expand beyond [MAX_FRAME_BYTES] either. */
+    fun parse(body: ByteArray, zlib: Boolean): JsonObject = parse(if (zlib) inflate(body) else body)
+
+    private fun deflate(body: ByteArray): ByteArray {
+        val deflater = Deflater()
+        try {
+            deflater.setInput(body); deflater.finish()
+            val output = ByteArrayOutputStream(body.size / 4 + 64); val buffer = ByteArray(8192)
+            while (!deflater.finished()) output.write(buffer, 0, deflater.deflate(buffer))
+            return output.toByteArray()
+        } finally { deflater.end() }
+    }
+
+    private fun inflate(body: ByteArray): ByteArray {
+        val inflater = Inflater()
+        try {
+            inflater.setInput(body)
+            val output = ByteArrayOutputStream(minOf(MAX_FRAME_BYTES, body.size * 8)); val buffer = ByteArray(8192)
+            while (!inflater.finished()) {
+                val count = inflater.inflate(buffer)
+                if (count == 0 && (inflater.needsInput() || inflater.needsDictionary())) throw IllegalArgumentException("Truncated local health frame")
+                require(output.size() + count <= MAX_FRAME_BYTES) { "Local health frame allocation budget exceeded" }
+                output.write(buffer, 0, count)
+            }
+            require(inflater.remaining == 0) { "Trailing bytes after a local health frame" }
+            return output.toByteArray()
+        } catch (_: DataFormatException) { throw IllegalArgumentException("Malformed local health frame") }
+        finally { inflater.end() }
     }
 
     /** Used by the watch's bounded socket callback. EOF before a new frame is a normal close. */
@@ -47,14 +99,13 @@ object LocalHealthProtocol {
         val first = input.read()
         if (first < 0) return null
         val rest = ByteArray(3); DataInputStream(input).readFully(rest)
-        val size = (first shl 24) or ((rest[0].toInt() and 255) shl 16) or
-            ((rest[1].toInt() and 255) shl 8) or (rest[2].toInt() and 255)
-        require(size in 1..MAX_FRAME_BYTES) { "Local health frame allocation budget exceeded" }
+        val (size, zlib) = header((first shl 24) or ((rest[0].toInt() and 255) shl 16) or
+            ((rest[1].toInt() and 255) shl 8) or (rest[2].toInt() and 255))
         val body = ByteArray(size); DataInputStream(input).readFully(body)
-        return parse(body)
+        return parse(body, zlib)
     }
 
-    fun write(output: OutputStream, value: JsonObject) { output.write(frame(value)); output.flush() }
+    fun write(output: OutputStream, value: JsonObject, zlib: Boolean = false) { output.write(frame(value, zlib)); output.flush() }
 
     fun wake(token: String) = buildJsonObject { put("version", 1); put("token", token) }
     fun hello(token: String) = buildJsonObject { put("op", "hello"); put("token", token) }
@@ -74,11 +125,16 @@ object LocalHealthProtocol {
         afterKey?.let { put("afterKey", it) }; upperKey?.let { put("upperKey", it) }
     }
 
-    /** [window]: a first sync reads only rows from the last this many milliseconds; older bridges ignore it. */
-    fun changes(table: LocalHealthTable, receiver: String, run: String, full: Boolean, window: Long? = null) = buildJsonObject {
+    /**
+     * [window]: a first sync reads only rows from the last this many milliseconds. [ack]: a batch of this table the phone
+     * has committed, for a bridge whose replies say `inlineAck`. [zlib]: the reply may be compressed. Older bridges ignore all three.
+     */
+    fun changes(table: LocalHealthTable, receiver: String, run: String, full: Boolean, window: Long? = null,
+        ack: String? = null, zlib: Boolean = false) = buildJsonObject {
         put("op", "changes"); put("table", table.wireName); put("receiver", receiver)
         put("run", run); put("full", full); put("limit", PAGE_SIZE)
-        window?.let { put("window", it) }
+        window?.let { put("window", it) }; ack?.let { put("ack", it) }
+        if (zlib) put("compression", ZLIB)
     }
     fun acknowledge(receiver: String, table: LocalHealthTable, batch: String) = buildJsonObject {
         put("op", "ack"); put("receiver", receiver); put("table", table.wireName); put("batch", batch)
@@ -93,7 +149,7 @@ object LocalHealthProtocol {
             value.number("upperId"), value.flag("complete") ?: rows.isEmpty(),
             incomplete || value.flag("partial") == true, value.text("error"), value.text("providerVersion"),
             value.text("nextKey"), value.text("upperKey"), value.text("batch"), value.number("scannedRows") ?: 0,
-            value.number("watchMillis"), wireBytes, value.number("deferredBefore"))
+            value.number("watchMillis"), wireBytes, value.number("deferredBefore"), value.flag("inlineAck") == true)
     }
 }
 
@@ -115,7 +171,9 @@ class LocalHealthPage(val rows: List<LocalHealthRow>, val nextId: Long?, val upp
     val watchMillis: Long? = null,
     val wireBytes: Long = 0,
     /** Rows older than this are still only on the watch, left behind by a first sync's window. */
-    val deferredBefore: Long? = null) {
+    val deferredBefore: Long? = null,
+    /** The bridge takes this batch's ACK on the table's next changes request. */
+    val inlineAck: Boolean = false) {
     override fun toString() = "LocalHealthPage(rows=${rows.size}, complete=$complete, contents=<redacted>)"
 }
 

@@ -1648,6 +1648,7 @@
     <string name="journal_error_connection">连接已变化，请重新读取。</string>
     <string name="journal_error_root_switch">请先在手表的本地桥接里开启“读取完整运动记录（root）”。</string>
     <string name="journal_error_unconfirmed">没能确认结果，已重新读取状态。</string>
+    <string name="journal_error_status_unread">没能从手表读到日志的状态。</string>
     <string name="journal_error_unsupported">这个版本的手表健康应用不支持变更日志。</string>
     <string name="journal_error_source_missing">手表上没有这个数据来源。</string>
     <string name="journal_error_broken">日志不完整，请移除后重新开启。</string>
