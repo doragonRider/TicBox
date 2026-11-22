@@ -28,8 +28,8 @@ TicBox 是 TicWatch 手表（TicWatch Pro 5、Pro 5 Enduro、Atlas）的本地�
 
 - **手表**：TicWatch Pro 5、Pro 5 Enduro 或 Atlas。Atlas 出厂就是 Wear OS 4；Pro 5 和 Pro 5 Enduro 出厂是 Wear OS 3.5，官方已经推送了 Wear OS 4 升级，没收到的话可以在手表的 Settings → System → System updates 手动检查。Wear OS 3.5 也能正常使用 TicBox，只是换手机时没法保留手表上的数据。
 - **手机**：Android 14 及以上，有蓝牙和 Wi-Fi。
-- **Wi-Fi**：手机和手表能连上同一个 Wi-Fi，安装手表上的本地桥接时要用。
-- **电脑（可选）**：只在手机上没法直接安装 App 时才需要，见[用电脑安装](#用电脑安装可选)。
+- **Wi-Fi**：手机和手表能连上同一个 Wi-Fi。手机通过手表的无线调试安装本地桥接、使用高级工具，所以手表不需要用线连电脑；手表附带的两触点充电线本来也不能传数据。
+- **电脑（可选）**：只在手机上没法直接安装 App 时才需要，用数据线连接的是手机，见[用电脑安装](#用电脑安装可选)。
 
 一块手表同一时间只能和一部手机配对。手表现在如果和别的手机（或官方 App）配着对，请看[第 2 步](#第-2-步让手表进入配对状态)。
 
@@ -53,7 +53,7 @@ TicBox 是 TicWatch 手表（TicWatch Pro 5、Pro 5 Enduro、Atlas）的本地�
 
 #### 用电脑安装（可选）
 
-需要一台电脑（Windows、macOS 或 Linux）和一根能传数据的 USB 线，只能充电的线不行。
+需要一台电脑（Windows、macOS 或 Linux）和一根能连接手机、能传数据的 USB 线，只能充电的线不行。
 
 1. 下载 Google 的 [SDK Platform-Tools](https://developer.android.com/tools/releases/platform-tools)，解压到一个好找的文件夹，例如 `D:\platform-tools`，并把下载的 APK 也放进去。
 2. 在这个文件夹里打开终端：Windows 上在文件夹空白处点右键，选“在终端中打开”；macOS 和 Linux 打开“终端”后用 `cd` 进入该文件夹。运行下面的命令，能看到版本号就说明 ADB 可以用了：
@@ -81,7 +81,7 @@ TicBox 是 TicWatch 手表（TicWatch Pro 5、Pro 5 Enduro、Atlas）的本地�
 
 ### 第 2 步：让手表进入配对状态
 
-先在手表的 Settings → System → About → Versions 里看一下 Wear OS 版本，再按手表现在的情况选一种做法：
+先看一下手表的 Wear OS 版本，它是 Settings → System → About 里的第一项。再按手表现在的情况选一种做法：
 
 | 手表现在 | 做法 |
 |---|---|
@@ -208,10 +208,10 @@ TicBox 是 TicWatch 手表（TicWatch Pro 5、Pro 5 Enduro、Atlas）的本地�
 
 ### 更新
 
-1. **手机**：下载新版 APK，像第 1 步一样点开安装，数据保留；又被拦截的话按第 1 步的办法处理。用电脑的话运行 `adb install -r`。
+1. **手机**：下载新版 APK，像第 1 步一样点开安装，数据保留。Play 保护机制可能提示“App scan recommended”：可以点“Scan app”扫描后安装，大约要半分钟；也可以点“More details”→“Install without scanning”直接安装。用电脑的话运行 `adb install -r`。
 2. **手表**：打开手机的“本地桥接”页，按提示更新。和第 5 步一样，需要手表的无线调试已连接；有 root 的话可以直接更新，见下文。
 
-手机 App 和手表上的本地桥接要一起更新：版本不一致时，高级工具会拒绝连接。每个版本的变化见[更新说明](docs/releases/)。
+每个版本的[更新说明](docs/releases/)会写明要更新手机、手表还是两边都要。两边之间的私有协议有变化时，只更新一边会让高级工具拒绝连接，所以拿不准时两边都更新。
 
 ### 常见问题
 

@@ -28,8 +28,8 @@ For what isn't implemented yet or is limited compared with the official app, see
 
 - **Watch**: a TicWatch Pro 5, Pro 5 Enduro or Atlas. The Atlas ships with Wear OS 4. The Pro 5 and Pro 5 Enduro ship with Wear OS 3.5 and have an official Wear OS 4 update; if yours hasn't received it, check under Settings → System → System updates on the watch. TicBox works on Wear OS 3.5 too, but on 3.5 the watch can't keep its data when it moves to another phone.
 - **Phone**: Android 14 or later, with Bluetooth and Wi-Fi.
-- **Wi-Fi**: one network that both the phone and the watch can join, used when installing Local Bridge on the watch.
-- **Computer (optional)**: only needed if the app can't be installed on the phone directly; see [installing from a computer](#installing-from-a-computer-optional).
+- **Wi-Fi**: one network that both the phone and the watch can join. The phone installs Local Bridge and runs the advanced tools over the watch's wireless debugging, so the watch never needs a cable to a computer; the two-pin charging cable that comes with it can't carry data anyway.
+- **Computer (optional)**: only needed if the app can't be installed on the phone directly, with a cable to the phone; see [installing from a computer](#installing-from-a-computer-optional).
 
 A watch can be paired with only one phone at a time. If yours is paired with another phone (or the official app), see [step 2](#step-2-put-the-watch-into-pairing-mode).
 
@@ -53,7 +53,7 @@ To look around first, tap "Try the demo watch" on the app's first page. It shows
 
 #### Installing from a computer (optional)
 
-You need a computer (Windows, macOS or Linux) and a USB cable that carries data; a charge-only cable won't work.
+You need a computer (Windows, macOS or Linux) and a USB cable for the phone that carries data; a charge-only cable won't work.
 
 1. Download Google's [SDK Platform-Tools](https://developer.android.com/tools/releases/platform-tools), unzip it somewhere easy to find, such as `D:\platform-tools`, and put the APK there too.
 2. Open a terminal in that folder: on Windows, right-click an empty part of the folder and choose "Open in Terminal"; on macOS and Linux, open Terminal and `cd` into the folder. If this prints a version, ADB works:
@@ -81,7 +81,7 @@ You need a computer (Windows, macOS or Linux) and a USB cable that carries data;
 
 ### Step 2: Put the watch into pairing mode
 
-First check the watch's Wear OS version under Settings → System → About → Versions, then pick what fits the watch now:
+First check the watch's Wear OS version: it's the first item under Settings → System → About. Then pick what fits the watch now:
 
 | The watch is | What to do |
 |---|---|
@@ -208,10 +208,10 @@ If the watch won't connect after the transfer, restart it here too.
 
 ### Updating
 
-1. **Phone**: download the new APK and open it as in step 1; your data stays. If it's blocked again, see step 1. From a computer, use `adb install -r`.
+1. **Phone**: download the new APK and open it as in step 1; your data stays. Play Protect may say "App scan recommended": tap "Scan app" to install after a scan, which takes about half a minute, or "More details" → "Install without scanning". From a computer, use `adb install -r`.
 2. **Watch**: open the Local Bridge page on the phone and follow its prompt to update. As in step 5, the watch's wireless debugging has to be connected; with root it can update without it (see below).
 
-Update the phone app and Local Bridge together: the advanced tools refuse to connect while their versions differ. What changed in each version is in the [release notes](docs/releases/) (in Chinese).
+Each version's [release notes](docs/releases/) (in Chinese) say whether to update the phone, the watch, or both. When the private protocol between them changes, updating only one side makes the advanced tools refuse to connect, so if in doubt, update both.
 
 ### Troubleshooting
 
