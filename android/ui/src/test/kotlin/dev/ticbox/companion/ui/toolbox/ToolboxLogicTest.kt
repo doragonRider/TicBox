@@ -334,4 +334,14 @@ class ToolboxLogicTest {
         assertFalse(LocalBridgeStatus.READY.needsSetup)
         assertTrue(LocalBridgeStatus.NOT_INSTALLED.needsSetup)
     }
+
+    @Test
+    fun aSilentBridgeMayStillBeSwitchedOffOnTheWatch() {
+        // A switched-off bridge ignores the phone, so it ends up unreachable rather than refusing.
+        assertTrue(LocalBridgeStatus.UNREACHABLE.mayBeSwitchedOff)
+        assertTrue(LocalBridgeStatus.NOT_ALLOWED.mayBeSwitchedOff)
+        assertFalse(LocalBridgeStatus.NOT_INSTALLED.mayBeSwitchedOff)
+        assertFalse(LocalBridgeStatus.UNKNOWN.mayBeSwitchedOff)
+        assertFalse(LocalBridgeStatus.READY.mayBeSwitchedOff)
+    }
 }
