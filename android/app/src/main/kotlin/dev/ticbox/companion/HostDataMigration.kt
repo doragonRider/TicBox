@@ -70,7 +70,7 @@ class HostDataMigration(
     private fun restart() {
         val launch =
             application.packageManager.getLaunchIntentForPackage(application.packageName)?.component
-                ?: ComponentName(application, MainActivity::class.java)
+                ?: ComponentName(application, CompanionActivity::class.java)
         application.startActivity(Intent.makeRestartActivityTask(launch))
         Runtime.getRuntime().exit(0)
     }

@@ -2,10 +2,13 @@ package dev.ticbox.companion
 
 import android.app.LocaleManager
 import android.app.UiModeManager
+import android.content.ComponentName
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.LocaleList
 import android.util.Log
 import androidx.core.content.edit
+import dev.ticbox.companion.ui.AppIconStyle
 import dev.ticbox.companion.ui.AppLanguage
 import dev.ticbox.companion.ui.AppPreferences
 import dev.ticbox.companion.ui.AppearanceSettings
@@ -25,6 +28,7 @@ class AndroidAppPreferences(private val context: Context) : AppPreferences {
     private val preferences = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
     private val localeManager = context.getSystemService(LocaleManager::class.java)
     private val uiModeManager = context.getSystemService(UiModeManager::class.java)
+    private val packageManager = context.packageManager
 
     private val appearanceState = MutableStateFlow(readAppearance())
     private val languageState = MutableStateFlow(readLanguage())
@@ -56,6 +60,22 @@ class AndroidAppPreferences(private val context: Context) : AppPreferences {
     override fun setDynamicColor(enabled: Boolean) {
         appearanceState.update { it.copy(dynamicColor = enabled) }
         preferences.edit { putBoolean(DYNAMIC_COLOR, enabled) }
+    }
+
+    /**
+     * Turns on the chosen icon's launcher entry before turning off the others, so there is never a
+     * moment without one. The setting is the entries themselves, which survive app updates.
+     */
+    override fun setAppIcon(icon: AppIconStyle) {
+        try {
+            setLauncher(icon, PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
+            AppIconStyle.entries
+                .filter { it != icon }
+                .forEach { setLauncher(it, PackageManager.COMPONENT_ENABLED_STATE_DISABLED) }
+        } catch (problem: RuntimeException) {
+            Log.w(TAG, "Changing the launcher icon failed: ${problem.javaClass.simpleName}")
+        }
+        appearanceState.update { it.copy(appIcon = readAppIcon()) }
     }
 
     override fun setLanguage(language: AppLanguage) {
@@ -111,7 +131,25 @@ class AndroidAppPreferences(private val context: Context) : AppPreferences {
                     ThemeMode.entries.firstOrNull { it.name == name }
                 } ?: ThemeMode.SYSTEM,
             dynamicColor = preferences.getBoolean(DYNAMIC_COLOR, true),
+            appIcon = readAppIcon(),
         )
+
+    private fun launcher(icon: AppIconStyle) = ComponentName(context, LAUNCHERS.getValue(icon))
+
+    private fun setLauncher(icon: AppIconStyle, state: Int) =
+        packageManager.setComponentEnabledSetting(
+            launcher(icon),
+            state,
+            PackageManager.DONT_KILL_APP,
+        )
+
+    /** The other icons are off unless turned on, so the default is whichever isn't. */
+    private fun readAppIcon(): AppIconStyle =
+        AppIconStyle.entries.firstOrNull { icon ->
+            icon != AppIconStyle.DARK_DIAL &&
+                packageManager.getComponentEnabledSetting(launcher(icon)) ==
+                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+        } ?: AppIconStyle.DARK_DIAL
 
     private fun readRemoteScreen(): RemoteScreenSettings {
         val defaults = RemoteScreenSettings()
@@ -160,6 +198,14 @@ class AndroidAppPreferences(private val context: Context) : AppPreferences {
 
     private companion object {
         const val TAG = "AppPreferences"
+
+        /** The launcher entries in the manifest, one per icon. */
+        val LAUNCHERS =
+            mapOf(
+                AppIconStyle.DARK_DIAL to "dev.ticbox.companion.MainActivity",
+                AppIconStyle.SLATE to "dev.ticbox.companion.IconSlate",
+                AppIconStyle.WHITE_DIAL to "dev.ticbox.companion.IconWhiteDial",
+            )
         const val FILE = "frontend-appearance"
         const val THEME_MODE = "color-mode"
         const val DYNAMIC_COLOR = "dynamic-color"

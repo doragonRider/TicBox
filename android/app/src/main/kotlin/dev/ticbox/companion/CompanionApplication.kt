@@ -20,6 +20,7 @@ class CompanionApplication : Application(), CompanionDependencies {
     override val messages = UserMessages()
     override val phoneApps by lazy { PackageManagerPhoneApps(this) }
     override val preferences by lazy { AndroidAppPreferences(this) }
+    override val faceShortcut by lazy { AndroidFaceShortcut(this) }
     override val sessions by lazy {
         ServiceSessionController(this, applicationScope) { LocalHealthProfile.id(this) }
     }

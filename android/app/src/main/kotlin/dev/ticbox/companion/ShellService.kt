@@ -144,9 +144,9 @@ class ShellService : Service() {
         PendingIntent.getActivity(
             this,
             0,
-            Intent.makeMainActivity(ComponentName(this, MainActivity::class.java))
+            Intent.makeMainActivity(ComponentName(this, CompanionActivity::class.java))
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                .putExtra(MainActivity.EXTRA_SHOW_SHELL, true),
+                .putExtra(CompanionActivity.EXTRA_SHOW_SHELL, true),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
