@@ -82,8 +82,6 @@ const val WatchScreenPixels = 466
 /** Larger photos are read at this length on their long side, which keeps one under 64 MiB. */
 private const val MaxPhotoPixels = 4096
 
-private const val PhotoQuality = 95
-
 data class PhotoFaceUiState(
     val loading: Boolean = true,
     val photo: WatchFacePhoto? = null,
@@ -292,11 +290,19 @@ private class BitmapRows(private val bitmap: Bitmap) : PixelRows {
     override fun read(y: Int, into: IntArray) = bitmap.getPixels(into, 0, width, 0, y, width, 1)
 }
 
+/**
+ * PNG, because the watch decodes whatever it gets and saves it again as a JPEG: a JPEG from here
+ * would be compressed twice. Opaque, so it is stored as RGB and even noise stays well under the 1
+ * MiB message limit (466 × 466 × 3 bytes is about 640 KiB).
+ */
 private fun encode(pixels: IntArray): ByteArray {
     val side = WatchScreenPixels
     val bitmap = Bitmap.createBitmap(pixels, side, side, Bitmap.Config.ARGB_8888)
     return ByteArrayOutputStream()
-        .also { bitmap.compress(Bitmap.CompressFormat.JPEG, PhotoQuality, it) }
+        .also {
+            bitmap.setHasAlpha(false)
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
         .toByteArray()
 }
 

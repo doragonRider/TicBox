@@ -772,7 +772,10 @@ class CompanionAppTest {
         compose.onNodeWithTag("time_MIDDLE").performScrollTo().performClick()
         compose.onNodeWithTag("photo_send").performScrollTo().performClick()
         waitForText("Choose a photo")
-        assertEquals(2, demo.watchFaces.state.value.photo?.settings?.timePlace)
+        val photo = demo.watchFaces.state.value.photo
+        assertEquals(2, photo?.settings?.timePlace)
+        // A PNG, so the watch's own JPEG is the only lossy step.
+        assertEquals("PNG", photo?.image?.bytes?.copyOfRange(1, 4)?.decodeToString())
     }
 
     @Test
