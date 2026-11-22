@@ -78,7 +78,7 @@ ready 的 version 为 3，表示同一连接提供持久的增量批次和入库
 {"op":"changes","table":"data_point","receiver":"<本地档案 ID>","run":"<本轮随机 ID>","full":false,"limit":128}
 ```
 
-table 只能是五个固定的逻辑表之一：`data_point / data_session / fitness_summary / fitness_record / fitness_point`。receiver 是手机持久的本地档案 ID，不是云账号；run 标识一次任务，重连时沿用，重启任务时可以接着手表上未完成的采集。`full=true` 强制重新读取全部启用的来源；手机没有该表的本地接收基线时也必须请求全量。手机不传 SQL、URI、projection、路径或官方的分页位置。
+table 只能是五个固定的逻辑表之一：`data_point / data_session / fitness_summary / fitness_record / fitness_point`。receiver 是手机持久的本地档案 ID，不是云账号；run 标识一次任务，重连时沿用，重启任务时可以接着手表上未完成的采集。`full=true` 强制重新读取全部启用的来源；手机没有该表的本地接收基线时也必须请求全量。可选的 `window` 是首次同步的时间窗（毫秒，见 [4.6](#46-首次同步的时间窗)），自动和普通同步都带，手动全量不带；旧版本的桥接忽略它。手机不传 SQL、URI、projection、路径或官方的分页位置。
 
 回复（合成数据）：
 
@@ -106,6 +106,7 @@ table 只能是五个固定的逻辑表之一：`data_point / data_session / fit
 | scannedRows | 本轮该来源累计读取的源行数，可能因范围重叠超过表的总行数 |
 | providerVersion | 实际来源的版本，用于诊断，可能缺失；不作为固件白名单 |
 | watchMillis | 手表处理这个请求所用的毫秒数（从读到请求到写出回复之前），用于区分手表处理和蓝牙传输；`ack` 和 `journal` 的回复也带。旧版本没有这个字段 |
+| deferredBefore | 只在 data_point 和 fitness_point 上：首次同步的时间窗把早于这个时间（epoch 毫秒）的行留在了手表上，直到一次手动全量。没有遗留时不带这个字段 |
 | sourceAbsent | 行级字段；完整范围观察后发现该行已从来源消失，见第 4.4 节 |
 
 每次 changes 按页读取，并原子保存观察结果、待传队列和采集位置；某页没有待传行时继续读下一页（最多连续 3 秒），然后生成持久批次。没有变化行时也可以发送带 batch 的空进度批次。单帧最大 1 MiB，行内容预留 8192 字节给元数据；放不下的行留待下一批，单行超限时报告 `row_exceeds_budget`，不静默跳过。
@@ -184,6 +185,18 @@ POINT 和私有运动表读取 Cursor 返回的所有列。SESSION 通过 data_p
 ### 4.5 全量同步
 
 手机“设置 → 诊断 → 立即全量同步数据库”调用 `sync(LocalHealthSyncMode.FULL)`：替换正在进行的增量任务，重复的全量请求合并。它逐表重新读取全部可用记录并发送完整的行，绕过新 ID、近期、轮查和训练退避等优化；仍然分页，仍然等手机事务提交后才确认。它不是 `.db` 文件传输，不读取未授权或未知的数据库，不触发云上传，也不清空已有归档。
+
+### 4.6 首次同步的时间窗
+
+一个本地档案第一次从手表读取 data_point 和 fitness_point 时，可能要读几万行。手机在每次非全量的 `changes` 里带 `window`（3 天），手表只在这张表对该 receiver 还没有基线、且以前没有为它观察过任何行（或者以前的时间窗已经留下了旧行）时使用它：
+
+1. 先用一页只取一行的查询判断有没有早于 `now - window` 的行（`time_to` / `TIMESTAMP` 大于 0 且早于边界），这一页的行不观察也不发送。
+2. 再按 `time_to>=边界 OR time_to<=0`（fitness_point 用 TIMESTAMP）读取并发送窗口内的行，完成后建立基线。
+3. 第 1 步有旧行时，在桥接库的 metadata 里记下边界，之后每个批次的回复都带 `deferredBefore`；没有旧行时不记，窗口内的读取就是全部。
+
+记下边界后，常规检查不能把旧行一点点补过来：近期范围的起点不早于边界；轮查从已观察到的最小 ID 开始；fitness_point 跳过结束时间早于边界的训练；日志的每日对账、日志重置和列变化后的整表比较也从最小 ID 开始。边界只记录在手表上，SESSION、fitness_record 和 fitness_summary 不受时间窗影响，照常整表比较。
+
+手动全量（不带 `window`，并重新发送全部行）完整结束后清除边界，此后的回复不再带 `deferredBefore`。手机的同步状态 `deferredBeforeMillis` 取各表最近一次回复里的最小值，健康页据此显示横幅和“全部同步”。这个值只在内存中，应用重启后要等下一轮同步读到这两张表才重新出现。
 
 ## 5. root 运动采集
 

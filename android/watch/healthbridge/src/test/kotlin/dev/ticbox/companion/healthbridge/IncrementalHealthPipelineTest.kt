@@ -38,6 +38,8 @@ class IncrementalHealthPipelineTest {
     private var transmitted = 0
     private var acknowledged = 0
     private var dropAck = false
+    /** Whether the phone's first-sync window goes on the wire, as in production. */
+    private var windowed = false
 
     @Before fun setup() {
         provider = LocalHealthPipelineTest.ReadOnlyFixtureProvider()
@@ -63,7 +65,7 @@ class IncrementalHealthPipelineTest {
             override val supportedTables = tables.toSet()
             override suspend fun page(table: LocalHealthTable, checkpoint: LocalHealthCheckpoint): LocalHealthPage {
                 val page = LocalHealthProtocol.page(exchange(LocalHealthProtocol.changes(table, link.source.localUserId,
-                    checkpoint.run!!, checkpoint.full)))
+                    checkpoint.run!!, checkpoint.full, checkpoint.window.takeIf { windowed })))
                 transmitted += page.rows.size
                 return page
             }
@@ -111,6 +113,40 @@ class IncrementalHealthPipelineTest {
             assertEquals(271, full.recordsCommitted)
             assertEquals(0, sync(phone).recordsCommitted)
             assertEquals(0, provider.mutations)
+        }
+    }
+
+    @Test fun aFirstSyncLeavesOlderPointsOnTheWatchUntilEverythingIsAskedFor() = runBlocking {
+        windowed = true
+        repeat(300) { provider.insertFixture(it + 1L, "75", 1) }
+        provider.db.execSQL("UPDATE data_point SET time_from=?,time_to=? WHERE _id>250", arrayOf(now - HOUR, now))
+        SQLiteDataSyncStore(context, "window-phone.sqlite").use { database ->
+            val phone = SQLiteLocalHealthStore(database, now = { now })
+            val first = sync(phone)
+            assertEquals(50, first.recordsCommitted)
+            assertEquals(now - 3 * DAY, first.deferredBeforeMillis)
+            now += HOUR // The hourly checks must not bring the older rows in a few at a time.
+            provider.db.execSQL("UPDATE data_point SET `values`='80' WHERE _id=5")
+            provider.insertFixture(301, "90", 1)
+            provider.db.execSQL("UPDATE data_point SET time_from=?,time_to=? WHERE _id=301", arrayOf(now - HOUR, now))
+            val next = sync(phone)
+            assertEquals(1, next.recordsCommitted); assertNotNull(next.deferredBeforeMillis)
+            val full = sync(phone, LocalHealthSyncMode.FULL)
+            assertEquals(301, full.recordsCommitted); assertNull(full.deferredBeforeMillis)
+            assertEquals("80", phone.points(HealthPointQuery(source, recordKey = "5")).items.single().rawValues)
+            now += HOUR
+            val after = sync(phone)
+            assertEquals(0, after.recordsCommitted); assertNull(after.deferredBeforeMillis)
+        }
+    }
+
+    @Test fun aWatchWithOnlyRecentPointsSendsThemAllWithoutLeavingAnythingBehind() = runBlocking {
+        windowed = true
+        repeat(3) { provider.insertFixture(it + 1L, "75", 1) }
+        provider.db.execSQL("UPDATE data_point SET time_from=?,time_to=?", arrayOf(now - HOUR, now))
+        SQLiteDataSyncStore(context, "recent-phone.sqlite").use { database ->
+            val first = sync(SQLiteLocalHealthStore(database, now = { now }))
+            assertEquals(3, first.recordsCommitted); assertNull(first.deferredBeforeMillis)
         }
     }
 

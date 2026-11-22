@@ -14,6 +14,7 @@ services.localHealth.cancel()                      // 保留已提交的进度
 
 - `sync()` 启动或合并服务持有的任务，不等待整轮完成；没有就绪的主连接时不发请求。主连接就绪和手机 Activity 重新打开都会自动触发。页面退出不取消任务。
 - `FULL` 替换进行中的增量任务，重复的全量请求合并。“设置 → 诊断 → 立即全量同步数据库”调用它。
+- 首次同步只读最近 3 天（`LocalHealthSyncClient.FIRST_SYNC_WINDOW_DAYS`）的 POINT 和训练明细，SESSION、训练摘要和 SPORT 摘要照常全部读取。手表上有更早的数据时，状态的 `deferredBeforeMillis` 给出边界，健康页显示横幅和“全部同步”（即 `FULL`）；全量完成后它变为 null。规则见[本地桥接协议 4.6](../spec/local-bridge.md#46-首次同步的时间窗)。
 - 来源：普通模式为 POINT、SESSION 和 SPORT 摘要；手表开启 root 运动采集后，以 `FITNESS_RECORD` / `FITNESS_POINT` 代替 SPORT 摘要。每个来源有独立的可用状态和续传位置。
 
 | phase | 含义 |
@@ -25,7 +26,7 @@ services.localHealth.cancel()                      // 保留已提交的进度
 | `UNAVAILABLE` | 手表未响应、Provider 缺失或拒绝；已有缓存仍可读 |
 | `FAILED` / `CLOSED` | 本地操作失败 / 服务生命周期结束 |
 
-状态还包括 `mode`、`source`、`sessionId`、`pagesCommitted`、`recordsCommitted`（本次提交的行数，包括更新，不是新增数或总行数）、`lastSuccessAtMillis`（连接时从数据库各表的 `last_success` 恢复）、`lastRun`（上一轮按表和阶段 checkpoint / open / wake / wait / connect / handshake / read / save / ack / retry_wait 汇总的耗时；手表报告自己的处理时间时，read 再拆成 watch / transfer，并带上收到的字节数）和 `advertisedTables`。完成后界面从 offset=0 重读缓存，不要等待某个可能一闪而过的中间阶段。
+状态还包括 `mode`、`source`、`sessionId`、`pagesCommitted`、`recordsCommitted`（本次提交的行数，包括更新，不是新增数或总行数）、`lastSuccessAtMillis`（连接时从数据库各表的 `last_success` 恢复）、`deferredBeforeMillis`（首次同步留在手表上的数据的边界，只在内存中）、`lastRun`（上一轮按表和阶段 checkpoint / open / wake / wait / connect / handshake / read / save / ack / retry_wait 汇总的耗时；手表报告自己的处理时间时，read 再拆成 watch / transfer，并带上收到的字节数）和 `advertisedTables`。完成后界面从 offset=0 重读缓存，不要等待某个可能一闪而过的中间阶段。
 
 ### 1.1 变更日志
 
@@ -154,4 +155,4 @@ adb -s <phone> logcat -d -s "TicBoxProtocol:I" | grep run_timing        # Window
 
 ## 7. 待验证
 
-多页 SESSION 的无线入库、非空的 root 运动采集（跑步的 GPS、暂停和圈，游泳，HIIT）、变更日志在真实 Magisk 下的安装与恢复、Local Bridge 进程被回收后的冷启动唤醒和长期耗电、未来的固件版本。
+首次同步时间窗在真机上的效果（判断旧数据的那一页、横幅、全部同步后横幅消失）、多页 SESSION 的无线入库、非空的 root 运动采集（跑步的 GPS、暂停和圈，游泳，HIIT）、变更日志在真实 Magisk 下的安装与恢复、Local Bridge 进程被回收后的冷启动唤醒和长期耗电、未来的固件版本。

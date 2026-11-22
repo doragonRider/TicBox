@@ -74,9 +74,11 @@ object LocalHealthProtocol {
         afterKey?.let { put("afterKey", it) }; upperKey?.let { put("upperKey", it) }
     }
 
-    fun changes(table: LocalHealthTable, receiver: String, run: String, full: Boolean) = buildJsonObject {
+    /** [window]: a first sync reads only rows from the last this many milliseconds; older bridges ignore it. */
+    fun changes(table: LocalHealthTable, receiver: String, run: String, full: Boolean, window: Long? = null) = buildJsonObject {
         put("op", "changes"); put("table", table.wireName); put("receiver", receiver)
         put("run", run); put("full", full); put("limit", PAGE_SIZE)
+        window?.let { put("window", it) }
     }
     fun acknowledge(receiver: String, table: LocalHealthTable, batch: String) = buildJsonObject {
         put("op", "ack"); put("receiver", receiver); put("table", table.wireName); put("batch", batch)
@@ -91,7 +93,7 @@ object LocalHealthProtocol {
             value.number("upperId"), value.flag("complete") ?: rows.isEmpty(),
             incomplete || value.flag("partial") == true, value.text("error"), value.text("providerVersion"),
             value.text("nextKey"), value.text("upperKey"), value.text("batch"), value.number("scannedRows") ?: 0,
-            value.number("watchMillis"), wireBytes)
+            value.number("watchMillis"), wireBytes, value.number("deferredBefore"))
     }
 }
 
@@ -111,7 +113,9 @@ class LocalHealthPage(val rows: List<LocalHealthRow>, val nextId: Long?, val upp
     val batchId: String? = null, val scannedRows: Long = 0,
     /** How long the watch worked on this reply; null from a bridge that doesn't say. */
     val watchMillis: Long? = null,
-    val wireBytes: Long = 0) {
+    val wireBytes: Long = 0,
+    /** Rows older than this are still only on the watch, left behind by a first sync's window. */
+    val deferredBefore: Long? = null) {
     override fun toString() = "LocalHealthPage(rows=${rows.size}, complete=$complete, contents=<redacted>)"
 }
 

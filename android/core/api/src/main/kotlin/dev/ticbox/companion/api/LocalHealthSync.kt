@@ -18,6 +18,11 @@ data class LocalHealthSyncState(
     val reason: String? = null,
     /** Where the most recent finished run spent its time; null until a run finishes. */
     val lastRun: LocalHealthSyncTiming? = null,
+    /**
+     * The first sync read only recent health and workout details: what is older than this is still only on the watch,
+     * until a FULL sync. Known once a run in this process has read those tables; null when nothing was left behind.
+     */
+    val deferredBeforeMillis: Long? = null,
     val mode: LocalHealthSyncMode = LocalHealthSyncMode.INCREMENTAL,
     /** Table wire names the watch offered in the latest handshake; null until one succeeds. */
     val advertisedTables: Set<String>? = null,
@@ -82,5 +87,8 @@ interface LocalHealthSyncClient : AutoCloseable {
     companion object {
         /** Automatic syncs are skipped while the last successful one is younger than this. */
         const val AUTO_SYNC_INTERVAL_MILLIS = 5 * 60_000L
+
+        /** How far back an INCREMENTAL sync reaches when the watch has never sent this phone its details. */
+        const val FIRST_SYNC_WINDOW_DAYS = 3
     }
 }

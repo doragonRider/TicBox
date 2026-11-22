@@ -16,7 +16,9 @@ internal data class HealthCapture(val run: String, val full: Boolean, val scopes
     val journal: JournalHealthCapture? = null,
     /** Full source coverage need not resend rows already durably owned by the bridge/phone. */
     val resend: Boolean = full,
-    val journalFallback: Boolean = false) {
+    val journalFallback: Boolean = false,
+    /** A first sync the phone limited to rows from this time on; older ones stay on the watch. */
+    val window: Long? = null) {
     val done get() = scopes.isEmpty() && (journal == null || journal.finished)
     fun json() = buildJsonObject {
         put("run", run); put("full", full); put("partial", partial); put("scanned", scanned)
@@ -24,6 +26,7 @@ internal data class HealthCapture(val run: String, val full: Boolean, val scopes
         stamp?.let { put("stamp", it) }
         journal?.let { put("journal", it.json()) }
         put("resend", resend); put("journalFallback", journalFallback)
+        window?.let { put("window", it) }
         put("scopes", JsonArray(scopes.map { it.json() }))
     }
     companion object {
@@ -31,7 +34,7 @@ internal data class HealthCapture(val run: String, val full: Boolean, val scopes
             (json["scopes"] as JsonArray).map { HealthScanScope.parse(it as JsonObject) },
             json.flag("partial") == true, json.number("scanned") ?: 0, json.text("providerVersion"), json.text("stamp"),
             (json["journal"] as? JsonObject)?.let(JournalHealthCapture::parse),
-            json.flag("resend") ?: (json.flag("full") == true), json.flag("journalFallback") == true)
+            json.flag("resend") ?: (json.flag("full") == true), json.flag("journalFallback") == true, json.number("window"))
     }
 }
 
@@ -92,9 +95,22 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
     private fun clearFallback(receiver: String, table: LocalHealthTable) {
         db.delete("metadata", "name=?", arrayOf(fallbackKey(receiver, table)))
     }
+    private fun deferredKey(receiver: String, table: LocalHealthTable) = "deferred_before:$receiver:${table.wireName}"
+    /** Rows older than this were never sent to the receiver; set by a first-sync window, cleared by a complete resend. */
+    fun deferredBefore(receiver: String, table: LocalHealthTable) = metadata(deferredKey(receiver, table))?.toLongOrNull()
+    private fun lowestObserved(receiver: String, table: LocalHealthTable) =
+        db.rawQuery("SELECT MIN(source_id) FROM observations WHERE receiver=? AND kind=?", args(receiver, table)).use { c ->
+            c.moveToFirst(); if (c.isNull(0)) null else c.getLong(0)
+        }
+    private fun observed(receiver: String, table: LocalHealthTable) =
+        db.rawQuery("SELECT 1 FROM observations WHERE receiver=? AND kind=? LIMIT 1", args(receiver, table)).use { it.moveToFirst() }
 
+    /**
+     * [window] is how far back the phone wants a first sync to reach. It applies only to a receiver this table has never
+     * sent rows to, or one an earlier window already left rows behind for.
+     */
     fun begin(receiver: String, table: LocalHealthTable, run: String, forceFull: Boolean,
-        journalWindow: HealthJournalWindow? = null,
+        journalWindow: HealthJournalWindow? = null, window: Long? = null,
         sourceStamp: () -> String? = { null }): HealthCapture = transaction {
         ensure(receiver, table)
         val previous = it.rawQuery("SELECT capture,baseline,audit_after FROM progress WHERE receiver=? AND kind=?", args(receiver, table)).use { cursor ->
@@ -109,6 +125,9 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
                 fallback(receiver, table, old.copy(run = run), sourceStamp()) else old.copy(run = run)
             else -> {
                 val resend = forceFull || !previous.second
+                val deferred = deferredBefore(receiver, table)
+                val since = window?.takeIf { !previous.second && table in WINDOWED && (deferred != null || !observed(receiver, table)) }
+                    ?.let { deferred ?: (now() - it) }
                 val journalLost = journalWindow == null && metadata(journalKey(receiver, table)) != null
                 val full = resend || (journalLost && metadata(fallbackKey(receiver, table)) == null)
                 if (journalWindow != null) {
@@ -120,15 +139,15 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
                         cursor.sequence !in journalWindow.floor..journalWindow.head || lastAudit == null || now() - lastAudit !in 0 until JOURNAL_AUDIT_MILLIS
                     val start = if (baseline) journalWindow.position() else cursor!!
                     if (!baseline && start.sequence == journalWindow.head) clearFallback(receiver, table)
-                    HealthCapture(run, baseline, if (baseline) listOf(HealthScanScope(audit = true)) else emptyList(),
+                    HealthCapture(run, baseline, if (baseline) coverage(receiver, table, since, resend) else emptyList(),
                         journal = JournalHealthCapture(start, journalWindow.head, baseline, !baseline && start.sequence == journalWindow.head),
-                        resend = resend)
+                        resend = resend, window = since)
                 } else {
                     val stamp = sourceStamp()
                     // Unjournaled fitness retains its prior best-effort polling path; FULL never skips it.
                     val unchanged = !full && stamp != null && stamp == metadata(stampKey(receiver, table))
-                    HealthCapture(run, full, if (unchanged) emptyList() else plan(receiver, table, full, previous.third), stamp = stamp,
-                        resend = resend, journalFallback = journalLost)
+                    HealthCapture(run, full, if (unchanged) emptyList() else plan(receiver, table, full, previous.third, since, resend),
+                        stamp = stamp, resend = resend, journalFallback = journalLost, window = since)
                 }
             }
         }
@@ -162,12 +181,12 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
         val full = capture.resend || !previous.first || metadata(fallbackKey(receiver, table)) == null
         val unchanged = !full && stamp != null && stamp == metadata(stampKey(receiver, table))
         return capture.copy(full = full, partial = false,
-            scopes = if (unchanged) emptyList() else plan(receiver, table, full, previous.second),
+            scopes = if (unchanged) emptyList() else plan(receiver, table, full, previous.second, capture.window, capture.resend),
             journal = null, stamp = stamp, journalFallback = true)
     }
 
     fun resetJournal(receiver: String, table: LocalHealthTable, capture: HealthCapture, window: HealthJournalWindow): HealthCapture = transaction {
-        capture.copy(full = true, scopes = listOf(HealthScanScope(audit = true)), partial = false, stamp = null,
+        capture.copy(full = true, scopes = coverage(receiver, table, capture.window, capture.resend), partial = false, stamp = null,
             journal = JournalHealthCapture(window.position(), window.head, baseline = true), journalFallback = false).also { save(receiver, table, it) }
     }
 
@@ -209,20 +228,47 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
         save(receiver, table, next); next
     }
 
-    private fun plan(receiver: String, table: LocalHealthTable, full: Boolean, auditAfter: Long): List<HealthScanScope> {
+    private fun plan(receiver: String, table: LocalHealthTable, full: Boolean, auditAfter: Long,
+        window: Long?, resend: Boolean): List<HealthScanScope> {
         if (table == LocalHealthTable.SESSION || table == LocalHealthTable.FITNESS_RECORD || table == LocalHealthTable.SPORT)
             return listOf(HealthScanScope(audit = true))
         val deep = deepCheckDue(receiver, table, full)
-        if (full) return listOf(HealthScanScope(audit = true))
+        if (full) return coverage(receiver, table, window, resend)
+        // Rows a first-sync window left behind must not trickle in through the regular checks either.
+        val deferred = deferredBefore(receiver, table)
         return buildList {
             val maximum = db.rawQuery("SELECT MAX(source_id) FROM observations WHERE receiver=? AND kind=?", args(receiver, table)).use { c ->
                 c.moveToFirst(); if (c.isNull(0)) null else c.getLong(0)
             }
-            add(HealthScanScope(startId = maximum))
-            if (table == LocalHealthTable.POINT) add(HealthScanScope(since = mutableHealthSince(receiver, if (deep) 3 * DAY else DAY)))
-            if (table == LocalHealthTable.FITNESS_POINT) dueParents(receiver).forEach { id -> add(HealthScanScope(parent = id, audit = true)) }
-            if (deep) add(HealthScanScope(startId = auditAfter.takeIf { value -> value > 0 }, audit = true, remaining = 256))
+            add(if (maximum == null && deferred != null) HealthScanScope(since = deferred) else HealthScanScope(startId = maximum))
+            if (table == LocalHealthTable.POINT) {
+                val since = mutableHealthSince(receiver, if (deep) 3 * DAY else DAY)
+                add(HealthScanScope(since = deferred?.let { maxOf(since, it) } ?: since))
+            }
+            if (table == LocalHealthTable.FITNESS_POINT) dueParents(receiver, deferred).forEach { id -> add(HealthScanScope(parent = id, audit = true)) }
+            if (deep) {
+                // Under a window, rows below the lowest one read are the ones left behind; with none read there is nothing to check.
+                val floor = if (deferred == null) 0L else lowestObserved(receiver, table)?.minus(1)
+                if (floor != null) add(HealthScanScope(startId = maxOf(auditAfter, floor).takeIf { value -> value > 0 }, audit = true, remaining = 256))
+            }
         }
+    }
+
+    /** Reads a whole table, except rows a first-sync window left on the watch, until the phone asks for everything. */
+    private fun coverage(receiver: String, table: LocalHealthTable, window: Long?, resend: Boolean): List<HealthScanScope> {
+        if (window != null) return listOf(HealthScanScope(before = window, remaining = 1, probe = true), HealthScanScope(since = window))
+        val deferred = if (resend) null else deferredBefore(receiver, table)
+        if (deferred == null || table !in WINDOWED) return listOf(HealthScanScope(audit = true))
+        val floor = lowestObserved(receiver, table) ?: return listOf(HealthScanScope(since = deferred))
+        return listOf(HealthScanScope(startId = floor - 1, audit = true))
+    }
+
+    /** Older rows are only left behind, and the phone told so, when there are any. */
+    fun probed(receiver: String, table: LocalHealthTable, capture: HealthCapture, older: Boolean): HealthCapture = transaction {
+        val window = checkNotNull(capture.window)
+        if (older) setMetadata(deferredKey(receiver, table), window.toString())
+        else it.delete("metadata", "name=?", arrayOf(deferredKey(receiver, table)))
+        capture.copy(scopes = capture.scopes.drop(1)).also { next -> save(receiver, table, next) }
     }
 
     /** Most of a sync goes to rereading what rarely changes, so the wider checks run at most hourly. */
@@ -251,7 +297,7 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
     }
 
     /** Unfinished records always stay eligible. Stable children back off but remain in the audit cycle. */
-    private fun dueParents(receiver: String): List<Long> = db.rawQuery(
+    private fun dueParents(receiver: String, deferred: Long?): List<Long> = db.rawQuery(
         "SELECT o.source_id,o.payload,o.last_changed,c.last_checked,c.same_count FROM observations o LEFT JOIN children c ON c.receiver=o.receiver AND c.parent_id=o.source_id WHERE o.receiver=? AND o.kind=? AND o.present=1",
         arrayOf(receiver, LocalHealthTable.FITNESS_RECORD.wireName)).use { cursor ->
         val result = mutableListOf<Pair<Long, Long>>()
@@ -259,6 +305,7 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
             if (cursor.isNull(0) || cursor.isNull(1)) continue
             val columns = LocalHealthRow(LocalHealthProtocol.parse(cursor.getString(1).toByteArray())).columns
             val end = columns.number("END_TIME")
+            if (deferred != null && end != null && end in 1 until deferred) continue
             val checked = if (cursor.isNull(3)) 0 else cursor.getLong(3)
             val same = if (cursor.isNull(4)) 0 else cursor.getInt(4)
             val interval = (5 * 60_000L * (1L shl same.coerceIn(0, 8))).coerceAtMost(DAY)
@@ -301,11 +348,13 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
             if (previousFields != fields) it.execSQL("UPDATE progress SET schema_fields=? WHERE receiver=? AND kind=?", arrayOf(fields, receiver, table.wireName))
             if (previousFields != null && previousFields != fields && !capture.full) {
                 // An observed schema change needs a fresh comparison of old rows too.
-                next = next.copy(full = true, scopes = listOf(HealthScanScope(audit = true)))
+                next = next.copy(full = true, scopes = coverage(receiver, table, capture.window, capture.resend))
             }
         }
         if (next.scopes.isEmpty() && capture.full && !partial) {
             it.execSQL("UPDATE progress SET baseline=1 WHERE receiver=? AND kind=?", args(receiver, table))
+            // Everything was read and resent, so nothing is left behind any more.
+            if (capture.resend && capture.window == null) it.delete("metadata", "name=?", arrayOf(deferredKey(receiver, table)))
             if (table == LocalHealthTable.FITNESS_POINT) it.execSQL(
                 "INSERT OR IGNORE INTO children SELECT receiver,source_id,?,0 FROM observations WHERE receiver=? AND kind=? AND source_id IS NOT NULL",
                 arrayOf<Any?>(now(), receiver, LocalHealthTable.FITNESS_RECORD.wireName))
@@ -399,6 +448,7 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
             put("op", "changes"); put("version", LocalHealthProtocol.INCREMENTAL_VERSION); put("table", table.wireName)
             put("rows", JsonArray(rows)); put("batch", batchId); put("nextId", step.toString())
             put("complete", capture.done && total <= rows.size); put("partial", capture.partial); put("scannedRows", capture.scanned)
+            deferredBefore(receiver, table)?.let { before -> put("deferredBefore", before) }
             capture.providerVersion?.let { put("providerVersion", it) }
             capture.journal?.let { journal -> put("sourceJournal", buildJsonObject {
                 put("version", 1); put("baseline", journal.baseline); put("finished", journal.finished)
@@ -430,5 +480,7 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
         private const val DAY = 86_400_000L
         private const val DEEP_CHECK_MILLIS = 3_600_000L
         private const val JOURNAL_AUDIT_MILLIS = DAY
+        /** The tables big enough for a first sync to leave older rows behind. */
+        private val WINDOWED = setOf(LocalHealthTable.POINT, LocalHealthTable.FITNESS_POINT)
     }
 }
