@@ -4,6 +4,7 @@ import dev.ticbox.companion.api.*
 import dev.ticbox.companion.protocol.*
 import java.io.*
 import java.nio.file.*
+import java.nio.file.attribute.PosixFilePermissions
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -77,6 +78,28 @@ class AgentMagiskModuleTest {
         Files.writeString(active.resolve("disable"), "")
         assertEquals("module_disabled_or_removing", assertFailsWith<ToolboxException> { f.backend.healthModule(p.catalog, p.bytes::inputStream, {}, {}) }.code)
         assertEquals(1, commands.installs.get())
+    } }
+    @Test fun turningTheNotificationControlOffSurvivesEveryInstall() = runBlocking { fixture { f, commands, root ->
+        val staged = root.resolve("modules_update/${MagiskModuleProtocol.ID}")
+        val active = root.resolve("modules/${MagiskModuleProtocol.ID}")
+        // As Magisk does, an install starts the staged copy afresh.
+        commands.beforeInstall = { staged.toFile().deleteRecursively() }
+        suspend fun install(build: Char) = Payload(build.toString().repeat(64)).let { p ->
+            assertEquals("STAGED_REBOOT_REQUIRED", f.backend.healthModule(p.catalog, p.bytes::inputStream, {}, {}).text("outcome"))
+        }
+        install('c')
+        assertFalse(Files.exists(staged.resolve(AgentMagiskModule.ALERTS_OFF), LinkOption.NOFOLLOW_LINKS)) // On unless turned off.
+        // Turned off while that update waits for its restart, so only the staged copy says so.
+        Files.writeString(staged.resolve(AgentMagiskModule.ALERTS_OFF), "")
+        install('d')
+        val kept = staged.resolve(AgentMagiskModule.ALERTS_OFF)
+        assertTrue(Files.isRegularFile(kept, LinkOption.NOFOLLOW_LINKS))
+        assertEquals(PosixFilePermissions.fromString("rw-------"), Files.getPosixFilePermissions(kept))
+        // After the restart it is in the active copy, and the next update keeps it as well.
+        active.toFile().deleteRecursively(); Files.move(staged, active)
+        install('e')
+        assertTrue(Files.isRegularFile(staged.resolve(AgentMagiskModule.ALERTS_OFF), LinkOption.NOFOLLOW_LINKS))
+        assertEquals(3, commands.installs.get())
     } }
     @Test fun corruptPayloadNeverReachesMagiskAndUploadIsCleaned() = runBlocking { fixture { f, commands, root ->
         val p = Payload(); val corrupt = p.bytes.clone().apply { this[lastIndex] = (this[lastIndex].toInt() xor 1).toByte() }

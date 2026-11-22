@@ -155,11 +155,10 @@ fun WatchModuleScreen(onBack: () -> Unit, navigate: (Any) -> Unit) {
         val shownAlerts = lastKnownAlertStage(current.patch)
         val host = current.host.snapshot
         val alertsSupported = host?.systemUiSupported != false
-        val alertsDefault = current.setup.applyAlerts || stage == ModuleStage.NOT_INSTALLED
+        // On unless turned off, which is the one choice the watch keeps.
         val wantAlerts =
-            alertsSupported && (alertsChoice ?: current.patch.reading()?.optedIn ?: alertsDefault)
-        val shownWant =
-            alertsSupported && (alertsChoice ?: current.patch.snapshot?.optedIn ?: alertsDefault)
+            alertsSupported && (alertsChoice ?: current.patch.reading()?.optedIn ?: true)
+        val shownWant = alertsSupported && (alertsChoice ?: current.patch.snapshot?.optedIn ?: true)
         val olderBridge = current.bridgeOnWatch?.takeIf { it.versionCode < phoneVersion }
         // It goes first, because this plan is worked out from what it reads.
         val plan =
@@ -228,7 +227,13 @@ fun WatchModuleScreen(onBack: () -> Unit, navigate: (Any) -> Unit) {
                 enabled = canAct,
                 onToggle = { want ->
                     alertsChoice = want
-                    if (!want && current.patch.snapshot?.optedIn == true) viewModel.turnOffAlerts()
+                    // Without a copy on the watch, installing it is what keeps it off.
+                    if (
+                        !want &&
+                            current.patch.snapshot?.optedIn == true &&
+                            stage != ModuleStage.NOT_INSTALLED
+                    )
+                        viewModel.turnOffAlerts()
                 },
                 onApply = viewModel::applyAlerts,
                 onTurnOff = viewModel::turnOffAlerts,

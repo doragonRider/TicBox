@@ -1,6 +1,6 @@
 # 通知的声音与振动
 
-本文说明手机桥接到手表的通知如何决定声音和振动：官方手表 SystemUI 的实际行为、本应用在手机端的提醒策略，以及可选的 SystemUI 补丁。通知本身的编码见[伴侣业务消息](companion.md)。
+本文说明手机桥接到手表的通知如何决定声音和振动：官方手表 SystemUI 的实际行为、本应用在手机端的提醒策略，以及本应用的 SystemUI 补丁。通知本身的编码见[伴侣业务消息](companion.md)。
 
 ## 1. 官方行为
 
@@ -43,7 +43,7 @@
 
 ## 3. 本应用的 SystemUI 补丁
 
-[进程内模块](monitoring-settings.md#52-进程内模块)包含一个可选的 SystemUI 扩展，按每条手机通知的 `hasSound` 和 `shouldVibrate` 分别限制声音和振动。它复用官方的卡片、过滤和提醒入口，不新增界面，也不替换官方 APK。实现见 [NotificationAlertsModule.java](../../android/watch/healthmodule/src/main/java/dev/ticbox/companion/healthmodule/NotificationAlertsModule.java) 和 [OemAlertAdapter.java](../../android/watch/healthmodule/src/main/java/dev/ticbox/companion/healthmodule/OemAlertAdapter.java)。
+[进程内模块](monitoring-settings.md#52-进程内模块)包含一个 SystemUI 扩展（默认开启，可以关闭），按每条手机通知的 `hasSound` 和 `shouldVibrate` 分别限制声音和振动。它复用官方的卡片、过滤和提醒入口，不新增界面，也不替换官方 APK。实现见 [NotificationAlertsModule.java](../../android/watch/healthmodule/src/main/java/dev/ticbox/companion/healthmodule/NotificationAlertsModule.java) 和 [OemAlertAdapter.java](../../android/watch/healthmodule/src/main/java/dev/ticbox/companion/healthmodule/OemAlertAdapter.java)。
 
 ### 3.1 准入
 
@@ -76,16 +76,25 @@
 
 两个包装器都准备好、字段写入并读回成功后才启用策略；只装上一部分时仍委托官方实现。运行时原型不符或读取异常时停用策略，报告 `notification_alert_contract_unavailable`，之后委托官方。官方自身抛出的异常只传播一次，不重试。
 
-### 3.3 启用与模式
+### 3.3 开关与模式
 
-ZIP **默认不含启用标记**，首次安装不会注入 SystemUI；更新时只保留此前满足检查的显式标记。启用方式是在手表上以 root 创建标记，然后重启：
+从 1.0.8 起，扩展**默认开启**：模块目录里没有关闭记录时，SystemUI 启动就加载它。只有显式关闭才写入记录：
 
 ```sh
-touch /data/adb/modules/ticwatch_health_settings/notification-alerts.enabled
-chmod 600 /data/adb/modules/ticwatch_health_settings/notification-alerts.enabled
+touch /data/adb/modules/ticwatch_health_settings/notification-alerts.disabled
+chmod 600 /data/adb/modules/ticwatch_health_settings/notification-alerts.disabled
 ```
 
-标记必须是 root 所有的普通文件，最多 16 字节，组和其他用户不可写，不接受符号链接。刚安装的新 ZIP 还在 Magisk 的暂存目录时，标记要写进 `/data/adb/modules_update/ticwatch_health_settings/`，因为开机时 Magisk 会用暂存目录整个替换活动目录。
+加载器在 SystemUI 进程启动时用 `fstatat(..., AT_SYMLINK_NOFOLLOW)` 查看这个名字：任何类型的条目都算关闭，包括符号链接和目录；只有确认“不存在”（`ENOENT`）才加载，其他错误也按关闭处理，所以损坏的记录不会让扩展重新开启。不加载时日志标签 `TicBoxHealthModule` 报告 `alert_opted_out`，查看失败时报告 `alert_opt_out_unreadable`。重新开启就删除记录，再重启 SystemUI。
+
+开机时 Magisk 用暂存目录 `/data/adb/modules_update/ticwatch_health_settings/` 整个替换活动目录。所以更新还在暂存时，下次启动只看暂存目录里的记录。关闭记录在更新中有两层保留：
+
+1. `customize.sh` 在活动目录里有这个名字时，在新的暂存目录写入同名的普通文件（root，`0600`），并在安装输出中说明“保持关闭”。
+2. root Local Bridge 安装模块前，先查看活动目录和暂存目录里有没有记录；Magisk 安装并核对暂存副本后，如果新副本缺少记录就补上（`0600`），补不上时报告 `module_alerts_off_not_kept`。这一层也覆盖“更新暂存后才关闭，再次更新”的情况。
+
+ZIP 不含 `notification-alerts.disabled`，也不含 1.0.7 及更早版本的启用标记 `notification-alerts.enabled`。1.0.8 的加载器不再读取启用标记，也不会把它带进新副本。
+
+**从 1.0.7 升级：**旧版没有关闭记录，所以升级后扩展默认开启。旧版删除启用标记的关闭方式不会转换成关闭记录；需要关闭时在升级后重新关闭一次。已保存的模式不受影响：此前在页面上关闭过的 SystemUI 保存着 `OFF`，升级后虽然加载，仍然委托官方实现，直到切到 `ALL`。
 
 控制命令可以在 Local Bridge 的 root 命令行运行（root Local Bridge 继承应用的挂载命名空间，客户端从 `/data/system/packages.list` 取得 SystemUI 的 UID）：
 
@@ -102,7 +111,7 @@ CLASSPATH=/data/adb/modules/ticwatch_health_settings/module.dex app_process / de
 | `PROBE` | 只对 `dev.ticbox.alertprobe` 生效，其他应用保持原样 |
 | `ALL` | 对所有手机通知生效 |
 
-首次加载的模式为 `OBSERVE`。模式按 APK 摘要隔离保存，跨 SystemUI 重启保留，只影响之后的加载调用。`installed=true` 只说明接口写入并读回成功，不说明提醒已经经过包装器。失败时 stderr 输出 `notification_alert_control_unavailable stage=<request|uid|connect|identity>`，错误回复带 `error`，退出码为 1。
+没有保存过模式时，首次加载的模式为 `ALL`（1.0.7 及更早版本为 `OBSERVE`）；保存的值无法识别时按 `OBSERVE`。模式按 APK 摘要隔离保存，跨 SystemUI 重启保留，只影响之后的加载调用。`installed=true` 只说明接口写入并读回成功，不说明提醒已经经过包装器。失败时 stderr 输出 `notification_alert_control_unavailable stage=<request|uid|connect|identity>`，错误回复带 `error`，退出码为 1。
 
 控制接口是抽象 Unix socket `ticbox-notification-alerts-v1`，只接受内核确认 UID 为 0 的客户端；客户端反查对端为 SystemUI 主用户的 UID，并校验回复中的身份。每个连接一个请求，帧为 4 字节大端长度 + UTF-8 JSON，最大 64 KiB，读取超时 15 秒。`moduleVersionCode=1` 是控制协议的实现号。
 
@@ -113,9 +122,14 @@ CLASSPATH=/data/adb/modules/ticwatch_health_settings/module.dex app_process / de
 
 观察日志的标签为 `TicNotifyModule`，只针对测试应用，记录 `role`、`sound`、`vibrate`、`patternPresent`、`plugged`、`patched`；前 32 次都记录，之后每 100 次记录一次。计数是加载器的调用次数，不是通知数或实际提醒次数。不记录标题、正文、通知标识或账号。
 
-手机上的手表模块页通过 [NotificationAlertPatch.kt](../../android/core/api/src/main/kotlin/dev/ticbox/companion/api/NotificationAlertPatch.kt) 执行这些固定命令，只提供 `OFF` 和 `ALL`：开启时创建标记，扩展加载后自动切到 `ALL`（只做一次）；关闭时分别尽力执行 `OFF` 和删除标记。标记只在 SystemUI 进程启动时读取，所以开关时只重启 SystemUI，不重启手表。命令行切到 `OBSERVE` 或 `PROBE` 后页面不会覆盖。
+手机上的手表模块页通过 [NotificationAlertPatch.kt](../../android/core/api/src/main/kotlin/dev/ticbox/companion/api/NotificationAlertPatch.kt) 执行这些固定命令，只提供 `OFF` 和 `ALL`：
 
-只停用这一补丁：执行 `OFF`，删除标记后重启。完全停用：在 Magisk 中禁用或移除整个模块并重启。删除标记不会清除已保存的模式。
+- 开关默认开启，读取时以下次启动会看的目录（有暂存目录时看暂存目录）里有没有关闭记录为准。页面用该目录的修改时间对比开机时长，判断这次开机是否已经有机会加载：安装会创建目录，重新开启会删除记录，两者都会改变修改时间。
+- 关闭时分别尽力执行 `OFF`，并在活动目录和暂存目录（有的话）里写入关闭记录，同时删除旧版的启用标记。开关关着时安装或更新，安装后、重启前再写一次（只写记录，不执行 `OFF`），手表上还没有模块时也靠这一步；没写成就停在重启之前。
+- 开启时删除两个目录里的关闭记录。扩展加载后，如果它还停在 `OFF` 或 `OBSERVE`，页面自动切到 `ALL`（每次设置只做一次）。
+- 安装或更新模块与开关在同一次重启里完成：先安装，再按开关写入或删除关闭记录，最后重启一次。已安装的模块只开关通知控制时只重启 SystemUI，不重启手表。命令行切到 `PROBE` 后页面不会覆盖。
+
+只停用这一补丁：执行 `OFF`，写入关闭记录后重启 SystemUI。完全停用：在 Magisk 中禁用或移除整个模块并重启。关闭记录不会清除已保存的模式。
 
 ### 3.4 验收方法
 

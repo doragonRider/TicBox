@@ -4,6 +4,7 @@ import dev.ticbox.companion.api.*
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermissions
 import java.util.concurrent.TimeUnit
 import kotlin.test.*
 import kotlinx.coroutines.test.runTest
@@ -18,25 +19,31 @@ class NotificationAlertPatchEngineTest {
             (error?.let { ",\"error\":\"$it\"" } ?: "") + "}"
     private fun result(stdout: String, exit: Int = 0) = ToolboxCommandResult(exit, stdout.toByteArray(), ByteArray(0))
 
-    @Test fun markerAgeAgainstUptimeTellsWhetherThisBootHasSeenIt() {
-        val none = parseNotificationAlertStatus("optin none\n")
-        assertFalse(none.optedIn); assertFalse(none.running); assertFalse(none.applied)
-        val sameBoot = parseNotificationAlertStatus("optin 60 3600\n")
+    @Test fun onUnlessTurnedOffAndTheAgeTellsWhetherThisBootHasSeenIt() {
+        val off = parseNotificationAlertStatus("alerts off\n")
+        assertFalse(off.optedIn); assertFalse(off.running); assertFalse(off.applied)
+        val sameBoot = parseNotificationAlertStatus("alerts on 60 3600\n")
         assertTrue(sameBoot.optedIn); assertFalse(sameBoot.optInSurvivedReboot)
-        val laterBoot = parseNotificationAlertStatus("optin 7200 3600\n")
+        val laterBoot = parseNotificationAlertStatus("alerts on 7200 3600\n")
         assertTrue(laterBoot.optInSurvivedReboot); assertFalse(laterBoot.running)
+        // No copy on the watch yet: nothing turned it off, and no boot has seen it.
+        val nothing = parseNotificationAlertStatus("alerts on\n")
+        assertTrue(nothing.optedIn); assertFalse(nothing.optInSurvivedReboot)
+        // The 1.0.7 line meant the opposite, so it is never read as either.
+        assertFailsWith<ToolboxException> { parseNotificationAlertStatus("optin none\n") }
+        assertFailsWith<ToolboxException> { parseNotificationAlertStatus("alerts maybe\n") }
     }
 
     @Test fun onlyAllModeOnAWrittenHookCountsAsApplied() {
-        assertTrue(parseNotificationAlertStatus("optin 7200 3600\n${status("ALL")}\n").applied)
-        assertFalse(parseNotificationAlertStatus("optin 7200 3600\n${status("PROBE")}\n").applied)
-        assertFalse(parseNotificationAlertStatus("optin 7200 3600\n${status("ALL", installed = false)}\n").applied)
+        assertTrue(parseNotificationAlertStatus("alerts on 7200 3600\n${status("ALL")}\n").applied)
+        assertFalse(parseNotificationAlertStatus("alerts on 7200 3600\n${status("PROBE")}\n").applied)
+        assertFalse(parseNotificationAlertStatus("alerts on 7200 3600\n${status("ALL", installed = false)}\n").applied)
         assertFailsWith<ToolboxException> { parseNotificationAlertStatus("") }
     }
 
     @Test fun attachingAsksNothingAndALinkChangeForgets() = runTest {
         var calls = 0
-        val engine = NotificationAlertPatchEngine { _, _, _ -> calls++; result("optin none\n") }
+        val engine = NotificationAlertPatchEngine { _, _, _ -> calls++; result("alerts off\n") }
         engine.attach(link)
         assertEquals(0, calls)
         assertEquals(NotificationAlertPatchPhase.READY, engine.state.value.phase)
@@ -51,35 +58,33 @@ class NotificationAlertPatchEngineTest {
         val commands = mutableListOf<String>()
         val engine = NotificationAlertPatchEngine { _, command, _ ->
             commands += command
-            if (command.contains("status")) result("optin 60 3600\n") else result("")
+            if (command.contains("status")) result("alerts on 60 3600\n") else result("")
         }
         engine.attach(link)
         engine.optIn()
         assertEquals(2, commands.size)
-        assertTrue(commands[0].contains("touch") && commands[0].contains("chmod 600"))
+        assertTrue(commands[0].contains("rm -f") && !commands[0].contains("touch"))
         assertTrue(commands[1].contains("status"))
         assertTrue(engine.state.value.snapshot!!.optedIn)
     }
 
-    @Test fun aStagedCopyTakesTheMarkerSoOneRestartFinishesBoth() = runTest {
+    @Test fun aStagedCopyIsWhatTheNextBootKeeps() = runTest {
         val commands = mutableListOf<String>()
-        val engine = NotificationAlertPatchEngine { _, command, _ -> commands += command; result("optin 60 3600\n") }
+        val engine = NotificationAlertPatchEngine { _, command, _ -> commands += command; result("alerts on 60 3600\n") }
         engine.attach(link)
         engine.optIn()
         // Magisk replaces the active directory with the staged one at boot.
-        assertTrue(commands[0].contains("[ -d /data/adb/modules_update/ticwatch_health_settings ]"))
-        assertTrue(commands[0].contains("m=/data/adb/modules_update/ticwatch_health_settings/notification-alerts.enabled"))
+        assertTrue(commands[0].contains("rm -f /data/adb/modules/ticwatch_health_settings/notification-alerts.disabled " +
+            "/data/adb/modules_update/ticwatch_health_settings/notification-alerts.disabled"))
         assertTrue(commands[0].contains("exit 3"))
-        assertTrue(commands[1].contains("[ -d /data/adb/modules_update/ticwatch_health_settings ]"))
+        assertTrue(commands[1].contains("if [ -d /data/adb/modules_update/ticwatch_health_settings ]; then d=/data/adb/modules_update/"))
         val snapshot = engine.state.value.snapshot!!
         assertTrue(snapshot.optedIn); assertFalse(snapshot.optInSurvivedReboot)
-        engine.optOut()
-        assertTrue(commands[2].contains("rm -f /data/adb/modules/ticwatch_health_settings/notification-alerts.enabled /data/adb/modules_update/"))
     }
 
     @Test fun aRefusedModeIsReportedBesideWhatTheWatchThenSays() = runTest {
         val engine = NotificationAlertPatchEngine { _, command, _ ->
-            if (command.contains("status")) result("optin 7200 3600\n${status("OBSERVE", installed = false)}\n")
+            if (command.contains("status")) result("alerts on 7200 3600\n${status("OBSERVE", installed = false)}\n")
             else result(status("OBSERVE", false, "notification_alert_contract_unavailable"), exit = 1)
         }
         engine.attach(link)
@@ -107,18 +112,18 @@ class NotificationAlertPatchEngineTest {
 
     @Test fun aReplyFromBeforeALinkChangeIsDropped() = runTest {
         lateinit var engine: NotificationAlertPatchEngine
-        engine = NotificationAlertPatchEngine { _, _, _ -> engine.attach(HealthModuleLink(link.peer, 2)); result("optin none\n") }
+        engine = NotificationAlertPatchEngine { _, _, _ -> engine.attach(HealthModuleLink(link.peer, 2)); result("alerts off\n") }
         engine.attach(link)
         engine.refresh()
         assertNull(engine.state.value.snapshot); assertEquals(NotificationAlertPatchPhase.READY, engine.state.value.phase)
     }
 
-    @Test fun failedOffRemainsVisibleWhenTheMarkerWasRemovedButAllIsStillRunning() = runTest {
+    @Test fun failedOffRemainsVisibleWhenTheRecordWasWrittenButAllIsStillRunning() = runTest {
         val commands = mutableListOf<String>()
         val engine = NotificationAlertPatchEngine { _, command, _ ->
             commands += command
             if (commands.size == 1) result(status("ALL", error = "mode_write_unconfirmed") + "\noptout 1 0\n", exit = 1)
-            else result("optin none\n" + status("ALL") + "\n")
+            else result("alerts off\n" + status("ALL") + "\n")
         }
         engine.attach(link); engine.optOut()
         assertEquals(2, commands.size)
@@ -129,11 +134,11 @@ class NotificationAlertPatchEngineTest {
         assertTrue(engine.state.value.snapshot!!.applied)
     }
 
-    @Test fun aMarkerRemovalFailureIsNotHiddenByASuccessfulOff() = runTest {
+    @Test fun aFailedRecordIsNotHiddenByASuccessfulOff() = runTest {
         var calls = 0
         val engine = NotificationAlertPatchEngine { _, _, _ ->
             if (++calls == 1) result(status("OFF") + "\noptout 0 1\n", exit = 1)
-            else result("optin 7200 3600\n" + status("OFF") + "\n")
+            else result("alerts on 7200 3600\n" + status("OFF") + "\n")
         }
         engine.attach(link); engine.optOut()
         assertEquals(2, calls)
@@ -148,7 +153,7 @@ class NotificationAlertPatchEngineTest {
             var calls = 0
             val engine = NotificationAlertPatchEngine { _, _, _ ->
                 if (++calls == 1) result("optout " + offExit + " 0\n", exit = offExit)
-                else result("optin none\n")
+                else result("alerts off\n")
             }
             engine.attach(link); engine.optOut()
             assertEquals(2, calls)
@@ -166,7 +171,7 @@ class NotificationAlertPatchEngineTest {
         val engine = NotificationAlertPatchEngine { _, command, _ ->
             commands += command
             if (commands.size == 1) result(status("OFF") + "\noptout 0 0\n")
-            else result("optin none\n" + status("OFF") + "\n")
+            else result("alerts off\n" + status("OFF") + "\n")
         }
         engine.attach(link); engine.optOut()
         assertEquals(2, commands.size)
@@ -192,7 +197,7 @@ class NotificationAlertPatchEngineTest {
         for (failure in failures) {
             var calls = 0
             val engine = NotificationAlertPatchEngine { _, _, _ ->
-                if (++calls == 1) failure else result("optin none\n")
+                if (++calls == 1) failure else result("alerts off\n")
             }
             engine.attach(link); engine.optOut()
             assertEquals(2, calls)
@@ -206,7 +211,7 @@ class NotificationAlertPatchEngineTest {
         var calls = 0
         val engine = NotificationAlertPatchEngine { _, _, _ ->
             if (++calls == 1) withTimeout(1) { awaitCancellation() }
-            else result("optin none\n" + status("ALL") + "\n")
+            else result("alerts off\n" + status("ALL") + "\n")
         }
         engine.attach(link); engine.optOut()
         assertEquals(2, calls)
@@ -214,15 +219,69 @@ class NotificationAlertPatchEngineTest {
         assertTrue(engine.state.value.snapshot!!.applied)
     }
 
-    @Test fun generatedOptOutShellPreservesControlFailureWhileRemovingTheMarker() = runTest {
+    @Test fun generatedCommandsKeepTheRecordInEveryCopyAndOnlyTurningOffWritesOne() = runTest {
+        val shell = listOf(Path.of("/bin/sh"), Path.of("/usr/bin/sh")).firstOrNull(Files::isExecutable)
+        assumeTrue(shell != null && Files.isReadable(Path.of("/proc/uptime")), "This shell contract test requires a POSIX sh host")
+        val directory = Files.createTempDirectory("notification-alert-marker-")
+        try {
+            val module = Files.createDirectory(directory.resolve("module directory"))
+            val staged = directory.resolve("staged directory")
+            Files.writeString(module.resolve("module.dex"), "fixture")
+            fun quoted(value: Path) = "'" + value.toString().replace("'", "'\\''") + "'"
+            val engine = NotificationAlertPatchEngine { _, command, _ ->
+                // Bind only the fixed device paths to local fixtures; the control answers nothing, as with no extension.
+                val local = command.replace("/data/adb/modules_update/ticwatch_health_settings", quoted(staged))
+                    .replace("/data/adb/modules/ticwatch_health_settings", quoted(module)).replace("/system/bin/app_process", "false")
+                val process = ProcessBuilder(checkNotNull(shell).toString(), "-c", local).start()
+                try {
+                    assertTrue(process.waitFor(10, TimeUnit.SECONDS), "Generated shell must terminate")
+                    ToolboxCommandResult(process.exitValue(), process.inputStream.use { it.readBytes() }, process.errorStream.use { it.readBytes() })
+                } finally { if (process.isAlive) process.destroyForcibly() }
+            }
+            engine.attach(link)
+            engine.refresh()
+            assertTrue(engine.state.value.snapshot!!.optedIn, "On with no record")
+            assertFalse(Files.list(module).use { it.anyMatch { path -> path.fileName.toString().startsWith("notification-alerts") } })
+            // An update waits for its restart: the record goes into both copies, and the older opt-in goes.
+            Files.createDirectory(staged); Files.writeString(staged.resolve("module.dex"), "fixture")
+            Files.writeString(module.resolve("notification-alerts.enabled"), "")
+            engine.keepOff()
+            assertNull(engine.state.value.reason)
+            assertFalse(engine.state.value.snapshot!!.optedIn)
+            for (copy in listOf(module, staged)) {
+                assertEquals(PosixFilePermissions.fromString("rw-------"), Files.getPosixFilePermissions(copy.resolve("notification-alerts.disabled")))
+            }
+            assertFalse(Files.exists(module.resolve("notification-alerts.enabled")))
+            // The staged copy is the one the next boot keeps, so it alone decides.
+            Files.delete(staged.resolve("notification-alerts.disabled")); engine.refresh()
+            assertTrue(engine.state.value.snapshot!!.optedIn)
+            Files.delete(module.resolve("notification-alerts.disabled")); Files.createSymbolicLink(staged.resolve("notification-alerts.disabled"), directory.resolve("gone"))
+            engine.refresh()
+            assertFalse(engine.state.value.snapshot!!.optedIn, "Anything under the name counts, as the loader has it")
+            Files.delete(staged.resolve("notification-alerts.disabled"))
+            engine.keepOff(); engine.optIn()
+            assertNull(engine.state.value.reason)
+            assertTrue(engine.state.value.snapshot!!.optedIn)
+            assertFalse(Files.exists(module.resolve("notification-alerts.disabled")) || Files.exists(staged.resolve("notification-alerts.disabled")))
+            // Nowhere to keep it, so it isn't kept.
+            Files.walk(directory).use { paths -> paths.sorted(Comparator.reverseOrder()).filter { it != directory }.forEach(Files::delete) }
+            engine.keepOff()
+            assertEquals("notification_alert_write_failed", engine.state.value.reason)
+            assertTrue(engine.state.value.snapshot!!.optedIn)
+            engine.close()
+        } finally {
+            Files.walk(directory).use { paths -> paths.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) } }
+        }
+    }
+
+    @Test fun generatedOptOutShellPreservesControlFailureWhileKeepingTheRecord() = runTest {
         val shell = listOf(Path.of("/bin/sh"), Path.of("/usr/bin/sh")).firstOrNull(Files::isExecutable)
         assumeTrue(shell != null, "This shell contract test requires a POSIX sh host")
         val directory = Files.createTempDirectory("notification-alert-optout-")
         try {
             val module = Files.createDirectory(directory.resolve("module directory"))
             Files.writeString(module.resolve("module.dex"), "fixture")
-            val marker = module.resolve("notification-alerts.enabled")
-            Files.writeString(marker, "")
+            val marker = module.resolve("notification-alerts.disabled")
             val control = directory.resolve("fake-app-process")
             Files.writeString(control, "#!/bin/sh\ncase \"\$3\" in\n" +
                 "OFF) printf '%s\\n' '" + status("ALL", error = "mode_write_unconfirmed") + "'; exit 7 ;;\n" +
@@ -246,7 +305,7 @@ class NotificationAlertPatchEngineTest {
             assertEquals(2, results.size)
             assertEquals(7, results[0].exitCode, "A successful rm must not replace the control failure exit")
             assertContains(results[0].stdout.decodeToString(), "optout 7 0")
-            assertFalse(Files.exists(marker), "Failure of OFF must not block cancelling the next load")
+            assertTrue(Files.isRegularFile(marker), "Failure of OFF must not block cancelling the next load")
             assertEquals("mode_write_unconfirmed", engine.state.value.reason)
             assertFalse(engine.state.value.snapshot!!.optedIn)
             assertTrue(engine.state.value.snapshot!!.applied)

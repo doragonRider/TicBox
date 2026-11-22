@@ -151,7 +151,8 @@ val verifyModuleZip = tasks.register("verifyModuleZip") {
             require(dex.size in 112..2 * 1024 * 1024 && dex.copyOfRange(0, 4).toString(Charsets.US_ASCII) == "dex\n")
             require(dex.toString(Charsets.ISO_8859_1).contains("Ldev/ticbox/companion/healthmodule/HealthModule;"))
             require(dex.toString(Charsets.ISO_8859_1).contains("Ldev/ticbox/companion/healthmodule/NotificationAlertsModule;"))
-            require("notification-alerts.enabled" !in names) // SystemUI injection is separately opt-in.
+            // The notification control is on until turned off on the watch; the package never carries either marker.
+            require("notification-alerts.disabled" !in names && "notification-alerts.enabled" !in names)
             require(!zip.getInputStream(zip.getEntry("module.prop")).readBytes().toString(Charsets.UTF_8).contains("\${version"))
         }
     }

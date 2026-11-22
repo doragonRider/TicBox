@@ -32,15 +32,9 @@ int main() {
     assert(!alert_target_allowed(kAlertTarget, "/data/user/0/com.mobvoi.wear.refsysui", 10068, true, false));
     assert(!alert_target_allowed(kAlertTarget, "/data/user/0/com.mobvoi.wear.refsysui", 10068, false, true));
     assert(!alert_target_allowed(kAlertTarget, "/data/user/10/com.mobvoi.wear.refsysui", 1010068, false, false));
-    struct stat flag{}; flag.st_mode = S_IFREG | 0600; flag.st_uid = 0; flag.st_size = 0;
-    assert(alert_opt_in_allowed(flag));
-    flag.st_uid = 10068; assert(!alert_opt_in_allowed(flag)); flag.st_uid = 0;
-    flag.st_mode = S_IFLNK | 0600; assert(!alert_opt_in_allowed(flag));
-    flag.st_mode = S_IFREG | 0620; assert(!alert_opt_in_allowed(flag));
-    flag.st_mode = S_IFREG | 0602; assert(!alert_opt_in_allowed(flag));
-    flag.st_mode = S_IFDIR | 0600; assert(!alert_opt_in_allowed(flag));
-    flag.st_mode = S_IFREG | 0644; flag.st_size = 17; assert(!alert_opt_in_allowed(flag));
-    flag.st_size = -1; assert(!alert_opt_in_allowed(flag));
+    assert(!alert_opted_out(-1, ENOENT));
+    assert(alert_opted_out(0, 0));
+    assert(alert_opted_out(-1, EACCES)); assert(alert_opted_out(-1, ELOOP)); assert(alert_opted_out(-1, EIO));
     unsigned char dex[112]{}; memcpy(dex, "dex\n039", 8);
     assert(dex_header_valid(dex, sizeof(dex)));
     assert(!dex_header_valid(dex, 111)); assert(!dex_header_valid(dex, kMaxDexBytes + 1));

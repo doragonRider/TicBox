@@ -18,7 +18,7 @@
 | [私有运动数据库](fitness-database.md) | RECORD 29 列 / POINT 19 列、字段复用、两条时间轴、GPS、圈、GROUPS / HIIT；[列结构](fitness-database-schema.json) |
 | [健康数据展示参考](health-display.md) | 官方 App 的统计和展示算法、未确认字段的推测、本应用的图表投影 |
 | [监测与提醒设置](monitoring-settings.md) | 官方的设置键、取值和副作用，本应用的读写方式与进程内模块；[设置目录](monitoring-settings-catalog.json) |
-| [通知的声音与振动](notification-alerts.md) | 官方 SystemUI 的提醒行为、手机端的提醒策略、可选的 SystemUI 补丁 |
+| [通知的声音与振动](notification-alerts.md) | 官方 SystemUI 的提醒行为、手机端的提醒策略、默认开启的 SystemUI 补丁 |
 | [账号、云与 Google 服务](cloud.md) | Mobvoi 账号与健康云 REST、手表资料桥、Google 账号复制、私有服务权限、官方的云同步算法 |
 | [Flow15 与旧 BLE](flow15-legacy.md) | 手机网络代理的握手与帧；旧 Mobvoi GATT 帧 |
 

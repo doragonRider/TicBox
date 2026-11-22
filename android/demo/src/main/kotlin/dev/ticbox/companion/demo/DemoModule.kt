@@ -115,7 +115,8 @@ internal class DemoAlertPatch(private val delayMillis: Long) : NotificationAlert
             val before =
                 it.snapshot
                     ?: NotificationAlertPatchSnapshot(
-                        optedIn = false,
+                        // On until turned off.
+                        optedIn = true,
                         optInSurvivedReboot = false,
                         running = false,
                         hooked = false,
@@ -132,7 +133,7 @@ internal class DemoAlertPatch(private val delayMillis: Long) : NotificationAlert
             optInSurvivedReboot = loaded,
             running = loaded,
             hooked = loaded,
-            mode = if (loaded) it.mode ?: NotificationAlertPatchMode.OBSERVE else null,
+            mode = if (loaded) it.mode ?: NotificationAlertPatchMode.ALL else null,
         )
     }
 

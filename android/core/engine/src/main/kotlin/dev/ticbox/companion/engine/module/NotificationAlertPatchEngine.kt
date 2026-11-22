@@ -34,6 +34,7 @@ class NotificationAlertPatchEngine(private val remote: ModuleShell) : Notificati
     override suspend fun refresh() = run(null, ::noWriteProblem)
     override suspend fun optIn() = run(OPT_IN) { if (it.exitCode == 3) "notification_alert_module_missing" else exitProblem(it) }
     override suspend fun optOut() = run(OPT_OUT, ::optOutProblem)
+    override suspend fun keepOff() = run(KEEP_OFF, ::exitProblem)
     override suspend fun applyToAll() = run(APPLY, ::modeProblem)
     private suspend fun run(write: String?, problemIn: (ToolboxCommandResult) -> String?) {
         val selected = active
@@ -81,22 +82,32 @@ class NotificationAlertPatchEngine(private val remote: ModuleShell) : Notificati
         const val MODULE = "/data/adb/modules/ticwatch_health_settings"
         const val DEX = "$MODULE/module.dex"
         const val STAGED = "/data/adb/modules_update/ticwatch_health_settings"
-        const val MARKER = "$MODULE/notification-alerts.enabled"
-        const val STAGED_MARKER = "$STAGED/notification-alerts.enabled"
+        const val OFF = "notification-alerts.disabled"
+        /** What 1.0.7 and earlier loaded the extension for; an older module still installed reads it. */
+        const val LEGACY_ON = "notification-alerts.enabled"
         const val CONTROL = "CLASSPATH=$DEX /system/bin/app_process / dev.ticbox.companion.healthmodule.NotificationAlertsControl"
-        // A staged copy replaces the active directory at the next boot, so only its marker counts.
-        const val PICK_MARKER = "if [ -d $STAGED ]; then m=$STAGED_MARKER; else m=$MARKER; fi; "
-        // The marker's age against the uptime tells whether this boot has already seen it.
-        const val STATUS = PICK_MARKER + "if [ -f \$m ]; then echo \"optin \$(( \$(date +%s) - \$(stat -c %Y \$m) )) \$(cut -d. -f1 /proc/uptime)\"; " +
-            "else echo 'optin none'; fi; [ -f $DEX ] && $CONTROL status 2>/dev/null; exit 0"
-        // Writing into the staged copy is what lets one restart finish an install and an opt-in.
-        const val OPT_IN = "[ -f $STAGED/module.dex ] || [ -f $DEX ] || exit 3; " + PICK_MARKER + "touch \$m && chmod 600 \$m"
+        // A staged copy replaces the active directory at the next boot, so only its marker counts. Anything under the
+        // marker's name counts, as the native loader has it.
+        const val PICK = "if [ -d $STAGED ]; then d=$STAGED; else d=$MODULE; fi; "
+        // On unless turned off. The directory's age against the uptime tells whether this boot has seen it as it is now:
+        // an install creates it and turning back on removes the marker, and both change it.
+        const val STATUS = PICK + "if [ -e \"\$d/$OFF\" ] || [ -L \"\$d/$OFF\" ]; then echo 'alerts off'; " +
+            "else t=\$(stat -c %Y \"\$d\" 2>/dev/null); if [ -n \"\$t\" ]; then echo \"alerts on \$(( \$(date +%s) - t )) \$(cut -d. -f1 /proc/uptime)\"; " +
+            "else echo 'alerts on'; fi; fi; [ -f $DEX ] && $CONTROL status 2>/dev/null; exit 0"
+        // Both copies, so whichever the next boot keeps loads it.
+        const val OPT_IN = "[ -f $STAGED/module.dex ] || [ -f $DEX ] || exit 3; rm -f $MODULE/$OFF $STAGED/$OFF"
+        // Into each copy there is, so the next boot finds it whichever it keeps; exit 3 when there's no copy to keep it in.
+        const val MARK_OFF = "notification_mark_exit=3; for d in $MODULE $STAGED; do [ -d \"\$d\" ] || continue; " +
+            "[ \$notification_mark_exit = 3 ] && notification_mark_exit=0; " +
+            "if [ ! -e \"\$d/$OFF\" ] && [ ! -L \"\$d/$OFF\" ]; then touch \"\$d/$OFF\" && chmod 600 \"\$d/$OFF\" || notification_mark_exit=1; fi; " +
+            "rm -f \"\$d/$LEGACY_ON\" || notification_mark_exit=1; done; "
+        /** Only the record, for a copy that a restart is about to load: whatever runs now goes with that restart. */
+        const val KEEP_OFF = MARK_OFF + "exit \$notification_mark_exit"
         // Turning off the loaded extension and cancelling its next load are independent. The
         // receipt preserves both outcomes even when OFF fails or the control socket is absent.
         const val OPT_OUT = "if [ -f $DEX ]; then $CONTROL OFF 2>/dev/null; notification_off_exit=\$?; else notification_off_exit=3; fi; " +
-            "rm -f $MARKER $STAGED_MARKER; notification_remove_exit=\$?; " +
-            "printf '\\noptout %s %s\\n' \"\$notification_off_exit\" \"\$notification_remove_exit\"; " +
-            "if [ \"\$notification_remove_exit\" -ne 0 ]; then exit \"\$notification_remove_exit\"; fi; exit \"\$notification_off_exit\""
+            MARK_OFF + "printf '\\noptout %s %s\\n' \"\$notification_off_exit\" \"\$notification_mark_exit\"; " +
+            "if [ \"\$notification_mark_exit\" -ne 0 ]; then exit \"\$notification_mark_exit\"; fi; exit \"\$notification_off_exit\""
         const val APPLY = "$CONTROL ALL 2>/dev/null"
         fun noWriteProblem(@Suppress("UNUSED_PARAMETER") result: ToolboxCommandResult): String? = null
         fun exitProblem(result: ToolboxCommandResult): String? = when {
@@ -130,13 +141,13 @@ class NotificationAlertPatchEngine(private val remote: ModuleShell) : Notificati
 private fun statusJson(stdout: String): JsonObject? = stdout.lineSequence().map(String::trim).firstOrNull { it.startsWith("{") }
     ?.let { runCatching { Json.parseToJsonElement(it).jsonObject }.getOrNull() }
 
-/** The first line is the marker; a JSON line means the control client verified SystemUI's identity. */
+/** The first line says whether it was turned off; a JSON line means the control client verified SystemUI's identity. */
 internal fun parseNotificationAlertStatus(stdout: String): NotificationAlertPatchSnapshot {
-    val marker = stdout.lineSequence().map(String::trim).firstOrNull { it.startsWith("optin ") }?.split(' ')
+    val marker = stdout.lineSequence().map(String::trim).firstOrNull { it.startsWith("alerts ") }?.split(' ')
         ?: throw ToolboxException("notification_alert_status_unreadable")
-    val optedIn = marker.getOrNull(1) != "none"
-    val age = marker.getOrNull(1)?.toLongOrNull()
-    val uptime = marker.getOrNull(2)?.toLongOrNull()
+    val optedIn = when (marker.getOrNull(1)) { "on" -> true; "off" -> false; else -> throw ToolboxException("notification_alert_status_unreadable") }
+    val age = marker.getOrNull(2)?.toLongOrNull()
+    val uptime = marker.getOrNull(3)?.toLongOrNull()
     val status = statusJson(stdout)
     return NotificationAlertPatchSnapshot(
         optedIn = optedIn,

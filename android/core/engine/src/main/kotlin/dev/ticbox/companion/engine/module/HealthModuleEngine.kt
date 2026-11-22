@@ -81,7 +81,9 @@ class HealthModuleEngine(
             } catch (problem: Exception) {
                 val reason = (problem as? ToolboxException)?.code ?: "module_operation_failed"
                 val refused = reason in setOf("module_root_required", "module_bridge_update_required", "module_device_unsupported", "magisk_unavailable", "magisk_too_old",
-                    "module_disabled_or_removing", "module_id_conflict", "module_busy", "module_payload_invalid", "magisk_install_failed", "invalid_request", "module_unsafe_path")
+                    "module_disabled_or_removing", "module_id_conflict", "module_busy", "module_payload_invalid", "magisk_install_failed", "invalid_request", "module_unsafe_path",
+                    // Staged, but a restart would load what was turned off, so nothing may follow it.
+                    "module_alerts_off_not_kept")
                 val result = HealthModuleResult(if (submitted.get() && !refused) HealthModuleOutcome.UNCONFIRMED else HealthModuleOutcome.REJECTED, reason)
                 update(selected) { it.copy(phase = HealthModulePhase.UNAVAILABLE, current = false, lastOperation = result) }
                 result

@@ -81,6 +81,9 @@ internal class AgentMagiskModule(private val wire: AgentWire, private val enviro
                     result("UP_TO_DATE", snapshot(catalog, work)); return
                 }
 
+                    // Magisk replaces the staged copy and, at the next boot, the active one. Turning the notification
+                    // control off is the one choice kept there, and an update must never turn it back on.
+                    val alertsOff = optedOut(installed) || optedOut(staged)
                     // No further read of the Bluetooth pipe after acceptance. A lost caller cannot
                     // abort a half-installed module; the bridge drains output until this agent exits.
                     receipt(work, catalog, "UNCONFIRMED")
@@ -92,11 +95,21 @@ internal class AgentMagiskModule(private val wire: AgentWire, private val enviro
                         refusal("magisk_install_failed")
                     }
                     if (image(staged, catalog)?.flag("matchesBundled") != true) refusal("module_install_unconfirmed")
+                    if (alertsOff && !optedOut(staged)) keepOptOut(staged)
                     receipt(work, catalog, "STAGED_REBOOT_REQUIRED")
                     result("STAGED_REBOOT_REQUIRED", snapshot(catalog, work))
                 } finally { directory.toFile().deleteRecursively() }
             }
         }
+    }
+    /** As the native loader reads it: anything under that name. */
+    private fun optedOut(directory: Path): Boolean { safe(directory); return Files.exists(directory.resolve(ALERTS_OFF), LinkOption.NOFOLLOW_LINKS) }
+    private fun keepOptOut(directory: Path) {
+        val marker = directory.resolve(ALERTS_OFF)
+        try {
+            Files.newByteChannel(marker, setOf(StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS),
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------"))).close()
+        } catch (_: IOException) { refusal("module_alerts_off_not_kept") }
     }
     private fun result(outcome: String, state: JsonObject) = wire.json(ToolboxProtocol.RESULT, buildJsonObject {
         put("outcome", outcome); put("snapshot", state)
@@ -157,6 +170,8 @@ internal class AgentMagiskModule(private val wire: AgentWire, private val enviro
         Files.move(temporary, work.resolve("last-install.json"), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
     }
     companion object {
+        /** Left by turning the notification control off; without it SystemUI loads the extension. */
+        internal const val ALERTS_OFF = "notification-alerts.disabled"
         internal fun verifyZip(path: Path, catalog: MagiskModuleProtocol.Catalog) {
             fun invalid(): Nothing = throw ModuleProblem("module_payload_invalid")
             if (Files.size(path) != catalog.bytes || Files.newInputStream(path).use { MagiskModuleProtocol.sha256(it, MagiskModuleProtocol.MAX_ZIP_BYTES.toLong()) } != catalog.sha256) invalid()
