@@ -3,6 +3,7 @@ package dev.ticbox.companion.ui.health
 import androidx.lifecycle.viewModelScope
 import dev.ticbox.companion.api.ConnectionPhase
 import dev.ticbox.companion.api.HealthRecordSource
+import dev.ticbox.companion.api.LocalHealthSyncMode
 import dev.ticbox.companion.api.LocalHealthSyncPhase
 import dev.ticbox.companion.api.LocalHealthSyncState
 import dev.ticbox.companion.ui.CompanionDependencies
@@ -50,6 +51,8 @@ data class HealthUiState(
     val onlyMetrics: Set<HealthMetric>? = null,
     /** Likewise for logs. */
     val onlyLogs: Set<HealthLog>? = null,
+    /** The first sync left older details on the watch; null while a full sync brings them over. */
+    val deferredBeforeMillis: Long? = null,
 ) {
     val earliest: LocalDate
         get() = today.minusYears(10)
@@ -112,6 +115,7 @@ class HealthViewModel(
                     days,
                     loading,
                     syncStatus(source, sync),
+                    deferredBeforeMillis = deferredBefore(source, sync),
                 )
             }
             .combine(
@@ -129,6 +133,7 @@ class HealthViewModel(
                     today = today(),
                     hasSource = source.value != null,
                     sync = syncStatus(source.value, syncState.value),
+                    deferredBeforeMillis = deferredBefore(source.value, syncState.value),
                     onlyMetrics =
                         emptySet<HealthMetric>().takeIf {
                             dependencies.preferences.hideEmptyHealthMetrics.value
@@ -181,6 +186,14 @@ class HealthViewModel(
     fun syncFromWatch() {
         command(SYNC) { session ->
             session.services.localHealth.sync()
+            null
+        }
+    }
+
+    /** Also brings over what the first sync left on the watch. */
+    fun syncEverything() {
+        command(SYNC) { session ->
+            session.services.localHealth.sync(LocalHealthSyncMode.FULL)
             null
         }
     }
@@ -288,6 +301,19 @@ class HealthViewModel(
                 if (!linkReady && state.lastSuccessAtMillis == null) HealthSyncStatus.Disconnected
                 else HealthSyncStatus.Synced(state.lastSuccessAtMillis)
         }
+    }
+
+    private fun deferredBefore(
+        source: HealthRecordSource.LocalDevice?,
+        sync: Pair<LocalHealthSyncState, Boolean>?,
+    ): Long? {
+        val state = sync?.first?.takeIf { source != null } ?: return null
+        val running =
+            state.phase == LocalHealthSyncPhase.CONNECTING ||
+                state.phase == LocalHealthSyncPhase.READING ||
+                state.phase == LocalHealthSyncPhase.RETRYING
+        val full = running && state.mode == LocalHealthSyncMode.FULL
+        return state.deferredBeforeMillis.takeUnless { full }
     }
 
     companion object {

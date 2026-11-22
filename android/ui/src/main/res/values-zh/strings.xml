@@ -311,6 +311,11 @@
     <string name="duration_under_minute">不足 1 分钟</string>
     <string name="time_range">%1$s – %2$s</string>
     <string name="health_sync_now">从手表同步</string>
+    <plurals name="health_window_title">
+        <item quantity="other">只同步了最近 %1$d 天的数据</item>
+    </plurals>
+    <string name="health_window_body">为了让首次同步更快，%1$s 之前的健康数据和运动明细还只在手表上。全部同步可能需要几分钟。</string>
+    <string name="health_window_action">全部同步</string>
     <string name="health_synced_recently">最近同步</string>
     <string name="health_synced_at">同步于%1$s</string>
     <string name="health_not_synced">尚未同步。</string>

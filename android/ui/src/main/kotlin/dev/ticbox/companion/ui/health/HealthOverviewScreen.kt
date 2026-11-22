@@ -22,10 +22,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.ticbox.companion.api.LocalHealthSyncClient
 import dev.ticbox.companion.ui.R
 import dev.ticbox.companion.ui.bridge.LocalBridgeBanner
 import dev.ticbox.companion.ui.bridge.rememberLocalBridgeStatus
 import dev.ticbox.companion.ui.common.currentLocale
+import dev.ticbox.companion.ui.common.formatDateTime
 import dev.ticbox.companion.ui.common.formatNumber
 import dev.ticbox.companion.ui.designsystem.ActionIcon
 import dev.ticbox.companion.ui.designsystem.AppIcons
@@ -36,6 +38,7 @@ import dev.ticbox.companion.ui.designsystem.NavigationRow
 import dev.ticbox.companion.ui.designsystem.PageList
 import dev.ticbox.companion.ui.designsystem.PageScaffold
 import dev.ticbox.companion.ui.designsystem.Reveal
+import dev.ticbox.companion.ui.designsystem.StatusBanner
 import dev.ticbox.companion.ui.navigation.HealthDetailRoute
 import dev.ticbox.companion.ui.navigation.HealthLogRoute
 import dev.ticbox.companion.ui.navigation.PairingRoute
@@ -93,6 +96,18 @@ fun HealthOverviewScreen(
             if (bridge.needsSetup) {
                 item(key = "bridge") {
                     LocalBridgeBanner(bridge, R.string.bridge_needed_health, navigate)
+                }
+            }
+            state.deferredBeforeMillis?.let { before ->
+                item(key = "window") {
+                    val days = LocalHealthSyncClient.FIRST_SYNC_WINDOW_DAYS
+                    val since = formatDateTime(before, currentLocale())
+                    StatusBanner(
+                        stringResource(R.string.health_window_body, since),
+                        title = pluralStringResource(R.plurals.health_window_title, days, days),
+                        actionLabel = stringResource(R.string.health_window_action),
+                        onAction = viewModel::syncEverything,
+                    )
                 }
             }
             item(key = "date") {

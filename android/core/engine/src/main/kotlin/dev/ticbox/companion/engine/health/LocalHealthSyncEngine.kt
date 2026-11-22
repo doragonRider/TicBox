@@ -18,7 +18,9 @@ data class LocalHealthCheckpoint(val afterId: Long? = null, val upperId: Long? =
     /** SPORT uses opaque HASH keys; afterId is the consumed occurrence count at afterKey. */
     val afterKey: String? = null, val upperKey: String? = null,
     val hasBaseline: Boolean = false,
-    val receiver: String? = null, val run: String? = null, val full: Boolean = false)
+    val receiver: String? = null, val run: String? = null, val full: Boolean = false,
+    /** How far back a first sync reaches; null asks for everything. */
+    val window: Long? = null)
 
 interface LocalHealthStore : HealthRecordReader {
     suspend fun begin(source: HealthRecordSource.LocalDevice, table: LocalHealthTable): LocalHealthCheckpoint
@@ -71,6 +73,8 @@ class LocalHealthSyncEngine(scope: CoroutineScope, private val store: LocalHealt
     private var generation = 0L
     private var work: Job? = null
     private var closed = false
+    /** Per table, from the last reply that table gave; a table not read this run keeps its earlier answer. */
+    private val deferred = mutableMapOf<LocalHealthTable, Long>()
 
     /** A new link syncs at once, unless the last successful sync is recent. */
     suspend fun attach(next: LocalHealthLink?) {
@@ -79,12 +83,13 @@ class LocalHealthSyncEngine(scope: CoroutineScope, private val store: LocalHealt
             if (closed || link == next) return
             generation++; work?.cancel(); work = null; link = next
             val previous = state.value
+            if (next != null && previous.source != next.source) deferred.clear()
             val remembered = previous.lastSuccessAtMillis.takeIf { next == null || previous.source == next.source }
             mutableState.value = LocalHealthSyncState(
                 phase = if (next == null) LocalHealthSyncPhase.DISCONNECTED else LocalHealthSyncPhase.IDLE,
                 source = next?.source, sessionId = next?.sessionId ?: 0,
                 lastSuccessAtMillis = listOfNotNull(remembered, stored).maxOrNull(),
-                lastRun = previous.lastRun)
+                lastRun = previous.lastRun, deferredBeforeMillis = deferred.values.minOrNull())
             if (next != null && isStale()) start()
         }
     }
@@ -161,7 +166,7 @@ class LocalHealthSyncEngine(scope: CoroutineScope, private val store: LocalHealt
                 pagesCommitted = pages, recordsCommitted = records, reason = reason,
                 lastSuccessAtMillis = if (phase == LocalHealthSyncPhase.COMPLETED || phase == LocalHealthSyncPhase.PARTIAL)
                     now() else state.value.lastSuccessAtMillis,
-                lastRun = finished ?: state.value.lastRun)
+                lastRun = finished ?: state.value.lastRun, deferredBeforeMillis = deferred.values.minOrNull())
         }
         /** One line per table, each stage its own field, so `adb logcat` shows a whole run at once. */
         fun logTiming(timing: LocalHealthSyncTiming, phase: LocalHealthSyncPhase) {
@@ -202,7 +207,8 @@ class LocalHealthSyncEngine(scope: CoroutineScope, private val store: LocalHealt
             val stage = table.wireName
             var checkpoint = stopwatch.measure(stage, "checkpoint") { store.begin(current.source, table) }.let {
                 it.copy(receiver = current.source.localUserId, run = runId,
-                    full = mode == LocalHealthSyncMode.FULL || !it.hasBaseline)
+                    full = mode == LocalHealthSyncMode.FULL || !it.hasBaseline,
+                    window = if (mode == LocalHealthSyncMode.FULL) null else LocalHealthSyncClient.FIRST_SYNC_WINDOW_DAYS * 86_400_000L)
             }
             var failures = 0
             while (true) {
@@ -252,12 +258,14 @@ class LocalHealthSyncEngine(scope: CoroutineScope, private val store: LocalHealt
                             val nextCheckpoint = LocalHealthCheckpoint(next ?: checkpoint.afterId,
                                 page.upperId ?: checkpoint.upperId, !page.complete && !stalled, checkpoint.partial || page.partial || stalled,
                                 page.nextKey ?: checkpoint.afterKey, page.upperKey ?: checkpoint.upperKey,
-                                hasBaseline = true, receiver = checkpoint.receiver, run = checkpoint.run, full = checkpoint.full)
+                                hasBaseline = true, receiver = checkpoint.receiver, run = checkpoint.run, full = checkpoint.full,
+                                window = checkpoint.window)
                             stopwatch.measure(stage, "save") { store.commit(current.source, table, page, nextCheckpoint) }
                             if (page.batchId == null || committedBatches.add("${table.wireName}:${page.batchId}")) {
                                 pages++; records += page.rows.size
                             }
                             checkpoint = nextCheckpoint
+                            synchronized(this) { page.deferredBefore?.let { deferred[table] = it } ?: deferred.remove(table) }
                             log("page_committed", page = page)
                             stopwatch.measure(stage, "ack") { withTimeout(30_000) { open.acknowledge(table, page) } }
                             failures = 0

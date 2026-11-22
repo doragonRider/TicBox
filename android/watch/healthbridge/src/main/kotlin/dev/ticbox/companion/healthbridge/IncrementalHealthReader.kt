@@ -47,16 +47,19 @@ internal class IncrementalHealthReader(
             store.acknowledge(receiver, table, batch)
         } else {
             val run = request.text("run") ?: return queryError("run_missing")
-            var capture = store.begin(receiver, table, run, request.flag("full") == true, window(table, run, cancellation)) { stamp(table, run, cancellation) }
+            var capture = store.begin(receiver, table, run, request.flag("full") == true, window(table, run, cancellation),
+                request.number("window")?.takeIf { it > 0 }) { stamp(table, run, cancellation) }
             if (!store.hasBatch(receiver, table)) {
                 // Pages without changes have nothing to deliver, so they needn't cost a round trip.
                 val deadline = System.nanoTime() + READ_BUDGET_NANOS
                 while (!capture.done && !store.hasPending(receiver, table) && System.nanoTime() < deadline) {
                     cancellation.throwIfCanceled()
                     if (capture.scopes.isNotEmpty()) {
-                        val page = LocalHealthProtocol.page(read(capture.scopes.first().request(table), cancellation))
+                        val scope = capture.scopes.first()
+                        val page = LocalHealthProtocol.page(read(scope.request(table), cancellation))
                         if (page.error != null) return queryError(page.error!!)
-                        capture = store.observe(receiver, table, capture, page)
+                        capture = if (scope.probe) store.probed(receiver, table, capture, page.rows.isNotEmpty())
+                            else store.observe(receiver, table, capture, page)
                     } else {
                         val selected = checkNotNull(capture.journal)
                         val page = try {

@@ -311,6 +311,12 @@
     <string name="duration_under_minute">Under 1 min</string>
     <string name="time_range">%1$s – %2$s</string>
     <string name="health_sync_now">Sync from watch</string>
+    <plurals name="health_window_title">
+        <item quantity="one">Only the last %1$d day was synced</item>
+        <item quantity="other">Only the last %1$d days were synced</item>
+    </plurals>
+    <string name="health_window_body">To keep the first sync quick, health readings and workout details from before %1$s are still only on the watch. Syncing everything can take a few minutes.</string>
+    <string name="health_window_action">Sync everything</string>
     <string name="health_synced_recently">Synced just now</string>
     <string name="health_synced_at">Synced %1$s</string>
     <string name="health_not_synced">Not synced yet.</string>
