@@ -48,6 +48,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable data object PhotoFaceRoute
 
+@Serializable data object PhotoFaceEditorRoute
+
 @Serializable data object CallingRoute
 
 /** [edit] names what the watch asked to edit; [sequence] keeps one request from opening twice. */

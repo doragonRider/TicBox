@@ -30,7 +30,9 @@ import dev.ticbox.companion.ui.diagnostics.DiagnosticsDetailScreen
 import dev.ticbox.companion.ui.diagnostics.DiagnosticsScreen
 import dev.ticbox.companion.ui.diagnostics.ObservationsScreen
 import dev.ticbox.companion.ui.diagnostics.StoredRecordsScreen
+import dev.ticbox.companion.ui.faces.PhotoFaceEditorScreen
 import dev.ticbox.companion.ui.faces.PhotoFaceScreen
+import dev.ticbox.companion.ui.faces.PhotoFaceViewModel
 import dev.ticbox.companion.ui.faces.WatchFacesScreen
 import dev.ticbox.companion.ui.finding.FindDevicesScreen
 import dev.ticbox.companion.ui.health.HealthDetailScreen
@@ -111,7 +113,16 @@ fun CompanionNavHost(navController: NavHostController, modifier: Modifier = Modi
                 SetupScreen(onBack = back, onDone = { navController.returnToWatchHome() })
             }
             page<WatchFacesRoute>(motion) { WatchFacesScreen(back, navigate) }
-            page<PhotoFaceRoute>(motion) { PhotoFaceScreen(back) }
+            page<PhotoFaceRoute>(motion) { entry ->
+                PhotoFaceScreen(photoFaceViewModel(navController, entry), back) {
+                    navigate(PhotoFaceEditorRoute)
+                }
+            }
+            page<PhotoFaceEditorRoute>(motion) { entry ->
+                PhotoFaceEditorScreen(photoFaceViewModel(navController, entry), back) {
+                    navController.popBackStack<PhotoFaceEditorRoute>(inclusive = true)
+                }
+            }
             page<NotificationsRoute>(motion) { NotificationsScreen(back, navigate) }
             page<WatchPreferencesRoute>(motion) { WatchPreferencesScreen(back, navigate) }
             page<HealthMonitoringRoute>(motion) { HealthMonitoringScreen(back, navigate) }
@@ -233,6 +244,16 @@ private fun healthViewModel(
 ): HealthViewModel {
     val graphEntry = remember(entry) { navController.getBackStackEntry<HealthGraph>() }
     return companionViewModel(graphEntry) { HealthViewModel(it) }
+}
+
+/** The photo face page and its editor share one view model, which holds the photo being edited. */
+@Composable
+private fun photoFaceViewModel(
+    navController: NavHostController,
+    entry: NavBackStackEntry,
+): PhotoFaceViewModel {
+    val pageEntry = remember(entry) { navController.getBackStackEntry<PhotoFaceRoute>() }
+    return companionViewModel(pageEntry) { PhotoFaceViewModel(it) }
 }
 
 /** The overview and the workout list share one view model, so the list is read only once. */
