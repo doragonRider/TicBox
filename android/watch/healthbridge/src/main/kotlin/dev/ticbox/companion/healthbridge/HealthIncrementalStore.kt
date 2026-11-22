@@ -99,6 +99,7 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
         db.delete("metadata", "name=?", arrayOf(fallbackKey(receiver, table)))
     }
     private fun deferredKey(receiver: String, table: LocalHealthTable) = "deferred_before:$receiver:${table.wireName}"
+    private fun batchKey(receiver: String, table: LocalHealthTable) = "batch_bound:$receiver:${table.wireName}"
     /** Rows older than this were never sent to the receiver; set by a first-sync window, cleared by a complete resend. */
     fun deferredBefore(receiver: String, table: LocalHealthTable) = metadata(deferredKey(receiver, table))?.toLongOrNull()
     private fun lowestObserved(receiver: String, table: LocalHealthTable) =
@@ -215,7 +216,7 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
         val journal = checkNotNull(capture.journal)
         val rows = (page["rows"] as? JsonArray).orEmpty().map { LocalHealthRow(it as JsonObject) }
         check(rows.none { it.partial })
-        rows.forEach { row -> observeRow(receiver, table, capture, HealthScanScope(), row) }
+        observeRows(receiver, table, capture, HealthScanScope(), prepare(table, rows))
         val missing = (page["missingKeys"] as? JsonArray).orEmpty().map { (it as JsonPrimitive).content }
         missing.forEach { key ->
             it.rawQuery("SELECT row_key,source_id,payload FROM observations WHERE receiver=? AND kind=? AND row_key=? AND present=1", args(receiver, table) + key).use { c ->
@@ -331,11 +332,15 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
         result.sortedWith(compareBy<Pair<Long, Long>> { it.second }.thenBy { it.first }).take(8).map { it.first }
     }
 
-    fun observe(receiver: String, table: LocalHealthTable, capture: HealthCapture, page: LocalHealthPage): HealthCapture = transaction {
-        val scope = capture.scopes.first(); var changed = scope.changed
-        page.rows.forEach { row ->
-            if (observeRow(receiver, table, capture, scope, row)) changed++
-        }
+    /** Keys and fingerprints of a page's rows, worked out before its transaction; hashing is most of the work per row. */
+    fun prepare(table: LocalHealthTable, rows: List<LocalHealthRow>): List<PreparedRow> = rows.map { row ->
+        PreparedRow(row, LocalHealthFingerprint.key(table, row.raw), if (row.partial) null else LocalHealthFingerprint.of(row.raw))
+    }
+
+    fun observe(receiver: String, table: LocalHealthTable, capture: HealthCapture, page: LocalHealthPage,
+        prepared: List<PreparedRow> = prepare(table, page.rows)): HealthCapture = transaction {
+        val scope = capture.scopes.first()
+        val changed = scope.changed + observeRows(receiver, table, capture, scope, prepared)
         val remaining = scope.remaining?.let { budget -> (budget - page.rows.size).coerceAtLeast(0) }
         val stalled = !page.complete && (if (table == LocalHealthTable.SPORT)
             page.nextKey == scope.afterKey && page.nextId == scope.afterId
@@ -383,30 +388,59 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
         save(receiver, table, next); next
     }
 
-    private fun observeRow(receiver: String, table: LocalHealthTable, capture: HealthCapture, scope: HealthScanScope, row: LocalHealthRow): Boolean {
-        val key = LocalHealthFingerprint.key(table, row.raw)
-        val fingerprint = if (row.partial) null else LocalHealthFingerprint.of(row.raw)
-        val previous = db.rawQuery("SELECT fingerprint,present FROM observations WHERE receiver=? AND kind=? AND row_key=?", args(receiver, table) + key).use { c ->
-            if (c.moveToFirst()) (if (c.isNull(0)) null else c.getString(0)) to (c.getInt(1) != 0) else null
+    /**
+     * Compares a page with what was observed before and queues what the phone must receive; returns how many rows
+     * changed. The page's earlier observations come from one query, and its writes use statements compiled once.
+     */
+    private fun observeRows(receiver: String, table: LocalHealthTable, capture: HealthCapture, scope: HealthScanScope,
+        rows: List<PreparedRow>): Int {
+        if (rows.isEmpty()) return 0
+        val previous = HashMap<String, Pair<String?, Boolean>>(rows.size * 2)
+        rows.map { it.key }.distinct().chunked(KEYS_PER_STATEMENT).forEach { keys ->
+            db.rawQuery("SELECT row_key,fingerprint,present FROM observations WHERE receiver=? AND kind=? AND row_key IN (${keys.joinToString(",") { "?" }})",
+                args(receiver, table) + keys).use { c ->
+                while (c.moveToNext()) previous[c.getString(0)] = (if (c.isNull(1)) null else c.getString(1)) to (c.getInt(2) != 0)
+            }
         }
-        val different = previous == null || !previous.second || fingerprint == null || previous.first != fingerprint
-        if (different || capture.resend) enqueue(receiver, table, key, row.raw)
-        if (different && table == LocalHealthTable.FITNESS_RECORD) row.id?.let { parent ->
-            db.execSQL("UPDATE children SET last_checked=0,same_count=0 WHERE receiver=? AND parent_id=?", arrayOf<Any?>(receiver, parent))
+        val keepsPayload = table == LocalHealthTable.SESSION || table == LocalHealthTable.FITNESS_RECORD || table == LocalHealthTable.SPORT
+        val seen = mutableListOf<String>(); var changed = 0
+        db.compileStatement("INSERT OR REPLACE INTO pending(receiver,kind,row_key,payload) VALUES (?,?,?,?)").use { queue ->
+            db.compileStatement("INSERT OR REPLACE INTO observations(receiver,kind,row_key,source_id,parent_id,fingerprint,present,last_changed,seen,payload) " +
+                "VALUES (?,?,?,?,?,?,1,?,?,?)").use { observed ->
+                rows.forEach { prepared ->
+                    val (row, key, fingerprint) = prepared
+                    val before = previous[key]
+                    val different = before == null || !before.second || fingerprint == null || before.first != fingerprint
+                    if (different || capture.resend) {
+                        queue.bindString(1, receiver); queue.bindString(2, table.wireName); queue.bindString(3, key); queue.bindString(4, prepared.payload)
+                        check(queue.executeInsert() != -1L)
+                    }
+                    if (!different) { if (scope.audit) seen += key; return@forEach }
+                    if (table == LocalHealthTable.FITNESS_RECORD) row.id?.let { parent ->
+                        db.execSQL("UPDATE children SET last_checked=0,same_count=0 WHERE receiver=? AND parent_id=?", arrayOf<Any?>(receiver, parent))
+                    }
+                    observed.clearBindings()
+                    observed.bindString(1, receiver); observed.bindString(2, table.wireName); observed.bindString(3, key)
+                    row.id?.let { observed.bindLong(4, it) }; row.number("RECORD_ID")?.let { observed.bindLong(5, it) }
+                    fingerprint?.let { observed.bindString(6, it) }
+                    // A session a full capture sees for the first time hasn't changed. Counting it would stretch the recent POINT
+                    // range back to the oldest such session on every sync for a day, although this first sync already read those
+                    // points or left them behind on purpose under its window.
+                    observed.bindLong(7, if (before == null && capture.full && table == LocalHealthTable.SESSION) 0L else now())
+                    observed.bindString(8, scope.token)
+                    if (keepsPayload) observed.bindString(9, prepared.payload)
+                    check(observed.executeInsert() != -1L)
+                    // A key twice on one page compares its second row with the first, as row-by-row writes would.
+                    previous[key] = fingerprint to true
+                    changed++
+                }
+            }
         }
-        if (!different) {
-            if (scope.audit) db.execSQL("UPDATE observations SET seen=? WHERE receiver=? AND kind=? AND row_key=?", arrayOf(scope.token, receiver, table.wireName, key))
-        } else db.insertWithOnConflict("observations", null, ContentValues().apply {
-            put("receiver", receiver); put("kind", table.wireName); put("row_key", key); put("source_id", row.id)
-            put("parent_id", row.number("RECORD_ID")); put("fingerprint", fingerprint); put("present", 1)
-            // A session a full capture sees for the first time hasn't changed. Counting it would stretch the recent POINT
-            // range back to the oldest such session on every sync for a day, although this first sync already read those
-            // points or left them behind on purpose under its window.
-            put("last_changed", if (previous == null && capture.full && table == LocalHealthTable.SESSION) 0L else now()); put("seen", scope.token)
-            if (table == LocalHealthTable.SESSION || table == LocalHealthTable.FITNESS_RECORD || table == LocalHealthTable.SPORT)
-                put("payload", row.raw.toString())
-        }, SQLiteDatabase.CONFLICT_REPLACE).also { check(it != -1L) }
-        return different
+        seen.distinct().chunked(KEYS_PER_STATEMENT).forEach { keys ->
+            db.execSQL("UPDATE observations SET seen=? WHERE receiver=? AND kind=? AND row_key IN (${keys.joinToString(",") { "?" }})",
+                arrayOf<Any?>(scope.token, receiver, table.wireName, *keys.toTypedArray()))
+        }
+        return changed
     }
 
     private fun enqueue(receiver: String, table: LocalHealthTable, key: String, row: JsonObject) {
@@ -443,21 +477,21 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
             if (c.moveToFirst()) LocalHealthProtocol.parse(c.getString(0).toByteArray()) else null
         }
         if (existing != null) return@transaction JsonObject(existing.toMutableMap().apply { if (!capture.done) put("complete", JsonPrimitive(false)) })
-        val epoch = it.rawQuery("SELECT value FROM metadata WHERE name='epoch'", null).use { c -> c.moveToFirst(); c.getString(0) }
-        val rows = mutableListOf<JsonObject>(); var bytes = 0
+        val epoch = JsonPrimitive(it.rawQuery("SELECT value FROM metadata WHERE name='epoch'", null).use { c -> c.moveToFirst(); c.getString(0) }).toString()
+        val rows = mutableListOf<JsonElement>(); var bytes = 0; var last = 0L
         it.rawQuery("SELECT revision,row_key,payload FROM pending WHERE receiver=? AND kind=? ORDER BY revision LIMIT ?", args(receiver, table) + (pageRows + 1).toString()).use { c ->
             while (c.moveToNext()) {
                 if (rows.size >= pageRows) break
-                val raw = LocalHealthProtocol.parse(c.getString(2).toByteArray())
-                val row = JsonObject(raw.toMutableMap().apply {
-                    put("bridgeRevision", JsonPrimitive(c.getLong(0).toString())); put("bridgeEpoch", JsonPrimitive(epoch)); put("bridgeKey", JsonPrimitive(c.getString(1)))
-                })
-                val size = row.toString().toByteArray(Charsets.UTF_8).size
+                // The stored object text with the delivery fields appended, as adding them to the parsed row would print it.
+                val payload = c.getString(2)
+                val fields = "\"bridgeRevision\":\"${c.getLong(0)}\",\"bridgeEpoch\":$epoch,\"bridgeKey\":${JsonPrimitive(c.getString(1))}}"
+                val row = if (payload == "{}") "{$fields" else payload.substring(0, payload.length - 1) + "," + fields
+                val size = utf8Length(row)
                 if (bytes + size > LocalHealthProtocol.MAX_FRAME_BYTES - 8192) {
                     if (rows.isEmpty()) return@transaction queryError("row_exceeds_budget")
                     break
                 }
-                rows += row; bytes += size
+                rows += LocalHealthProtocol.storedRow(row); bytes += size; last = c.getLong(0)
             }
         }
         val total = it.rawQuery("SELECT COUNT(*) FROM pending WHERE receiver=? AND kind=?", args(receiver, table)).use { c -> c.moveToFirst(); c.getLong(0) }
@@ -478,6 +512,8 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
             }) }
         }
         it.execSQL("INSERT INTO batches VALUES (?,?,?,?)", arrayOf<Any?>(receiver, table.wireName, batchId, result.toString()))
+        // A batch is the table's queued rows up to its last revision, and later rows get higher ones; its ACK deletes by that.
+        setMetadata(batchKey(receiver, table), "$batchId $last")
         result
     }
     fun hasBatch(receiver: String, table: LocalHealthTable) = db.rawQuery("SELECT 1 FROM batches WHERE receiver=? AND kind=?", args(receiver, table)).use { it.moveToFirst() }
@@ -486,6 +522,14 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
         db.rawQuery("SELECT COUNT(*) FROM pending WHERE receiver=? AND kind=?", args(receiver, table)).use { it.moveToFirst(); it.getLong(0) }
 
     fun acknowledge(receiver: String, table: LocalHealthTable, batch: String): JsonObject = transaction {
+        val bound = metadata(batchKey(receiver, table))?.split(' ')?.takeIf { parts -> parts.size == 2 && parts[0] == batch }?.get(1)?.toLongOrNull()
+        if (bound != null) {
+            if (it.delete("batches", "receiver=? AND kind=? AND batch_id=?", args(receiver, table) + batch) > 0)
+                it.execSQL("DELETE FROM pending WHERE receiver=? AND kind=? AND revision<=?", arrayOf<Any?>(receiver, table.wireName, bound))
+            it.delete("metadata", "name=?", arrayOf(batchKey(receiver, table)))
+            return@transaction buildJsonObject { put("op", "ack"); put("batch", batch); put("committed", true) }
+        }
+        // A batch made before its bound was kept names its rows only in its payload.
         val stored = it.rawQuery("SELECT payload FROM batches WHERE receiver=? AND kind=? AND batch_id=?", args(receiver, table) + batch).use { c ->
             if (c.moveToFirst()) LocalHealthProtocol.parse(c.getString(0).toByteArray()) else null
         }
@@ -506,5 +550,29 @@ internal class HealthIncrementalStore(context: Context, name: String = "health-i
         private const val JOURNAL_AUDIT_MILLIS = DAY
         /** The tables big enough for a first sync to leave older rows behind. */
         private val WINDOWED = setOf(LocalHealthTable.POINT, LocalHealthTable.FITNESS_POINT)
+        /** Keys per IN list, well under SQLite's 999 bound parameters. */
+        private const val KEYS_PER_STATEMENT = 500
+
+        /** The UTF-8 size of [text] without encoding it; a lone surrogate encodes as one replacement byte. */
+        private fun utf8Length(text: String): Int {
+            var bytes = 0; var index = 0
+            while (index < text.length) {
+                val char = text[index]
+                bytes += when {
+                    char.code < 0x80 -> 1
+                    char.code < 0x800 -> 2
+                    char.isHighSurrogate() && index + 1 < text.length && text[index + 1].isLowSurrogate() -> { index++; 4 }
+                    char.isSurrogate() -> 1
+                    else -> 3
+                }
+                index++
+            }
+            return bytes
+        }
     }
+}
+
+/** A source row with what the ledger compares it by; its delivery text is made only when it is queued or kept. */
+internal data class PreparedRow(val row: LocalHealthRow, val key: String, val fingerprint: String?) {
+    val payload: String by lazy(LazyThreadSafetyMode.NONE) { row.raw.toString() }
 }

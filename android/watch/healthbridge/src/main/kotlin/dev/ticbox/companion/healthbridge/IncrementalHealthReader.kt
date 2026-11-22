@@ -20,8 +20,9 @@ internal class IncrementalHealthReader(
         { cancellation -> if (BridgeSettings.rootFitnessEnabled(context)) RootFitnessPageReader(context).stamp(cancellation) else null }, RootHealthJournalReader(context))
 
     private var stamped: Pair<String, String?>? = null
-    /** Where the last reply or read-ahead spent its time, for the log: reading the source and this side's ledger. */
+    /** Where the last reply or read-ahead spent its time, for the log: reading the source, hashing rows, the ledger. */
     private var sourceNanos = 0L
+    private var hashNanos = 0L
     private var ledgerNanos = 0L
     var lastStages = ""
         private set
@@ -29,7 +30,7 @@ internal class IncrementalHealthReader(
         val started = System.nanoTime()
         try { return block() } finally { into(System.nanoTime() - started) }
     }
-    private fun stages(vararg extra: Pair<String, Long>) = (listOf("source" to sourceNanos, "ledger" to ledgerNanos) + extra)
+    private fun stages(vararg extra: Pair<String, Long>) = (listOf("source" to sourceNanos, "hash" to hashNanos, "ledger" to ledgerNanos) + extra)
         .joinToString(" ") { (name, nanos) -> "$name=${nanos / 1_000_000}ms" }
     private var journalRun: String? = null
     private val journalWindows = mutableMapOf<String, HealthJournalWindow?>()
@@ -49,7 +50,7 @@ internal class IncrementalHealthReader(
     }
 
     fun handle(request: JsonObject, cancellation: CancellationSignal): JsonObject = try {
-        sourceNanos = 0; ledgerNanos = 0; lastStages = ""
+        sourceNanos = 0; hashNanos = 0; ledgerNanos = 0; lastStages = ""
         cancellation.throwIfCanceled()
         val table = tables.firstOrNull { it.wireName == request.text("table") }
             ?: return queryError("unsupported_table")
@@ -96,22 +97,18 @@ internal class IncrementalHealthReader(
                 val scope = capture.scopes.first()
                 val page = timed({ sourceNanos += it }) { LocalHealthProtocol.page(read(scope.request(table, store.pageRows), cancellation)) }
                 if (page.error != null) return capture to queryError(page.error!!)
-                capture = timed({ ledgerNanos += it }) {
-                    if (scope.probe) store.probed(receiver, table, capture, page.rows.isNotEmpty()) else store.observe(receiver, table, capture, page)
+                capture = if (scope.probe) timed({ ledgerNanos += it }) { store.probed(receiver, table, capture, page.rows.isNotEmpty()) }
+                else {
+                    val prepared = timed({ hashNanos += it }) { store.prepare(table, page.rows) }
+                    timed({ ledgerNanos += it }) { store.observe(receiver, table, capture, page, prepared) }
                 }
             } else {
                 val selected = checkNotNull(capture.journal)
+                // A finished baseline keeps the log head read before it, with no second read of the window: the next run checks
+                // its cursor against the window anyway and starts over if the log was cut, rebuilt or replaced meanwhile.
+                if (selected.baseline) { capture = store.finishJournal(receiver, table, capture); continue }
                 val page = try {
-                    if (selected.baseline) {
-                        val current = journal?.window(table, cancellation)
-                        if (current == null) null
-                        else if (current.epoch != selected.position.epoch || current.generation != selected.position.generation ||
-                            selected.upper !in current.floor..current.head) {
-                            capture = store.resetJournal(receiver, table, capture, current); continue
-                        } else {
-                            capture = store.finishJournal(receiver, table, capture); continue
-                        }
-                    } else timed({ sourceNanos += it }) { journal?.page(table, selected.position, selected.upper, cancellation) }
+                    timed({ sourceNanos += it }) { journal?.page(table, selected.position, selected.upper, cancellation) }
                 } catch (cancelled: android.os.OperationCanceledException) { throw cancelled }
                 catch (_: Exception) { null }
                 val current = page?.let(HealthJournalWindow::parse)
@@ -137,7 +134,7 @@ internal class IncrementalHealthReader(
             val receiver = request.text("receiver") ?: return
             val run = request.text("run") ?: return
             val capture = begin(request, table, receiver, run, cancellation)
-            sourceNanos = 0; ledgerNanos = 0
+            sourceNanos = 0; hashNanos = 0; ledgerNanos = 0
             val started = android.os.SystemClock.elapsedRealtime()
             // The batch on its way still counts as pending until its ACK, so this stops one page ahead.
             val (next, error) = fill(receiver, table, run, capture, cancellation) {
@@ -166,7 +163,7 @@ internal class IncrementalHealthReader(
 
 private fun sourceReader(context: Context): (JsonObject, CancellationSignal) -> JsonObject {
     val provider = HealthProviderReader(context.contentResolver, healthProviderVersion(context, HealthProviderReader.URI),
-        healthProviderVersion(context, SportProviderReader.URI))
+        healthProviderVersion(context, SportProviderReader.URI), framed = false)
     val fitness = RootFitnessPageReader(context)
     return { request, cancellation ->
         if (LocalHealthTable.entries.firstOrNull { it.wireName == request.text("table") }?.privateFitness == true) {

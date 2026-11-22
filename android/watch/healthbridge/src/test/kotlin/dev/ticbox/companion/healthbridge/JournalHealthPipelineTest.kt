@@ -106,8 +106,10 @@ class JournalHealthPipelineTest {
         assertEquals(1, cycle().size)
     }
 
+    /** The reply as the phone reads it off the wire. */
     private fun changes(run: String, receiver: String = "receiver", full: Boolean = false): JsonObject =
-        reader.handle(LocalHealthProtocol.changes(table, receiver, run, full), signal).also { assertNull(it.text("error"), it.toString()) }
+        LocalHealthProtocol.parse(reader.handle(LocalHealthProtocol.changes(table, receiver, run, full), signal).toString().toByteArray())
+            .also { assertNull(it.text("error"), it.toString()) }
     private fun ack(batch: JsonObject, receiver: String = "receiver") =
         reader.handle(LocalHealthProtocol.acknowledge(receiver, table, batch.text("batch")!!), signal)
     private fun cycle(receiver: String = "receiver", full: Boolean = false): List<JsonObject> {

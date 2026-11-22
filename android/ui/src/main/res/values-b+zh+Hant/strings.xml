@@ -433,7 +433,7 @@
     <string name="diagnostics_records_saved">已儲存記錄</string>
     <string name="diagnostics_last_success">最近成功</string>
     <string name="diagnostics_sync_timing">上次同步耗時</string>
-    <string name="diagnostics_sync_timing_note">checkpoint 為讀取續傳位置；縮排的階段是 open 或 read 的組成部分（watch 為手錶處理各頁的時間，transfer 為藍牙傳輸與手機解析）；read、save 和 ack 為各次之和。</string>
+    <string name="diagnostics_sync_timing_note">checkpoint 為讀取續傳位置；縮排的階段是 open 或 read 的組成部分（watch 為手錶處理各頁的時間，queued 為請求等待手錶預讀下一頁的時間，transfer 為藍牙傳輸與手機解析）；read、save 和 ack 為各次之和。</string>
     <string name="diagnostics_sync_started">開始時間</string>
     <string name="diagnostics_sync_total">總耗時</string>
     <string name="diagnostics_sync_timing_empty">應用程式啟動後還沒有完成過同步。</string>

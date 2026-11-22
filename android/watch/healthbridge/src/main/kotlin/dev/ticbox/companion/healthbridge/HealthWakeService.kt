@@ -14,8 +14,10 @@ import dev.ticbox.companion.protocol.*
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.concurrent.thread
 import kotlinx.serialization.json.*
 
 /** GMS starts this background listener on a matching direct MessageApi event, even without an Activity. */
@@ -53,15 +55,27 @@ class HealthWakeService : WearableListenerService() {
                     if (!MessageDigest.isEqual(token.toByteArray(Charsets.UTF_8), supplied.toByteArray(Charsets.UTF_8))) return@use
                     window.touch(60_000)
                     LocalHealthProtocol.write(socket.outputStream, JsonObject(LocalHealthProtocol.ready(reader.tables) + ("journalVersion" to JsonPrimitive(1))))
+                    // Requests are read on their own thread, so a reply can say how long its request waited while this
+                    // side read ahead; that wait is neither Bluetooth nor work on the request.
+                    val arrivals = LinkedBlockingQueue<Result<Pair<JsonObject, Long>?>>()
+                    thread(isDaemon = true, name = "TicBoxHealthRequests") {
+                        try {
+                            do {
+                                val next = LocalHealthProtocol.read(socket.inputStream)
+                                arrivals.put(Result.success(next?.let { it to SystemClock.elapsedRealtime() }))
+                            } while (next != null)
+                        } catch (problem: Exception) { arrivals.put(Result.failure(problem)) }
+                    }
                     // One connection serves every table; the window ends when the phone closes it.
                     while (!cancellation.isCanceled) {
-                        val request = LocalHealthProtocol.read(socket.inputStream) ?: return
+                        val (request, arrived) = arrivals.take().getOrThrow() ?: return
                         if (request.text("op") !in setOf("changes", "ack", "journal")) continue
                         val started = SystemClock.elapsedRealtime()
                         val handled = if (request.text("op") == "journal") RootHealthJournalReader(applicationContext).control(request, cancellation)
                             else reader.handle(request, cancellation)
                         // Lets the phone tell this side's work from the Bluetooth transfer in its sync timing.
-                        val page = JsonObject(handled + ("watchMillis" to JsonPrimitive(SystemClock.elapsedRealtime() - started)))
+                        val page = JsonObject(handled + ("watchMillis" to JsonPrimitive(SystemClock.elapsedRealtime() - started)) +
+                            ("queuedMillis" to JsonPrimitive((started - arrived).coerceAtLeast(0))))
                         if (request.text("op") == "journal" && request.text("action") in setOf("enable", "disable") &&
                             (page.text("error") == null || request.text("action") == "disable")) reader.invalidateJournal(request.text("source")!!)
                         LocalHealthProtocol.write(socket.outputStream, page, zlib = request.text("compression") == LocalHealthProtocol.ZLIB)
@@ -69,7 +83,8 @@ class HealthWakeService : WearableListenerService() {
                         if (request.text("op") == "changes") {
                             pages++; rows += (page["rows"] as? JsonArray)?.size ?: 0
                             Log.i(TAG, "Local changes sent; pages=$pages rows=$rows scanned=${page.number("scannedRows") ?: 0} " +
-                                "partial=${page.flag("partial") == true} error=${page.text("error") ?: "none"} millis=${page.number("watchMillis")} ${reader.lastStages}")
+                                "partial=${page.flag("partial") == true} error=${page.text("error") ?: "none"} millis=${page.number("watchMillis")} " +
+                                "queued=${page.number("queuedMillis")} ${reader.lastStages}")
                             // While this reply travels and the phone saves it, read the rows of the next one.
                             if (page.text("error") == null && page.flag("complete") != true) reader.prefetch(request, cancellation)
                         }

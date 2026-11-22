@@ -253,7 +253,9 @@ class LocalHealthSyncEngine(scope: CoroutineScope, private val store: LocalHealt
                             // The watch says how long it worked on the page; the rest went to Bluetooth and parsing here.
                             page.watchMillis?.let { watch ->
                                 stopwatch.add(stage, "watch", watch)
-                                stopwatch.add(stage, "transfer", (elapsedMillis() - readStarted - watch).coerceAtLeast(0))
+                                // The request waited on the watch while it read the next rows ahead; not Bluetooth time.
+                                val queued = page.queuedMillis?.also { stopwatch.add(stage, "queued", it) } ?: 0
+                                stopwatch.add(stage, "transfer", (elapsedMillis() - readStarted - watch - queued).coerceAtLeast(0))
                             }
                             if (page.error != null) {
                                 // Remote errors are identifiers, never copy remote exception text into diagnostics/UI.

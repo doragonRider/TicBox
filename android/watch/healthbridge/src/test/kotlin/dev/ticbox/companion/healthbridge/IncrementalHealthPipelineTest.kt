@@ -261,7 +261,7 @@ class IncrementalHealthPipelineTest {
         val next = ledger.batch(receiver, table, capture)
         assertEquals("second", LocalHealthProtocol.page(next).rows.single().text("values"))
         ledger.acknowledge(receiver, table, first.text("batch")!!)
-        assertEquals(next, ledger.batch(receiver, table, capture))
+        assertEquals(next.toString(), ledger.batch(receiver, table, capture).toString())
     }
 
     @Test fun persistedOutboxIsDeliveredEvenIfTheNextSourceReadIsDenied() {

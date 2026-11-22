@@ -9,7 +9,12 @@ import kotlinx.serialization.json.*
 
 /** Only query(), fixed local authorities/tables; never accepts caller-supplied SQL or URIs. */
 class HealthProviderReader(private val resolver: ContentResolver, private val providerVersion: String? = null,
-    private val sportProviderVersion: String? = null) {
+    private val sportProviderVersion: String? = null,
+    /**
+     * Whether a page goes out as it is and must fit one frame. Incremental sync keeps rows in its ledger and bounds its own
+     * batches, so it skips measuring every row here.
+     */
+    private val framed: Boolean = true) {
     fun page(request: JsonObject, cancellation: CancellationSignal = CancellationSignal()): JsonObject { return try {
         val table = LocalHealthTable.entries.firstOrNull { it.wireName == request.text("table") }
             ?: return error("unsupported_table")
@@ -37,13 +42,16 @@ class HealthProviderReader(private val resolver: ContentResolver, private val pr
                     if (rows.size == limit) { complete = false; break }
                     val id = cursor.healthRowId()
                     val row = cursor.healthRawRow(id, table)
-                    val size = row.toString().toByteArray(Charsets.UTF_8).size
-                    // Leave room for framing metadata. Defer a large row to the next page, never silently skip it.
-                    if (bytes + size > LocalHealthProtocol.MAX_FRAME_BYTES - 8192) {
-                        if (rows.isEmpty()) return error("row_exceeds_budget")
-                        complete = false; break
+                    if (framed) {
+                        val size = row.toString().toByteArray(Charsets.UTF_8).size
+                        // Leave room for framing metadata. Defer a large row to the next page, never silently skip it.
+                        if (bytes + size > LocalHealthProtocol.MAX_FRAME_BYTES - 8192) {
+                            if (rows.isEmpty()) return error("row_exceeds_budget")
+                            complete = false; break
+                        }
+                        bytes += size
                     }
-                    rows += row; bytes += size; lastId = id
+                    rows += row; lastId = id
                 }
                 response(session?.expand(rows, request, cancellation) ?: rows, lastId, upper, complete)
             }
